@@ -1,4 +1,5 @@
 #include "sandbox-wrap.h"
+#include "sandbox-worker.h"
 
 #include <iostream>
 #include <memory>
@@ -46,9 +47,11 @@ NAN_METHOD(SandboxWrap::New) {
 NAN_METHOD(SandboxWrap::Run) {
   const char *code = *Nan::Utf8String(info[0]);
 
-  auto sandbox = std::unique_ptr<Sandbox>(new Sandbox);
+  SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
 
-  std::string result = sandbox->RunInSandbox(code);
+  Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
 
-  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+  Nan::AsyncQueueWorker(new SandboxWorker(callback, sandbox, code));
+
+  info.GetReturnValue().Set(info.This());
 }

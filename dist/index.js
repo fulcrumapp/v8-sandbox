@@ -13,9 +13,11 @@ class Sandbox {
     this.id = ++nextObjectID;
   }
 
-  run(code, timeout) {
-    // run
-    return 1;
+  run(code, callback) {
+    return this._native.run(code, result => {
+      console.log('finished!', result);
+      callback(result);
+    });
   }
 }
 exports.Sandbox = Sandbox;

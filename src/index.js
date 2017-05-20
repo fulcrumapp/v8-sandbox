@@ -8,7 +8,7 @@ export class Sandbox {
     this.id = ++nextObjectID;
   }
 
-  run(code, timeout) {
-    return this._native.run(code);
+  run(code, callback) {
+    return this._native.run(code, callback);
   }
 }
