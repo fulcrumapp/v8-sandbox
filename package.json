@@ -6,13 +6,13 @@
   "main": "dist/index.js",
   "scripts": {
     "configure": "./node_modules/node-gyp/bin/node-gyp.js configure",
-    "build": "./node_modules/node-gyp/bin/node-gyp.js configure build && node_modules/.bin/babel src --out-dir dist --source-maps",
+    "build": "./node_modules/node-gyp/bin/node-gyp.js configure build && node_modules/.bin/babel lib --out-dir dist --source-maps",
     "rebuild": "./node_modules/node-gyp/bin/node-gyp.js configure rebuild",
     "test": "mocha test/setup.js test/index.js",
     "clean": "rm -rf dist build",
-    "lint": "eslint 'src/**/*.js'",
+    "lint": "eslint 'lib/**/*.js'",
     "install": "node-pre-gyp install --fallback-to-build",
-    "watch": "babel src --out-dir dist --source-maps --watch"
+    "watch": "babel lib --out-dir dist --source-maps --watch"
   },
   "author": "Zac McCormick <zac.mccormick@gmail.com> (http://github.com/zhm)",
   "license": "BSD",
@@ -44,7 +44,8 @@
     "generic-pool": "^2.4.2",
     "nan": "^2.3.3",
     "node-gyp": "^3.3.1",
-    "node-pre-gyp": "^0.6.34"
+    "node-pre-gyp": "^0.6.34",
+    "request": "^2.81.0"
   },
   "binary": {
     "module_name": "sandbox",

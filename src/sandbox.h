@@ -26,6 +26,7 @@ struct AsyncCallBaton {
   uv_mutex_t *mutex;
   uv_cond_t *condition;
   void *sandboxCallback;
+  std::string name;
   std::string sandboxArguments;
   std::string sandboxResult;
 };

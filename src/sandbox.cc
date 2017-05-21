@@ -197,6 +197,7 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
   Nan::SetPrivate(argumentObject, Nan::New("baton").ToLocalChecked(), External::New(nodeIsolate, baton));
   Nan::SetMethod(argumentObject, "callback", AsyncNodeCallback);
   Nan::Set(argumentObject, Nan::New("args").ToLocalChecked(), Nan::New(baton->sandboxArguments.c_str()).ToLocalChecked());
+  Nan::Set(argumentObject, Nan::New("name").ToLocalChecked(), Nan::New(baton->name.c_str()).ToLocalChecked());
 
   Local<Value> argv[] = {
     argumentObject
@@ -216,6 +217,7 @@ NAN_METHOD(Sandbox::HttpRequest) {
 
   auto baton = new AsyncCallBaton();
 
+  baton->name = "httpRequest";
   baton->sandbox = sandbox;
   baton->sandboxCallback = persistentCallback;
   baton->sandboxArguments = options;

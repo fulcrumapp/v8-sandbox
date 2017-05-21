@@ -2,7 +2,7 @@ const char *SandboxRuntime = R"JSRUNTIME(
 (function() {
 
 global.httpRequest = (options, callback) => {
-  const parameters = [ JSON.stringify(options) ];
+  const parameters = [ JSON.stringify([ options ]) ];
 
   if (callback) {
     const wrappedCallback = (args) => {
@@ -18,7 +18,7 @@ global.httpRequest = (options, callback) => {
 };
 
 global.setResult = (result) => {
-  return global._setResult(JSON.stringify(result));
+  return global._setResult(result != null ? JSON.stringify(result) : null);
 };
 
 global.setTimeout = (callback, timeout) => {

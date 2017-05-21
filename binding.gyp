@@ -2,11 +2,11 @@
   "targets": [
     {
       "target_name": "sandbox",
-      "sources": [ "addon.cc",
-                   "sandbox.cc",
-                   "sandbox-runtime.cc",
-                   "sandbox-worker.cc",
-                   "sandbox-wrap.cc" ],
+      "sources": [ "src/addon.cc",
+                   "src/sandbox.cc",
+                   "src/sandbox-runtime.cc",
+                   "src/sandbox-worker.cc",
+                   "src/sandbox-wrap.cc" ],
       "include_dirs": [
         "<!(node -e \"require('nan')\")"
 			],
