@@ -9,9 +9,6 @@ const run = (code, callback) => {
 const jsAsync = `
 httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'}, (err, res, body) => {
   setResult(body);
-// setTimeout(() => {
-//   setResult(1337);
-// }, 1000);
 });
 `;
 

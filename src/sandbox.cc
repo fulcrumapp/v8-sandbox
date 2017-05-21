@@ -45,6 +45,8 @@ void Sandbox::RunIsolate(const char *code) {
   Nan::SetMethod(context->Global(), "_setResult", SetResult);
   Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
   Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
+  Nan::SetMethod(context->Global(), "_log", ConsoleLog);
+  Nan::SetMethod(context->Global(), "_error", ConsoleError);
 
   std::string js = std::string(SandboxRuntime) + code;
 
@@ -207,63 +209,101 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 }
 
 NAN_METHOD(Sandbox::HttpRequest) {
-  const char *options = *Nan::Utf8String(info[0]);
+  const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
   bool synchronous = info[1]->IsNull() || info[1]->IsUndefined();
 
-  auto persistentCallback = new Nan::Persistent<Function>(info[1].As<v8::Function>());
+  if (synchronous) {
+    std::string result = sandbox->DispatchSync("httpRequest", arguments);
+    info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+  } else {
+    sandbox->DispatchAsync("httpRequest", arguments, info[1].As<v8::Function>());
+  }
+}
+
+void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Function> callback) {
+  auto persistentCallback = new Nan::Persistent<Function>(callback);
 
   auto baton = new AsyncCallBaton();
 
-  baton->name = "httpRequest";
-  baton->sandbox = sandbox;
+  baton->name = name;
+  baton->sandbox = this;
   baton->sandboxCallback = persistentCallback;
-  baton->sandboxArguments = options;
+  baton->sandboxArguments = arguments;
+  baton->mutex = nullptr;
+  baton->condition = nullptr;
 
   // wake up the nodejs loop
   uv_async_t *async = new uv_async_t;
   uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
   async->data = baton;
 
-  baton->sandboxAsync = nullptr;
-
-  if (!synchronous) {
-    uv_async_t *sandboxAsync = new uv_async_t;
-    uv_async_init(sandbox->loop_, sandboxAsync, OnEndNodeInvocation);
-    baton->sandboxAsync = sandboxAsync;
-    sandboxAsync->data = baton;
-  }
-
-  baton->mutex = nullptr;
-  baton->condition = nullptr;
-
-  if (synchronous) {
-    baton->mutex = new uv_mutex_t;
-    baton->condition = new uv_cond_t;
-
-    uv_mutex_init(baton->mutex);
-    uv_cond_init(baton->condition);
-
-  }
+  uv_async_t *sandboxAsync = new uv_async_t;
+  uv_async_init(loop_, sandboxAsync, OnEndNodeInvocation);
+  baton->sandboxAsync = sandboxAsync;
+  sandboxAsync->data = baton;
 
   uv_async_send(async);
+}
 
-  if (synchronous) {
-    uv_mutex_lock(baton->mutex);
-    uv_cond_wait(baton->condition, baton->mutex);
-    uv_mutex_unlock(baton->mutex);
+std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
+  auto baton = new AsyncCallBaton();
 
-    uv_mutex_destroy(baton->mutex);
-    uv_cond_destroy(baton->condition);
+  baton->name = name;
+  baton->sandbox = this;
+  baton->sandboxArguments = arguments;
 
-    std::string result = baton->sandboxResult;
+  // wake up the nodejs loop
+  uv_async_t *async = new uv_async_t;
 
-    delete baton;
+  async->data = baton;
 
-    info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
-  }
+  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
+
+  baton->sandboxAsync = nullptr;
+  baton->mutex = new uv_mutex_t;
+  baton->condition = new uv_cond_t;
+
+  uv_mutex_init(baton->mutex);
+  uv_cond_init(baton->condition);
+
+  // dispatch the actual call on the node message loop
+  uv_async_send(async);
+
+  uv_mutex_lock(baton->mutex);
+  uv_cond_wait(baton->condition, baton->mutex);
+  uv_mutex_unlock(baton->mutex);
+
+  uv_mutex_destroy(baton->mutex);
+  uv_cond_destroy(baton->condition);
+
+  std::string result = baton->sandboxResult;
+
+  delete baton;
+
+  return result;
+}
+
+NAN_METHOD(Sandbox::ConsoleError) {
+  const char *arguments = *Nan::Utf8String(info[0]);
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  std::string result = sandbox->DispatchSync("error", arguments);
+
+  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+}
+
+NAN_METHOD(Sandbox::ConsoleLog) {
+  const char *arguments = *Nan::Utf8String(info[0]);
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  std::string result = sandbox->DispatchSync("log", arguments);
+
+  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
 void Sandbox::Dispose() {
