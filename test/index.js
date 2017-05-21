@@ -10,9 +10,11 @@ const run = (code, callback) => {
 describe('sandbox', () => {
   it('should execute javascript', (done) => {
     const js = `
-setTimeout(() => {
-  setResult(1337);
-}, 1000);
+httpRequest(JSON.stringify({url: ''}), (err, res, body) => {
+  // setTimeout(() => {
+  //   setResult(1337);
+  // }, 1000);
+});
 `;
 
     run(js, (err, result) => {

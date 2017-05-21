@@ -15,7 +15,7 @@ SandboxWorker::~SandboxWorker()
 void SandboxWorker::Execute() {
   Sandbox box;
 
-  result_ = box.RunInSandbox(code_.c_str());
+  result_ = box.RunInSandbox(code_.c_str(), sandbox_);
 }
 
 void SandboxWorker::HandleOKCallback() {

@@ -9,6 +9,16 @@ export class Sandbox {
   }
 
   run(code, callback) {
-    return this._native.run(code, callback);
+    return this._native.run(code, (err, res) => {
+      callback(err, JSON.parse(res));
+    }, this.dispatch.bind(this));
+  }
+
+  dispatch(object) {
+    const finish = (...args) => {
+      object.callback(object, JSON.stringify(args));
+    };
+
+    finish(null, null, 'response data');
   }
 }

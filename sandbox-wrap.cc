@@ -51,6 +51,8 @@ NAN_METHOD(SandboxWrap::Run) {
 
   Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
 
+  sandbox->bridge_.Reset(info[2].As<v8::Function>());
+
   Nan::AsyncQueueWorker(new SandboxWorker(callback, sandbox, code));
 
   info.GetReturnValue().Set(info.This());

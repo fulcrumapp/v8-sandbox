@@ -8,6 +8,7 @@ class SandboxWrap : public Nan::ObjectWrap {
 public:
   static void Init(v8::Local<v8::Object> exports);
 
+  Nan::Persistent<v8::Function>& GetBridge() { return bridge_; }
 private:
   explicit SandboxWrap();
 
@@ -16,6 +17,8 @@ private:
   static NAN_METHOD(New);
 
   static NAN_METHOD(Run);
+
+  Nan::Persistent<v8::Function> bridge_;
 
   static Nan::Persistent<v8::Function> constructor;
 };

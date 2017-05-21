@@ -1,6 +1,11 @@
 #include <uv.h>
 #include "sandbox.h"
+#include "sandbox-wrap.h"
 #include <iostream>
+
+void Debug(const char *msg) {
+  std::cout << msg << std::endl;
+}
 
 Sandbox::Sandbox()
 : params_(),
@@ -37,17 +42,22 @@ void Sandbox::RunIsolate(const char *code) {
   Nan::SetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked(), External::New(isolate_, this));
 
   Nan::Set(context->Global(), Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(context->Global(), "setResult", SetResult);
-  Nan::SetMethod(context->Global(), "setTimeout", SetTimeout);
+  Nan::SetMethod(context->Global(), "_setResult", SetResult);
+  Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
+  Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
 
-  Local<String> source = Nan::New(code).ToLocalChecked();
+  std::string js = std::string(SandboxRuntime) + code;
+
+  Local<String> source = Nan::New(js.c_str()).ToLocalChecked();
 
   Local<Script> script = Script::Compile(context, source).ToLocalChecked();
 
   (void)script->Run(context);
 }
 
-std::string Sandbox::RunInSandbox(const char *code) {
+std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
+  wrap_ = wrap;
+
   loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 
   uv_loop_init(loop_);
@@ -81,6 +91,10 @@ NAN_METHOD(Sandbox::SetResult) {
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
   sandbox->result_ = *value;
+}
+
+void Sandbox::OnHandleClose(uv_handle_t *handle) {
+  delete handle;
 }
 
 void HandleTimer(uv_timer_t *handle) {
@@ -118,6 +132,97 @@ NAN_METHOD(Sandbox::SetTimeout) {
   timer->data = new Baton(sandbox, persistentCallback);
 
   uv_timer_start(timer, HandleTimer, timeout, 0);
+}
+
+NAN_METHOD(Sandbox::AsyncNodeCallback) {
+  auto object = Nan::To<Object>(info[0]).ToLocalChecked();
+  const char *result = *Nan::Utf8String(info[1]);
+
+  auto hidden = Nan::GetPrivate(object, Nan::New("baton").ToLocalChecked()).ToLocalChecked();
+
+  Local<External> field = Local<External>::Cast(hidden);
+
+  AsyncCallBaton *baton = (AsyncCallBaton *)field->Value();
+
+  baton->sandboxResult = result;
+
+  // signal the sandbox to wake up to process the result
+  uv_async_send(baton->sandboxAsync);
+}
+
+void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
+  AsyncCallBaton *baton = (AsyncCallBaton *)handle->data;
+
+  Nan::Persistent<Function> *callback = (Nan::Persistent<Function> *)baton->sandboxCallback;
+
+  // enter the node isolate
+  Isolate *sandboxIsolate = baton->sandbox->GetIsolate();
+
+  HandleScope scope(sandboxIsolate);
+
+  Local<Function> cb = Nan::New(callback->As<Function>());
+
+  uv_close((uv_handle_t *)handle, OnHandleClose);
+
+  Local<Value> argv[] = {
+    Nan::New(baton->sandboxResult).ToLocalChecked()
+  };
+
+  delete baton;
+
+  (void)cb->Call(sandboxIsolate->GetCurrentContext(), sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
+}
+
+void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
+  AsyncCallBaton *baton = (AsyncCallBaton *)handle->data;
+
+  // enter the node isolate
+  Isolate *nodeIsolate = Isolate::GetCurrent();
+
+  HandleScope scope(nodeIsolate);
+
+  Local<Function> cb = Nan::New(baton->sandbox->GetWrap()->GetBridge().As<Function>());
+
+  uv_close((uv_handle_t *)handle, OnHandleClose);
+
+  auto argumentObject = Nan::New<v8::Object>();
+
+  Nan::SetPrivate(argumentObject, Nan::New("baton").ToLocalChecked(), External::New(nodeIsolate, baton));
+  Nan::SetMethod(argumentObject, "callback", AsyncNodeCallback);
+  Nan::Set(argumentObject, Nan::New("args").ToLocalChecked(), Nan::New(baton->sandboxArguments.c_str()).ToLocalChecked());
+
+  Local<Value> argv[] = {
+    argumentObject
+  };
+
+  (void)cb->Call(nodeIsolate->GetCurrentContext(), nodeIsolate->GetCurrentContext()->Global(), 1, argv);
+}
+
+NAN_METHOD(Sandbox::HttpRequest) {
+  const char *options = *Nan::Utf8String(info[0]);
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  auto persistentCallback = new Nan::Persistent<Function>(info[1].As<v8::Function>());
+
+  // wake up the nodejs loop
+  uv_async_t *async = new uv_async_t;
+  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
+
+  uv_async_t *sandboxAsync = new uv_async_t;
+  uv_async_init(sandbox->loop_, sandboxAsync, OnEndNodeInvocation);
+
+  auto baton = new AsyncCallBaton();
+
+  baton->sandbox = sandbox;
+  baton->sandboxAsync = sandboxAsync;
+  baton->sandboxCallback = persistentCallback;
+  baton->sandboxArguments = options;
+
+  async->data = baton;
+  sandboxAsync->data = baton;
+
+  uv_async_send(async);
 }
 
 void Sandbox::Dispose() {

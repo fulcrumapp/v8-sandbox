@@ -3,9 +3,12 @@
 
 #include <nan.h>
 
+extern const char *SandboxRuntime;
+
 using namespace v8;
 
 class Sandbox;
+class SandboxWrap;
 
 struct Baton {
   Baton(Sandbox *sandbox, void *data) {
@@ -17,13 +20,21 @@ struct Baton {
   void *data_;
 };
 
+struct AsyncCallBaton {
+  Sandbox *sandbox;
+  uv_async_t *sandboxAsync;
+  void *sandboxCallback;
+  std::string sandboxArguments;
+  std::string sandboxResult;
+};
+
 class Sandbox {
 public:
   Sandbox();
 
   ~Sandbox();
 
-  std::string RunInSandbox(const char *code);
+  std::string RunInSandbox(const char *code, SandboxWrap *wrap);
 
   Isolate *GetIsolate() { return isolate_; }
 
@@ -31,10 +42,22 @@ public:
 
   Nan::Persistent<Object> *GetGlobal() { return global_; }
 
+  SandboxWrap *GetWrap() { return wrap_; }
+
 private:
   static NAN_METHOD(SetResult);
 
   static NAN_METHOD(SetTimeout);
+
+  static NAN_METHOD(HttpRequest);
+
+  static NAN_METHOD(AsyncNodeCallback);
+
+  static void OnStartNodeInvocation(uv_async_t *handle);
+
+  static void OnEndNodeInvocation(uv_async_t *handle);
+
+  static void OnHandleClose(uv_handle_t *handle);
 
   void Dispose();
 
@@ -53,6 +76,8 @@ private:
   std::string result_;
 
   uv_loop_t *loop_;
+
+  SandboxWrap *wrap_;
 };
 
 #endif
