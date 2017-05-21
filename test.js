@@ -7,7 +7,7 @@ const run = (code, callback) => {
   return sandbox.run(code, callback);
 };
 
-const js = `
+const jsAsync = `
 httpRequest({url: ''}, (err, res, body) => {
   setResult(body);
 // setTimeout(() => {
@@ -16,7 +16,17 @@ httpRequest({url: ''}, (err, res, body) => {
 });
 `;
 
+const js = `
+const [err, res, body] = httpRequest({url: ''});
+setResult(body);
+`;
+
+run(jsAsync, (err, result) => {
+  assert.equal(result, 'response data');
+  console.log('success!');
+});
+
 run(js, (err, result) => {
-  assert.equal(result, 1337);
-  setTimeout(done, 20);
+  assert.equal(result, 'response data');
+  console.log('success!');
 });

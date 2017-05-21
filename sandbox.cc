@@ -146,8 +146,15 @@ NAN_METHOD(Sandbox::AsyncNodeCallback) {
 
   baton->sandboxResult = result;
 
-  // signal the sandbox to wake up to process the result
-  uv_async_send(baton->sandboxAsync);
+  if (baton->condition) {
+    // signal the wait condition to end the synchronous call on the other thread
+    uv_mutex_lock(baton->mutex);
+    uv_cond_signal(baton->condition);
+    uv_mutex_unlock(baton->mutex);
+  } else {
+    // signal the sandbox to wake up to process the result
+    uv_async_send(baton->sandboxAsync);
+  }
 }
 
 void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
@@ -155,7 +162,7 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 
   Nan::Persistent<Function> *callback = (Nan::Persistent<Function> *)baton->sandboxCallback;
 
-  // enter the node isolate
+  // enter the sandbox isolate
   Isolate *sandboxIsolate = baton->sandbox->GetIsolate();
 
   HandleScope scope(sandboxIsolate);
@@ -203,26 +210,58 @@ NAN_METHOD(Sandbox::HttpRequest) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
+  bool synchronous = info[1]->IsNull() || info[1]->IsUndefined();
+
   auto persistentCallback = new Nan::Persistent<Function>(info[1].As<v8::Function>());
-
-  // wake up the nodejs loop
-  uv_async_t *async = new uv_async_t;
-  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
-
-  uv_async_t *sandboxAsync = new uv_async_t;
-  uv_async_init(sandbox->loop_, sandboxAsync, OnEndNodeInvocation);
 
   auto baton = new AsyncCallBaton();
 
   baton->sandbox = sandbox;
-  baton->sandboxAsync = sandboxAsync;
   baton->sandboxCallback = persistentCallback;
   baton->sandboxArguments = options;
 
+  // wake up the nodejs loop
+  uv_async_t *async = new uv_async_t;
+  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
   async->data = baton;
-  sandboxAsync->data = baton;
+
+  baton->sandboxAsync = nullptr;
+
+  if (!synchronous) {
+    uv_async_t *sandboxAsync = new uv_async_t;
+    uv_async_init(sandbox->loop_, sandboxAsync, OnEndNodeInvocation);
+    baton->sandboxAsync = sandboxAsync;
+    sandboxAsync->data = baton;
+  }
+
+  baton->mutex = nullptr;
+  baton->condition = nullptr;
+
+  if (synchronous) {
+    baton->mutex = new uv_mutex_t;
+    baton->condition = new uv_cond_t;
+
+    uv_mutex_init(baton->mutex);
+    uv_cond_init(baton->condition);
+
+  }
 
   uv_async_send(async);
+
+  if (synchronous) {
+    uv_mutex_lock(baton->mutex);
+    uv_cond_wait(baton->condition, baton->mutex);
+    uv_mutex_unlock(baton->mutex);
+
+    uv_mutex_destroy(baton->mutex);
+    uv_cond_destroy(baton->condition);
+
+    std::string result = baton->sandboxResult;
+
+    delete baton;
+
+    info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+  }
 }
 
 void Sandbox::Dispose() {

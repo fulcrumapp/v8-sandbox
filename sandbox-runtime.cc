@@ -2,15 +2,19 @@ const char *SandboxRuntime = R"JSRUNTIME(
 (function() {
 
 global.httpRequest = (options, callback) => {
-  if (typeof callback !== 'function') {
-    throw new Error('callback must be a function');
+  const parameters = [ JSON.stringify(options) ];
+
+  if (callback) {
+    const wrappedCallback = (args) => {
+      callback.apply(null, JSON.parse(args));
+    };
+
+    parameters.push(wrappedCallback);
   }
 
-  const wrappedCallback = (args) => {
-    callback.apply(null, JSON.parse(args));
-  };
+  const result = global._httpRequest.apply(global, parameters);
 
-  return global._httpRequest(JSON.stringify(options), wrappedCallback);
+  return result != null ? JSON.parse(result) : null;
 };
 
 global.setResult = (result) => {

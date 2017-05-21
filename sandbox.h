@@ -23,6 +23,8 @@ struct Baton {
 struct AsyncCallBaton {
   Sandbox *sandbox;
   uv_async_t *sandboxAsync;
+  uv_mutex_t *mutex;
+  uv_cond_t *condition;
   void *sandboxCallback;
   std::string sandboxArguments;
   std::string sandboxResult;
