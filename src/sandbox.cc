@@ -1,11 +1,14 @@
 #include <uv.h>
 #include "sandbox.h"
 #include "sandbox-wrap.h"
+#include "timer.h"
 #include <iostream>
 
 void Debug(const char *msg) {
   std::cout << msg << std::endl;
 }
+
+static int nextTimerID = 0;
 
 Sandbox::Sandbox()
 : params_(),
@@ -13,7 +16,9 @@ Sandbox::Sandbox()
   locker_(nullptr),
   context_(nullptr),
   global_(nullptr),
-  loop_(nullptr)
+  result_("null"),
+  loop_(nullptr),
+  timers_()
 {
   params_.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
 
@@ -44,6 +49,7 @@ void Sandbox::RunIsolate(const char *code) {
   Nan::Set(context->Global(), Nan::New("global").ToLocalChecked(), context->Global());
   Nan::SetMethod(context->Global(), "_setResult", SetResult);
   Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
+  Nan::SetMethod(context->Global(), "_clearTimeout", ClearTimeout);
   Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
   Nan::SetMethod(context->Global(), "_log", ConsoleLog);
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
@@ -69,6 +75,7 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
   uv_run(loop_, UV_RUN_DEFAULT);
   uv_loop_close(loop_);
   free(loop_);
+  loop_ = nullptr;
 
   Dispose();
 
@@ -99,8 +106,8 @@ void Sandbox::OnHandleClose(uv_handle_t *handle) {
   delete handle;
 }
 
-void HandleTimer(uv_timer_t *handle) {
-  Baton *baton = (Baton *)handle->data;
+void Sandbox::OnTimer(Timer *timer) {
+  Baton *baton = (Baton *)timer->GetData();
 
   Nan::Persistent<Function> *callback = (Nan::Persistent<Function> *)baton->data_;
 
@@ -112,12 +119,29 @@ void HandleTimer(uv_timer_t *handle) {
   Local<Context> context = Nan::New(baton->sandbox_->GetContext()->As<Context>());
   Local<Object> global = Nan::New(baton->sandbox_->GetGlobal()->As<Object>());
 
-  delete baton;
-  delete handle;
+  /* delete baton; */
+
+  timer->Stop(OnTimerClosed);
+  /* delete timer; */
 
   (void)cb->Call(context, global, 0, 0);
 
   callback->Reset();
+}
+
+void Sandbox::OnTimerClosed(Timer *timer) {
+  Baton *baton = (Baton *)timer->GetData();
+
+  std::map<int, std::shared_ptr<Timer>> &timers = baton->sandbox_->timers_;
+
+  for (auto& item : baton->sandbox_->timers_) {
+    if (item.second.get() == timer) {
+      timers.erase(item.first);
+      break;
+    }
+  }
+
+  delete baton;
 }
 
 NAN_METHOD(Sandbox::SetTimeout) {
@@ -125,15 +149,38 @@ NAN_METHOD(Sandbox::SetTimeout) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  uv_timer_t *timer = new uv_timer_t;
-
-  uv_timer_init(sandbox->loop_, timer);
-
   auto persistentCallback = new Nan::Persistent<Function>(info[0].As<v8::Function>());
 
-  timer->data = new Baton(sandbox, persistentCallback);
+  auto baton = new Baton(sandbox, persistentCallback);
 
-  uv_timer_start(timer, HandleTimer, timeout, 0);
+  std::shared_ptr<Timer> timer(new Timer(sandbox->loop_, baton));
+
+  timer->Start(OnTimer, timeout, 0);
+
+  int timerID = ++nextTimerID;
+
+  sandbox->timers_[timerID] = timer;
+
+  info.GetReturnValue().Set(Nan::New(timerID));
+}
+
+NAN_METHOD(Sandbox::ClearTimeout) {
+  if (!info[0]->IsInt32()) {
+    Nan::ThrowTypeError("first argument must be an integer");
+    return;
+  }
+
+  auto timerID = Nan::To<int>(info[0]).FromJust();
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  std::map<int, std::shared_ptr<Timer>> &timers = sandbox->timers_;
+
+  auto iter = timers.find(timerID);
+
+  if (iter != timers.end()) {
+    (*iter).second->Stop(OnTimerClosed);
+  }
 }
 
 NAN_METHOD(Sandbox::AsyncNodeCallback) {
@@ -306,7 +353,47 @@ NAN_METHOD(Sandbox::ConsoleLog) {
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
+void Sandbox::Terminate() {
+  if (isolate_) {
+    CancelPendingOperations();
+
+    isolate_->TerminateExecution();
+
+    if (loop_) {
+      uv_stop(loop_);
+    }
+  }
+}
+
+void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
+  Sandbox *sandbox = (Sandbox *)handle->data;
+
+  for (auto &item : sandbox->timers_) {
+    item.second->Stop(OnTimerClosed);
+  }
+
+  uv_close((uv_handle_t *)handle, OnHandleClose);
+}
+
+void Sandbox::CancelPendingOperations() {
+  if (!loop_) {
+    return;
+  }
+
+  uv_async_t *cancel = new uv_async_t;
+  uv_async_init(loop_, cancel, OnCancelPendingOperations);
+  cancel->data = this;
+  uv_async_send(cancel);
+
+  /* for (auto &timer : timers_) { */
+  /*   timer->Stop(); */
+  /* } */
+  /* timers_.clear(); */
+}
+
 void Sandbox::Dispose() {
+  CancelPendingOperations();
+
   if (isolate_) {
     {
       HandleScope scope(isolate_);

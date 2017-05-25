@@ -1,4 +1,4 @@
-echo 'const char *SandboxRuntime = R"JSRUNTIME(\n(function() {' > sandbox-runtime.cc
-cat src/runtime.js >> sandbox-runtime.cc
-echo '})();\n)JSRUNTIME";' >> sandbox-runtime.cc
+echo 'const char *SandboxRuntime = R"JSRUNTIME(\n(function() {' > src/sandbox-runtime.cc
+cat lib/runtime.js >> src/sandbox-runtime.cc
+echo '})();\n)JSRUNTIME";' >> src/sandbox-runtime.cc
 

@@ -3,20 +3,28 @@
 
 #include <nan.h>
 #include <vector>
+#include "sandbox.h"
 
 class SandboxWrap : public Nan::ObjectWrap {
+  friend class SandboxExecuteWorker;
+  friend class SandboxTerminateWorker;
+
 public:
   static void Init(v8::Local<v8::Object> exports);
 
   Nan::Persistent<v8::Function>& GetBridge() { return bridge_; }
 private:
+  Sandbox *sandbox_;
+
   explicit SandboxWrap();
 
   ~SandboxWrap();
 
   static NAN_METHOD(New);
 
-  static NAN_METHOD(Run);
+  static NAN_METHOD(Execute);
+
+  static NAN_METHOD(Terminate);
 
   Nan::Persistent<v8::Function> bridge_;
 

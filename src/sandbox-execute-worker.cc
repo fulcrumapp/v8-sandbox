@@ -1,24 +1,26 @@
-#include "sandbox-worker.h"
+#include "sandbox-execute-worker.h"
 #include "sandbox.h"
 #include <iostream>
 
-SandboxWorker::SandboxWorker(Nan::Callback *callback, SandboxWrap *sandbox, const char *code)
+SandboxExecuteWorker::SandboxExecuteWorker(Nan::Callback *callback, SandboxWrap *sandbox, const char *code)
     : AsyncWorker(callback),
       sandbox_(sandbox),
       code_(code),
       result_()
 {}
 
-SandboxWorker::~SandboxWorker()
+SandboxExecuteWorker::~SandboxExecuteWorker()
 {}
 
-void SandboxWorker::Execute() {
+void SandboxExecuteWorker::Execute() {
   Sandbox box;
+
+  sandbox_->sandbox_ = &box;
 
   result_ = box.RunInSandbox(code_.c_str(), sandbox_);
 }
 
-void SandboxWorker::HandleOKCallback() {
+void SandboxExecuteWorker::HandleOKCallback() {
   Nan::HandleScope scope;
 
   v8::Local<v8::Value> argv[] = {

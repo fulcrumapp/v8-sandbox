@@ -1,7 +1,9 @@
 #ifndef __SANDBOX_H__
 #define __SANDBOX_H__
 
+#include <map>
 #include <nan.h>
+#include "timer.h"
 
 extern const char *SandboxRuntime;
 
@@ -47,10 +49,14 @@ public:
 
   SandboxWrap *GetWrap() { return wrap_; }
 
+  void Terminate();
+
 private:
   static NAN_METHOD(SetResult);
 
   static NAN_METHOD(SetTimeout);
+
+  static NAN_METHOD(ClearTimeout);
 
   static NAN_METHOD(HttpRequest);
 
@@ -66,11 +72,19 @@ private:
 
   static void OnHandleClose(uv_handle_t *handle);
 
+  static void OnCancelPendingOperations(uv_async_t *handle);
+
+  static void OnTimer(Timer *timer);
+
+  static void OnTimerClosed(Timer *timer);
+
   void DispatchAsync(const char *name, const char *arguments, Local<Function> callback);
 
   std::string DispatchSync(const char *name, const char *arguments);
 
   void Dispose();
+
+  void CancelPendingOperations();
 
   void RunIsolate(const char *code);
 
@@ -89,6 +103,8 @@ private:
   uv_loop_t *loop_;
 
   SandboxWrap *wrap_;
+
+  std::map<int, std::shared_ptr<Timer>> timers_;
 };
 
 #endif

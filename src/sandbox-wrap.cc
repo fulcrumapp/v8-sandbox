@@ -1,5 +1,6 @@
 #include "sandbox-wrap.h"
-#include "sandbox-worker.h"
+#include "sandbox-execute-worker.h"
+#include "sandbox-terminate-worker.h"
 
 #include <iostream>
 #include <memory>
@@ -24,7 +25,8 @@ void SandboxWrap::Init(v8::Local<v8::Object> exports) {
   tpl->SetClassName(Nan::New("Sandbox").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-  Nan::SetPrototypeMethod(tpl, "run", Run);
+  Nan::SetPrototypeMethod(tpl, "execute", Execute);
+  Nan::SetPrototypeMethod(tpl, "terminate", Terminate);
 
   constructor.Reset(tpl->GetFunction());
 
@@ -44,7 +46,7 @@ NAN_METHOD(SandboxWrap::New) {
   }
 }
 
-NAN_METHOD(SandboxWrap::Run) {
+NAN_METHOD(SandboxWrap::Execute) {
   const char *code = *Nan::Utf8String(info[0]);
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
@@ -53,7 +55,17 @@ NAN_METHOD(SandboxWrap::Run) {
 
   sandbox->bridge_.Reset(info[2].As<v8::Function>());
 
-  Nan::AsyncQueueWorker(new SandboxWorker(callback, sandbox, code));
+  Nan::AsyncQueueWorker(new SandboxExecuteWorker(callback, sandbox, code));
+
+  info.GetReturnValue().Set(info.This());
+}
+
+NAN_METHOD(SandboxWrap::Terminate) {
+  SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
+
+  Nan::Callback *callback = new Nan::Callback(info[0].As<v8::Function>());
+
+  Nan::AsyncQueueWorker(new SandboxTerminateWorker(callback, sandbox));
 
   info.GetReturnValue().Set(info.This());
 }
