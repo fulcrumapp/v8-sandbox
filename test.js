@@ -21,7 +21,7 @@ const timerID = setTimeout(() => {
 
 console.log('timerid', timerID);
 clearTimeout(timerID);
-// clearTimeout(timerID);
+clearTimeout(timerID);
 //while(true){};
 `;
 
@@ -30,7 +30,7 @@ clearTimeout(timerID);
 //   console.log('success!');
 // });
 
-run(js, 1000000, (err, result) => {
+run(js, 5000, (err, result) => {
   console.log('success!', err, result);
   assert.equal(result, 'hi there');
 });

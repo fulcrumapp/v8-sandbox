@@ -3,7 +3,7 @@
     {
       "target_name": "sandbox",
       "sources": [ "src/addon.cc",
-                   "src/timer.cc",
+                   "src/baton.cc",
                    "src/sandbox.cc",
                    "src/sandbox-runtime.cc",
                    "src/sandbox-execute-worker.cc",

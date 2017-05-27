@@ -1,14 +1,11 @@
 #include <uv.h>
 #include "sandbox.h"
 #include "sandbox-wrap.h"
-#include "timer.h"
 #include <iostream>
 
 void Debug(const char *msg) {
   std::cout << msg << std::endl;
 }
-
-static int nextTimerID = 0;
 
 Sandbox::Sandbox()
 : params_(),
@@ -106,37 +103,30 @@ void Sandbox::OnHandleClose(uv_handle_t *handle) {
   delete handle;
 }
 
-void Sandbox::OnTimer(Timer *timer) {
-  Baton *baton = (Baton *)timer->GetData();
+void Sandbox::OnTimer(uv_timer_t *timer) {
+  SandboxBaton *baton = (SandboxBaton *)timer->data;
 
-  Nan::Persistent<Function> *callback = (Nan::Persistent<Function> *)baton->data_;
-
-  Isolate *isolate = baton->sandbox_->GetIsolate();
+  Isolate *isolate = baton->instance->isolate_;
 
   HandleScope scope(isolate);
 
-  Local<Function> cb = Nan::New(callback->As<Function>());
-  Local<Context> context = Nan::New(baton->sandbox_->GetContext()->As<Context>());
-  Local<Object> global = Nan::New(baton->sandbox_->GetGlobal()->As<Object>());
+  Local<Function> cb = Nan::New(baton->callback->As<Function>());
+  Local<Context> context = Nan::New(baton->instance->context_->As<Context>());
+  Local<Object> global = Nan::New(baton->instance->global_->As<Object>());
 
-  /* delete baton; */
+  uv_timer_stop(timer);
 
-  timer->Stop(OnTimerClosed);
-  /* delete timer; */
+  uv_close((uv_handle_t *)timer, OnTimerClose);
 
   (void)cb->Call(context, global, 0, 0);
-
-  callback->Reset();
 }
 
-void Sandbox::OnTimerClosed(Timer *timer) {
-  Baton *baton = (Baton *)timer->GetData();
+void Sandbox::OnTimerClose(uv_handle_t *timer) {
+  SandboxBaton *baton = (SandboxBaton *)timer->data;
 
-  std::map<int, std::shared_ptr<Timer>> &timers = baton->sandbox_->timers_;
-
-  for (auto& item : baton->sandbox_->timers_) {
-    if (item.second.get() == timer) {
-      timers.erase(item.first);
+  for (auto& item : baton->instance->timers_) {
+    if (item.second.get() == (uv_timer_t *)timer) {
+      baton->instance->timers_.erase(item.first);
       break;
     }
   }
@@ -149,19 +139,20 @@ NAN_METHOD(Sandbox::SetTimeout) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  auto persistentCallback = new Nan::Persistent<Function>(info[0].As<v8::Function>());
+  auto persistentCallback = std::make_shared<Nan::Persistent<Function>>(info[0].As<v8::Function>());
 
-  auto baton = new Baton(sandbox, persistentCallback);
+  auto baton = new SandboxBaton(sandbox, persistentCallback);
 
-  std::shared_ptr<Timer> timer(new Timer(sandbox->loop_, baton));
+  std::shared_ptr<uv_timer_t> timer = std::make_shared<uv_timer_t>();
+  uv_timer_init(sandbox->loop_, timer.get());
+  timer->data = baton;
 
-  timer->Start(OnTimer, timeout, 0);
+  sandbox->timers_[baton->id] = timer;
+  sandbox->activeTimers_[baton->id] = timer;
 
-  int timerID = ++nextTimerID;
+  uv_timer_start(timer.get(), OnTimer, timeout, 0);
 
-  sandbox->timers_[timerID] = timer;
-
-  info.GetReturnValue().Set(Nan::New(timerID));
+  info.GetReturnValue().Set(Nan::New(baton->id));
 }
 
 NAN_METHOD(Sandbox::ClearTimeout) {
@@ -174,12 +165,14 @@ NAN_METHOD(Sandbox::ClearTimeout) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  std::map<int, std::shared_ptr<Timer>> &timers = sandbox->timers_;
+  TimerMap &timers = sandbox->activeTimers_;
 
   auto iter = timers.find(timerID);
 
   if (iter != timers.end()) {
-    (*iter).second->Stop(OnTimerClosed);
+    timers.erase((*iter).first);
+    uv_timer_stop((*iter).second.get());
+    uv_close((uv_handle_t *)((*iter).second.get()), OnTimerClose);
   }
 }
 
@@ -191,9 +184,9 @@ NAN_METHOD(Sandbox::AsyncNodeCallback) {
 
   Local<External> field = Local<External>::Cast(hidden);
 
-  AsyncCallBaton *baton = (AsyncCallBaton *)field->Value();
+  SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)field->Value();
 
-  baton->sandboxResult = result;
+  baton->result = result;
 
   if (baton->condition) {
     // signal the wait condition to end the synchronous call on the other thread
@@ -202,26 +195,24 @@ NAN_METHOD(Sandbox::AsyncNodeCallback) {
     uv_mutex_unlock(baton->mutex);
   } else {
     // signal the sandbox to wake up to process the result
-    uv_async_send(baton->sandboxAsync);
+    uv_async_send(baton->dispatchAsync);
   }
 }
 
 void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
-  AsyncCallBaton *baton = (AsyncCallBaton *)handle->data;
-
-  Nan::Persistent<Function> *callback = (Nan::Persistent<Function> *)baton->sandboxCallback;
+  SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)handle->data;
 
   // enter the sandbox isolate
-  Isolate *sandboxIsolate = baton->sandbox->GetIsolate();
+  Isolate *sandboxIsolate = baton->instance->isolate_;
 
   HandleScope scope(sandboxIsolate);
 
-  Local<Function> cb = Nan::New(callback->As<Function>());
+  Local<Function> cb = Nan::New(baton->callback->As<Function>());
 
   uv_close((uv_handle_t *)handle, OnHandleClose);
 
   Local<Value> argv[] = {
-    Nan::New(baton->sandboxResult).ToLocalChecked()
+    Nan::New(baton->result).ToLocalChecked()
   };
 
   delete baton;
@@ -230,14 +221,14 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 }
 
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
-  AsyncCallBaton *baton = (AsyncCallBaton *)handle->data;
+  SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)handle->data;
 
   // enter the node isolate
   Isolate *nodeIsolate = Isolate::GetCurrent();
 
   HandleScope scope(nodeIsolate);
 
-  Local<Function> cb = Nan::New(baton->sandbox->GetWrap()->GetBridge().As<Function>());
+  Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
   uv_close((uv_handle_t *)handle, OnHandleClose);
 
@@ -245,7 +236,7 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 
   Nan::SetPrivate(argumentObject, Nan::New("baton").ToLocalChecked(), External::New(nodeIsolate, baton));
   Nan::SetMethod(argumentObject, "callback", AsyncNodeCallback);
-  Nan::Set(argumentObject, Nan::New("args").ToLocalChecked(), Nan::New(baton->sandboxArguments.c_str()).ToLocalChecked());
+  Nan::Set(argumentObject, Nan::New("args").ToLocalChecked(), Nan::New(baton->arguments.c_str()).ToLocalChecked());
   Nan::Set(argumentObject, Nan::New("name").ToLocalChecked(), Nan::New(baton->name.c_str()).ToLocalChecked());
 
   Local<Value> argv[] = {
@@ -271,14 +262,12 @@ NAN_METHOD(Sandbox::HttpRequest) {
 }
 
 void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Function> callback) {
-  auto persistentCallback = new Nan::Persistent<Function>(callback);
+  auto cb = std::make_shared<Nan::Persistent<Function>>(callback);
 
-  auto baton = new AsyncCallBaton();
+  auto baton = new SandboxNodeInvocationBaton(this, cb);
 
   baton->name = name;
-  baton->sandbox = this;
-  baton->sandboxCallback = persistentCallback;
-  baton->sandboxArguments = arguments;
+  baton->arguments = arguments;
   baton->mutex = nullptr;
   baton->condition = nullptr;
 
@@ -287,20 +276,19 @@ void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Funct
   uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
   async->data = baton;
 
-  uv_async_t *sandboxAsync = new uv_async_t;
-  uv_async_init(loop_, sandboxAsync, OnEndNodeInvocation);
-  baton->sandboxAsync = sandboxAsync;
-  sandboxAsync->data = baton;
+  uv_async_t *dispatchAsync = new uv_async_t;
+  uv_async_init(loop_, dispatchAsync, OnEndNodeInvocation);
+  baton->dispatchAsync = dispatchAsync;
+  dispatchAsync->data = baton;
 
   uv_async_send(async);
 }
 
 std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
-  auto baton = new AsyncCallBaton();
+  auto baton = new SandboxNodeInvocationBaton(this, PersistentCallback());
 
   baton->name = name;
-  baton->sandbox = this;
-  baton->sandboxArguments = arguments;
+  baton->arguments = arguments;
 
   // wake up the nodejs loop
   uv_async_t *async = new uv_async_t;
@@ -309,7 +297,7 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
 
   uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
 
-  baton->sandboxAsync = nullptr;
+  baton->dispatchAsync = nullptr;
   baton->mutex = new uv_mutex_t;
   baton->condition = new uv_cond_t;
 
@@ -326,7 +314,7 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
   uv_mutex_destroy(baton->mutex);
   uv_cond_destroy(baton->condition);
 
-  std::string result = baton->sandboxResult;
+  std::string result = baton->result;
 
   delete baton;
 
@@ -369,7 +357,8 @@ void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
   Sandbox *sandbox = (Sandbox *)handle->data;
 
   for (auto &item : sandbox->timers_) {
-    item.second->Stop(OnTimerClosed);
+    uv_timer_stop(item.second.get());
+    uv_close((uv_handle_t *)item.second.get(), OnTimerClose);
   }
 
   uv_close((uv_handle_t *)handle, OnHandleClose);

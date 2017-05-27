@@ -3,7 +3,7 @@
 
 #include <map>
 #include <nan.h>
-#include "timer.h"
+#include "baton.h"
 
 extern const char *SandboxRuntime;
 
@@ -12,26 +12,8 @@ using namespace v8;
 class Sandbox;
 class SandboxWrap;
 
-struct Baton {
-  Baton(Sandbox *sandbox, void *data) {
-    sandbox_ = sandbox;
-    data_ = data;
-  }
-
-  Sandbox *sandbox_;
-  void *data_;
-};
-
-struct AsyncCallBaton {
-  Sandbox *sandbox;
-  uv_async_t *sandboxAsync;
-  uv_mutex_t *mutex;
-  uv_cond_t *condition;
-  void *sandboxCallback;
-  std::string name;
-  std::string sandboxArguments;
-  std::string sandboxResult;
-};
+typedef Baton<Sandbox> SandboxBaton;
+typedef NodeInvocationBaton<Sandbox> SandboxNodeInvocationBaton;
 
 class Sandbox {
 public:
@@ -40,14 +22,6 @@ public:
   ~Sandbox();
 
   std::string RunInSandbox(const char *code, SandboxWrap *wrap);
-
-  Isolate *GetIsolate() { return isolate_; }
-
-  Nan::Persistent<Context> *GetContext() { return context_; }
-
-  Nan::Persistent<Object> *GetGlobal() { return global_; }
-
-  SandboxWrap *GetWrap() { return wrap_; }
 
   void Terminate();
 
@@ -74,9 +48,9 @@ private:
 
   static void OnCancelPendingOperations(uv_async_t *handle);
 
-  static void OnTimer(Timer *timer);
+  static void OnTimer(uv_timer_t *handle);
 
-  static void OnTimerClosed(Timer *timer);
+  static void OnTimerClose(uv_handle_t *handle);
 
   void DispatchAsync(const char *name, const char *arguments, Local<Function> callback);
 
@@ -104,7 +78,13 @@ private:
 
   SandboxWrap *wrap_;
 
-  std::map<int, std::shared_ptr<Timer>> timers_;
+  typedef std::map<int, std::shared_ptr<uv_timer_t>> TimerMap;
+
+  // active timers are ones that are currently running
+  TimerMap activeTimers_;
+
+  // all timers, including ones that are still in the process of closing/shutting down
+  TimerMap timers_;
 };
 
 #endif
