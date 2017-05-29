@@ -25,12 +25,31 @@ clearTimeout(timerID);
 //while(true){};
 `;
 
+const jsInfinite1 = `
+setTimeout(() => {}, 10000);
+let i = 0;
+
+  console.log(i++);
+const createTimeout = () => {
+  console.log(i++);
+  setTimeout(() => {
+    createTimeout();
+  }, 1);
+};
+
+createTimeout();
+`;
+
+const jsInfinite = `
+setTimeout(() => {}, 10000);
+`;
+
 // run(jsAsync, (err, result) => {
 //   assert.equal(result, 'hi there');
 //   console.log('success!');
 // });
 
-run(js, 5000, (err, result) => {
+run(jsInfinite, 5000, (err, result) => {
   console.log('success!', err, result);
-  assert.equal(result, 'hi there');
+  // assert.equal(result, 'hi there');
 });

@@ -13,6 +13,7 @@ public:
   static void Init(v8::Local<v8::Object> exports);
 
   Nan::Persistent<v8::Function>& GetBridge() { return bridge_; }
+
 private:
   Sandbox *sandbox_;
 

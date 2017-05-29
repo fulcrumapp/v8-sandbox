@@ -118,6 +118,8 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
 
   uv_close((uv_handle_t *)timer, OnTimerClose);
 
+  /* TryCatch tryCatch(isolate); */
+
   (void)cb->Call(context, global, 0, 0);
 }
 
@@ -215,7 +217,7 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
     Nan::New(baton->result).ToLocalChecked()
   };
 
-  delete baton;
+  baton->instance->pendingOperations_.erase(baton->id);
 
   (void)cb->Call(sandboxIsolate->GetCurrentContext(), sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
 }
@@ -231,6 +233,7 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
   uv_close((uv_handle_t *)handle, OnHandleClose);
+  baton->dispatchNode = nullptr;
 
   auto argumentObject = Nan::New<v8::Object>();
 
@@ -264,7 +267,9 @@ NAN_METHOD(Sandbox::HttpRequest) {
 void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Function> callback) {
   auto cb = std::make_shared<Nan::Persistent<Function>>(callback);
 
-  auto baton = new SandboxNodeInvocationBaton(this, cb);
+  auto baton = std::make_shared<SandboxNodeInvocationBaton>(this,  cb);
+
+  pendingOperations_[baton->id] = baton;
 
   baton->name = name;
   baton->arguments = arguments;
@@ -272,30 +277,34 @@ void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Funct
   baton->condition = nullptr;
 
   // wake up the nodejs loop
-  uv_async_t *async = new uv_async_t;
-  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
-  async->data = baton;
+  baton->dispatchNode = new uv_async_t;
+
+  uv_async_init(uv_default_loop(), baton->dispatchNode, OnStartNodeInvocation);
+
+  baton->dispatchNode->data = baton.get();
 
   uv_async_t *dispatchAsync = new uv_async_t;
   uv_async_init(loop_, dispatchAsync, OnEndNodeInvocation);
   baton->dispatchAsync = dispatchAsync;
-  dispatchAsync->data = baton;
+  dispatchAsync->data = baton.get();
 
-  uv_async_send(async);
+  uv_async_send(baton->dispatchNode);
 }
 
 std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
-  auto baton = new SandboxNodeInvocationBaton(this, PersistentCallback());
+  auto baton = std::make_shared<SandboxNodeInvocationBaton>(this,  PersistentCallback());
+
+  pendingOperations_[baton->id] = baton;
 
   baton->name = name;
   baton->arguments = arguments;
 
   // wake up the nodejs loop
-  uv_async_t *async = new uv_async_t;
+  baton->dispatchNode = new uv_async_t;
 
-  async->data = baton;
+  uv_async_init(uv_default_loop(), baton->dispatchNode, OnStartNodeInvocation);
 
-  uv_async_init(uv_default_loop(), async, OnStartNodeInvocation);
+  baton->dispatchNode->data = baton.get();
 
   baton->dispatchAsync = nullptr;
   baton->mutex = new uv_mutex_t;
@@ -305,18 +314,19 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
   uv_cond_init(baton->condition);
 
   // dispatch the actual call on the node message loop
-  uv_async_send(async);
+  uv_async_send(baton->dispatchNode);
 
   uv_mutex_lock(baton->mutex);
   uv_cond_wait(baton->condition, baton->mutex);
   uv_mutex_unlock(baton->mutex);
+  baton->mutex = nullptr;
 
-  uv_mutex_destroy(baton->mutex);
-  uv_cond_destroy(baton->condition);
+  baton->Dispose();
 
   std::string result = baton->result;
 
-  delete baton;
+  pendingOperations_.erase(baton->id);
+
 
   return result;
 }
@@ -343,9 +353,10 @@ NAN_METHOD(Sandbox::ConsoleLog) {
 
 void Sandbox::Terminate() {
   if (isolate_) {
-    CancelPendingOperations();
-
     isolate_->TerminateExecution();
+    /* isolate_->CancelTerminateExecution(); */
+
+    CancelPendingOperations();
 
     if (loop_) {
       uv_stop(loop_);
@@ -356,9 +367,13 @@ void Sandbox::Terminate() {
 void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
   Sandbox *sandbox = (Sandbox *)handle->data;
 
+  sandbox->pendingOperations_.clear();
+
   for (auto &item : sandbox->timers_) {
     uv_timer_stop(item.second.get());
-    uv_close((uv_handle_t *)item.second.get(), OnTimerClose);
+    if (!uv_is_closing((uv_handle_t *)item.second.get())) {
+      uv_close((uv_handle_t *)item.second.get(), OnTimerClose);
+    }
   }
 
   uv_close((uv_handle_t *)handle, OnHandleClose);
@@ -373,11 +388,6 @@ void Sandbox::CancelPendingOperations() {
   uv_async_init(loop_, cancel, OnCancelPendingOperations);
   cancel->data = this;
   uv_async_send(cancel);
-
-  /* for (auto &timer : timers_) { */
-  /*   timer->Stop(); */
-  /* } */
-  /* timers_.clear(); */
 }
 
 void Sandbox::Dispose() {

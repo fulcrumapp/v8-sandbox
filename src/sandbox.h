@@ -80,11 +80,16 @@ private:
 
   typedef std::map<int, std::shared_ptr<uv_timer_t>> TimerMap;
 
+  typedef std::map<int, std::shared_ptr<SandboxNodeInvocationBaton>> InvocationMap;
+
   // active timers are ones that are currently running
   TimerMap activeTimers_;
 
   // all timers, including ones that are still in the process of closing/shutting down
   TimerMap timers_;
+
+  // need to clean up pending operations on abrupt termination
+  InvocationMap pendingOperations_;
 };
 
 #endif

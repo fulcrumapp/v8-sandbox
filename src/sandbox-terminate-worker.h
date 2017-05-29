@@ -5,7 +5,7 @@
 #include "sandbox-wrap.h"
 
 class SandboxTerminateWorker : public Nan::AsyncWorker {
- public:
+public:
   SandboxTerminateWorker(Nan::Callback *callback, SandboxWrap *sandbox);
 
   virtual ~SandboxTerminateWorker();
@@ -14,7 +14,7 @@ class SandboxTerminateWorker : public Nan::AsyncWorker {
 
   void HandleOKCallback() override;
 
- private:
+private:
   SandboxWrap *sandbox_;
 };
 

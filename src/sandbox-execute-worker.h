@@ -5,7 +5,7 @@
 #include "sandbox-wrap.h"
 
 class SandboxExecuteWorker : public Nan::AsyncWorker {
- public:
+public:
   SandboxExecuteWorker(Nan::Callback *callback, SandboxWrap *sandbox, const char *code);
 
   virtual ~SandboxExecuteWorker();
@@ -14,7 +14,7 @@ class SandboxExecuteWorker : public Nan::AsyncWorker {
 
   void HandleOKCallback() override;
 
- private:
+private:
   SandboxWrap *sandbox_;
 
   std::string code_;
