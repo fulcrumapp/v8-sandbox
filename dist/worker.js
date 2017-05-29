@@ -11,7 +11,6 @@ process.on('message', message => {
 
   sandbox.execute(message.code, (err, value) => {
     process.send({ err: err, value: value });
-    process.disconnect();
   });
 });
 //# sourceMappingURL=worker.js.map

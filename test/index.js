@@ -2,8 +2,9 @@ import Sandbox from '../dist';
 
 import assert from 'assert';
 
+const sandbox = new Sandbox();
+
 const runWithTimeout = (code, timeout, callback) => {
-  const sandbox = new Sandbox();
   return sandbox.execute(code, timeout, callback);
 };
 
@@ -23,6 +24,19 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
 
     run(js, (err, result) => {
       assert.equal(result, 'hi there');
+      done();
+    });
+  });
+
+  it('should handle errors from httpRequest', (done) => {
+    const js = `
+httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
+  throw new Error('yoyo');
+});
+`;
+
+    run(js, (err, result) => {
+      assert.equal(err.message, 'yoyo');
       done();
     });
   });
@@ -72,13 +86,13 @@ let value = 1;
 
 const id = setTimeout(() => {
   value = 2;
-}, 10);
+}, 1);
 
 clearTimeout(id);
 
 setTimeout(() => {
   setResult({value});
-}, 50);
+}, 5);
 `;
     run(js, (err, result) => {
       assert.equal(result, 1);
@@ -128,7 +142,7 @@ setTimeout(() => {
   it('should timeout when locked up in js', (done) => {
     const js = `while (true) {}`;
 
-    runWithTimeout(js, 100, (err, result) => {
+    runWithTimeout(js, 30, (err, result) => {
       assert.equal(err.isTimeout, true);
       done();
     });
@@ -137,7 +151,7 @@ setTimeout(() => {
   it('should timeout when idling in the run loop', (done) => {
     const js = `setTimeout(() => {}, 10000)`;
 
-    runWithTimeout(js, 100, (err, result) => {
+    runWithTimeout(js, 30, (err, result) => {
       assert.equal(err.isTimeout, true);
       done();
     });
