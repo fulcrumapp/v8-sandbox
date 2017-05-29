@@ -21,5 +21,7 @@ void SandboxTerminateWorker::HandleOKCallback() {
     Nan::Null()
   };
 
-  callback->Call(1, argv);
+  if (!callback->IsEmpty()) {
+    callback->Call(1, argv);
+  }
 }

@@ -24,9 +24,10 @@ void SandboxExecuteWorker::HandleOKCallback() {
   Nan::HandleScope scope;
 
   v8::Local<v8::Value> argv[] = {
-    Nan::Null(),
     Nan::New(result_.c_str()).ToLocalChecked()
   };
 
-  callback->Call(2, argv);
+  if (!callback->IsEmpty()) {
+    callback->Call(1, argv);
+  }
 }

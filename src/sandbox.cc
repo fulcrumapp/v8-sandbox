@@ -51,7 +51,10 @@ void Sandbox::RunIsolate(const char *code) {
   Nan::SetMethod(context->Global(), "_log", ConsoleLog);
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
 
-  std::string js = std::string(SandboxRuntime) + code;
+  std::string prologue = "global._tryCallback(() => {\n";
+  std::string epilogue = "\n});";
+
+  std::string js = std::string(SandboxRuntime) + prologue + code + epilogue;
 
   Local<String> source = Nan::New(js.c_str()).ToLocalChecked();
 
@@ -211,8 +214,6 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 
   Local<Function> cb = Nan::New(baton->callback->As<Function>());
 
-  uv_close((uv_handle_t *)handle, OnHandleClose);
-
   Local<Value> argv[] = {
     Nan::New(baton->result).ToLocalChecked()
   };
@@ -232,8 +233,8 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
-  uv_close((uv_handle_t *)handle, OnHandleClose);
-  baton->dispatchNode = nullptr;
+  /* uv_close((uv_handle_t *)handle, OnHandleClose); */
+  /* baton->dispatchNode = nullptr; */
 
   auto argumentObject = Nan::New<v8::Object>();
 
@@ -267,7 +268,7 @@ NAN_METHOD(Sandbox::HttpRequest) {
 void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Function> callback) {
   auto cb = std::make_shared<Nan::Persistent<Function>>(callback);
 
-  auto baton = std::make_shared<SandboxNodeInvocationBaton>(this,  cb);
+  auto baton = std::make_shared<SandboxNodeInvocationBaton>(this, cb);
 
   pendingOperations_[baton->id] = baton;
 
