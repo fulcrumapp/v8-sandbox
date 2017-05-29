@@ -1,4 +1,4 @@
-import { Sandbox } from '../dist';
+import Sandbox from '../dist';
 
 import assert from 'assert';
 

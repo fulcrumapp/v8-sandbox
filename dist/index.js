@@ -3,7 +3,6 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Sandbox = undefined;
 
 var _child_process = require('child_process');
 
@@ -51,5 +50,5 @@ class Sandbox {
     child.send({ code: code });
   }
 }
-exports.Sandbox = Sandbox;
+exports.default = Sandbox;
 //# sourceMappingURL=index.js.map
