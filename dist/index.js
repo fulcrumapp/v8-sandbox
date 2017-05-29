@@ -5,61 +5,50 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.Sandbox = undefined;
 
-var _request = require('request');
+var _child_process = require('child_process');
 
-var _request2 = _interopRequireDefault(_request);
+var _path = require('path');
+
+var _path2 = _interopRequireDefault(_path);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const NativeSandbox = require('bindings')('sandbox').Sandbox;
-
-let nextObjectID = 0;
+class TimeoutError extends Error {
+  get isTimeout() {
+    return true;
+  }
+}
 
 class Sandbox {
-  constructor() {
-    this._native = new NativeSandbox();
-    this.id = ++nextObjectID;
-  }
+  execute(code, timeout, callback) {
+    let executionTimeout = null;
 
-  static run(code, callback) {
-    new Sandbox().run(code, callback);
-  }
+    const child = (0, _child_process.fork)(_path2.default.join(__dirname, 'worker'));
 
-  run(code, callback) {
-    return this._native.run(code, (err, res) => {
-      callback(err, JSON.parse(res));
-    }, this.dispatch.bind(this));
-  }
+    child.on('message', message => {
+      callback(message.err, message.value);
+    });
 
-  // handle function calls from the sandbox
-  dispatch(invocation) {
-    const finish = function finish(err) {
-      for (var _len = arguments.length, results = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-        results[_key - 1] = arguments[_key];
-      }
+    child.on('error', message => {
+      clearTimeout(executionTimeout);
+    });
 
-      const serialized = [err != null ? { message: err.message } : null];
+    child.on('disconnect', () => {
+      clearTimeout(executionTimeout);
+    });
 
-      if (results && results.length) {
-        serialized.push.apply(serialized, results);
-      }
+    child.on('exit', message => {
+      clearTimeout(executionTimeout);
+    });
 
-      invocation.callback(invocation, JSON.stringify(serialized));
-    };
-
-    const parameters = JSON.parse(invocation.args);
-
-    // console.log(invocation.name + '(' + JSON.stringify(parameters) + ')');
-
-    if (invocation.name === 'httpRequest') {
-      return this.httpRequest(...parameters, finish);
+    if (timeout > 0) {
+      executionTimeout = setTimeout(() => {
+        child.kill();
+        callback(new TimeoutError('timeout'));
+      }, timeout);
     }
 
-    return finish(null);
-  }
-
-  httpRequest(options, callback) {
-    (0, _request2.default)(options, callback);
+    child.send({ code: code });
   }
 }
 exports.Sandbox = Sandbox;

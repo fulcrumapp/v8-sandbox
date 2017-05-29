@@ -1,11 +1,27 @@
 "use strict";
 
+global._tryCallback = func => {
+  try {
+    func();
+  } catch (ex) {
+    global.setResult({
+      error: {
+        name: ex.name,
+        message: ex.message,
+        stack: ex.stack
+      }
+    });
+  }
+};
+
 global.httpRequest = (options, callback) => {
   const parameters = [JSON.stringify([options])];
 
   if (callback) {
     const wrappedCallback = args => {
-      callback.apply(null, JSON.parse(args));
+      global._tryCallback(() => {
+        callback.apply(null, JSON.parse(args));
+      });
     };
 
     parameters.push(wrappedCallback);
@@ -21,7 +37,15 @@ global.setResult = result => {
 };
 
 global.setTimeout = (callback, timeout) => {
-  return global._setTimeout(callback, timeout);
+  const handler = () => {
+    global._tryCallback(callback);
+  };
+
+  return global._setTimeout(handler, timeout);
+};
+
+global.clearTimeout = id => {
+  return global._clearTimeout(id);
 };
 
 global.console = {

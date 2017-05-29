@@ -1,4 +1,5 @@
-import { Sandbox } from './lib';
+import { Sandbox } from './dist';
+// import Sandbox from './lib/sandbox';
 
 import assert from 'assert';
 
@@ -44,12 +45,40 @@ const jsInfinite = `
 setTimeout(() => {}, 10000);
 `;
 
+const jsTest = `
+httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'}, (err, res, body) => {
+  setResult({value: body});
+});
+`;
+
+const jsTest2 = `
+setResult(1337);
+`;
+
+const jsTest3 = `
+while (true) {}
+throw new Error('yo');
+`;
+
+const jsTest4 = `
+setTimeout(() => {
+
+}, 1000);
+`;
+
 // run(jsAsync, (err, result) => {
 //   assert.equal(result, 'hi there');
 //   console.log('success!');
 // });
 
-run(jsInfinite, 5000, (err, result) => {
+// new Sandbox().execute(jsTest, (err, result) => {
+//   console.log('success!', err, result);
+// });
+run(jsTest4, 10000, (err, result) => {
+  if (err && err.isTimeout) {
+    console.log('TIMEOUT!');
+  }
+
   console.log('success!', err, result);
   // assert.equal(result, 'hi there');
 });
