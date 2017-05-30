@@ -10,6 +10,10 @@ var _path = require('path');
 
 var _path2 = _interopRequireDefault(_path);
 
+var _async = require('async');
+
+var _async2 = _interopRequireDefault(_async);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 class TimeoutError extends Error {
@@ -30,6 +34,10 @@ class Sandbox {
   constructor() {
     let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
+    this.worker = (task, callback) => {
+      this._execute(task.code, task.timeout, callback);
+    };
+
     this._workerCount = options.workers || 4;
     this.start();
   }
@@ -37,6 +45,7 @@ class Sandbox {
   start() {
     this._inactiveWorkers = [];
     this._activeWorkers = [];
+    this._queue = _async2.default.queue(this.worker, this._workerCount);
     this.ensureWorkers();
   }
 
@@ -45,12 +54,20 @@ class Sandbox {
       worker.removeAllListeners();
       worker.kill();
     }
+
     for (const worker of this._activeWorkers) {
       worker.removeAllListeners();
       worker.kill();
     }
+
     this._inactiveWorkers = [];
     this._activeWorkers = [];
+
+    if (this._queue) {
+      this._queue.kill();
+    }
+
+    this._queue = _async2.default.queue(this.worker, this._workerCount);
   }
 
   ensureWorkers() {
@@ -102,19 +119,33 @@ class Sandbox {
   }
 
   execute(code, timeout, callback) {
-    if (callback == null) {
-      return new Promise((resolve, reject) => {
-        this._execute(code, timeout, (err, value) => {
-          if (err) {
-            return reject(err);
-          }
+    const item = {
+      code: code, timeout: timeout
+    };
 
-          return resolve(value);
-        });
+    let promise = null;
+
+    if (callback == null) {
+      let itemResolve = null;
+      let itemReject = null;
+
+      promise = new Promise((resolve, reject) => {
+        itemResolve = resolve;
+        itemReject = reject;
       });
+
+      callback = (err, value) => {
+        if (err) {
+          return itemReject(value);
+        }
+
+        return itemResolve(value);
+      };
     }
 
-    return this._execute(code, timeout, callback);
+    this._queue.push(item, callback);
+
+    return promise;
   }
 
   _execute(code, timeout, callback) {
