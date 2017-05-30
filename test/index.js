@@ -178,4 +178,79 @@ setTimeout(() => {
       done();
     });
   });
+
+  it('should handle stress', (done) => {
+    const iterations = 500;
+
+    let count = 0;
+
+    for (let i = 0; i < iterations; ++i) {
+      const js = `
+setTimeout(() => {
+  setResult({value: ${i}});
+}, 1);
+`;
+
+      run(js, (err, value) => {
+        count++;
+        assert.equal(value, i);
+
+        if (count === iterations) {
+          done();
+        }
+      });
+    }
+  });
+
+  it('should handle queued stress', (done) => {
+    const iterations = 500;
+
+    let count = 0;
+
+    for (let i = 0; i < iterations; ++i) {
+      const js = `
+setTimeout(() => {
+  setResult({value: ${i}});
+}, 1);
+`;
+
+      setImmediate(() => {
+        run(js, (err, value) => {
+          count++;
+          assert.equal(value, i);
+
+          if (count === iterations) {
+            done();
+          }
+        });
+      });
+    }
+  });
+
+  it('should handle recursive stress', function (done) {
+    this.timeout(10000000);
+
+    const iterations = 500000;
+
+    const executeNext = (i) => {
+      const js = `
+setResult({value: ${i}});
+`;
+
+      run(js, (err, value) => {
+        console.log('VALUE', value);
+        assert.equal(value, i);
+
+        if (i === iterations) {
+          done();
+        } else {
+          setImmediate(() => {
+            executeNext(i + 1);
+          });
+        }
+      });
+    };
+
+    executeNext(0);
+  });
 });
