@@ -1,8 +1,8 @@
 environment:
   node_pre_gyp_accessKeyId:
-    secure: tRTeycc9QsAhb1FCXkU6JQwEyr5wu7pz9YtMsJvDFsA=
+    secure: KtXz4rvhLsEvhc3JSnbhkSJdmu7gCCWXuCx/MQDBREI=
   node_pre_gyp_secretAccessKey:
-    secure: K8M62m8ynQah8FRcnHyoetn5X0XzXdfwLrf7iWiM9A3SyX1TF1xy+auYQF/Nu48B
+    secure: glJa1riPgsunQkgBPfyCl21X2ITqNe9wn6AqtAQj5LSM3PWoc+aTTAvNgdq30UAS
   matrix:
     - NODE_VERSION: "7.6.0"
       platform: x64
