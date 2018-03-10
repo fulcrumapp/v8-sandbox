@@ -42,7 +42,6 @@
     "async": "^2.4.1",
     "bindings": "^1.2.1",
     "eslint-plugin-babel": "^4.1.1",
-    "generic-pool": "^2.4.2",
     "nan": "^2.3.3",
     "node-gyp": "^3.3.1",
     "node-pre-gyp": "^0.6.34",

@@ -121,8 +121,6 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
 
   uv_close((uv_handle_t *)timer, OnTimerClose);
 
-  /* TryCatch tryCatch(isolate); */
-
   (void)cb->Call(context, global, 0, 0);
 }
 
@@ -233,9 +231,6 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
-  /* uv_close((uv_handle_t *)handle, OnHandleClose); */
-  /* baton->dispatchNode = nullptr; */
-
   auto argumentObject = Nan::New<v8::Object>();
 
   Nan::SetPrivate(argumentObject, Nan::New("baton").ToLocalChecked(), External::New(nodeIsolate, baton));
@@ -328,7 +323,6 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
 
   pendingOperations_.erase(baton->id);
 
-
   return result;
 }
 
@@ -355,7 +349,6 @@ NAN_METHOD(Sandbox::ConsoleLog) {
 void Sandbox::Terminate() {
   if (isolate_) {
     isolate_->TerminateExecution();
-    /* isolate_->CancelTerminateExecution(); */
 
     CancelPendingOperations();
 
@@ -372,6 +365,7 @@ void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
 
   for (auto &item : sandbox->timers_) {
     uv_timer_stop(item.second.get());
+
     if (!uv_is_closing((uv_handle_t *)item.second.get())) {
       uv_close((uv_handle_t *)item.second.get(), OnTimerClose);
     }
