@@ -230,7 +230,7 @@ setTimeout(() => {
   it('should handle recursive stress', function (done) {
     this.timeout(10000000);
 
-    const iterations = 500000;
+    const iterations = 500;
 
     const executeNext = (i) => {
       const js = `
@@ -238,7 +238,6 @@ setResult({value: ${i}});
 `;
 
       run(js, (err, value) => {
-        console.log('VALUE', value);
         assert.equal(value, i);
 
         if (i === iterations) {
