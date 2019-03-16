@@ -54,8 +54,6 @@ class Sandbox {
 
     const parameters = JSON.parse(invocation.args);
 
-    // console.log(invocation.name + '(' + JSON.stringify(parameters) + ')');
-
     if (invocation.name === 'httpRequest') {
       return this.httpRequest(...parameters, finish);
     } else if (invocation.name === 'log') {
