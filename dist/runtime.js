@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 global._tryCallback = func => {
   try {
@@ -12,6 +12,40 @@ global._tryCallback = func => {
       }
     });
   }
+};
+
+global._execute = () => {
+  global._tryCallback(() => {
+    eval(global._code);
+  });
+};
+
+global.dispatchSync = (name, args) => {
+  const parameters = [JSON.stringify([name, ...args])];
+
+  const result = global._dispatchSync.apply(global, parameters);
+
+  return result != null ? JSON.parse(result) : null;
+};
+
+global.dispatchAsync = (name, args, callback) => {
+  if (typeof callback !== 'function') {
+    callback = () => {};
+  }
+
+  const parameters = [JSON.stringify([name, ...args])];
+
+  const wrappedCallback = args => {
+    global._tryCallback(() => {
+      callback.apply(null, JSON.parse(args));
+    });
+  };
+
+  parameters.push(wrappedCallback);
+
+  const result = global._dispatchAsync.apply(global, parameters);
+
+  return result != null ? JSON.parse(result) : null;
 };
 
 global.httpRequest = (options, callback) => {

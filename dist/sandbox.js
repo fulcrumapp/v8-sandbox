@@ -54,7 +54,11 @@ class Sandbox {
 
     const parameters = JSON.parse(invocation.args);
 
-    if (invocation.name === 'httpRequest') {
+    if (invocation.name === 'dispatchSync') {
+      return this.dispatchSync(parameters, finish);
+    } else if (invocation.name === 'dispatchAsync') {
+      return this.dispatchAsync(parameters, finish);
+    } else if (invocation.name === 'httpRequest') {
       return this.httpRequest(...parameters, finish);
     } else if (invocation.name === 'log') {
       this.log(...parameters);
@@ -77,6 +81,28 @@ class Sandbox {
 
   httpRequest(options, callback) {
     (0, _request2.default)(options, callback);
+  }
+
+  dispatchSync(args, callback) {
+    try {
+      const name = args[0];
+      const parameters = args.slice(1);
+
+      callback(null, global.$exports[name](...parameters));
+    } catch (err) {
+      callback(err);
+    }
+  }
+
+  dispatchAsync(args, callback) {
+    try {
+      const name = args[0];
+      const parameters = args.slice(1);
+
+      global.$exports[name](...[...parameters, callback]);
+    } catch (err) {
+      callback(err);
+    }
   }
 }
 exports.default = Sandbox;

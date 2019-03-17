@@ -25,7 +25,17 @@ global.dispatchSync = (name, args) => {
 
   const result = global._dispatchSync.apply(global, parameters);
 
-  return result != null ? JSON.parse(result) : null;
+  if (result != null) {
+    const [error, value] = JSON.parse(result);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return value;
+  }
+
+  return null;
 }
 
 global.dispatchAsync = (name, args, callback) => {

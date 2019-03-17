@@ -39,6 +39,7 @@ class Sandbox {
     };
 
     this._workerCount = options.workers || 4;
+    this._require = options.require;
     this.start();
   }
 
@@ -74,7 +75,13 @@ class Sandbox {
     const total = this._inactiveWorkers.length + this._activeWorkers;
 
     for (let i = 0; i < this._workerCount - total; ++i) {
-      this._inactiveWorkers.push(this.forkWorker());
+      const worker = this.forkWorker();
+
+      if (this._require) {
+        worker.send({ require: this._require });
+      }
+
+      this._inactiveWorkers.push(worker);
     }
   }
 
