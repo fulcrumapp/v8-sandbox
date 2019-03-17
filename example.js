@@ -23,6 +23,19 @@ dispatchAsync('testAsync', [1, 2], function(error, value) {
 });
 `;
 
+// synchronous http request
+const example4 = `
+var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'});
+setResult({value: response.body});
+`;
+
+// asynchronous http request
+const example5 = `
+var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'}, (err, res, body) => {
+  setResult({value: body});
+});
+`;
+
 run(example1, (err, result) => {
   console.log('example 1:', result);
 
@@ -32,7 +45,15 @@ run(example1, (err, result) => {
     run(example3, (err, result) => {
       console.log('example 3:', result);
 
-      sandbox.shutdown();
+      run(example4, (err, result) => {
+        console.log('example 4:', result);
+
+        run(example5, (err, result) => {
+          console.log('example 5:', result);
+
+          sandbox.shutdown();
+        });
+      });
     });
   });
 });

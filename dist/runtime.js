@@ -80,7 +80,23 @@ global.httpRequest = (options, callback) => {
 
   const result = global._httpRequest.apply(global, parameters);
 
-  return result != null ? JSON.parse(result) : null;
+  const parsed = result != null ? JSON.parse(result) : null;
+
+  if (!callback) {
+    var _parsed = _slicedToArray(parsed, 2);
+
+    const error = _parsed[0],
+          response = _parsed[1];
+
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return response;
+  }
+
+  return parsed;
 };
 
 global.setResult = result => {

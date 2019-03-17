@@ -73,7 +73,19 @@ global.httpRequest = (options, callback) => {
 
   const result = global._httpRequest.apply(global, parameters);
 
-  return result != null ? JSON.parse(result) : null;
+  const parsed = result != null ? JSON.parse(result) : null;
+
+  if (!callback) {
+    const [error, response] = parsed;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return response;
+  }
+
+  return parsed;
 };
 
 global.setResult = (result) => {
