@@ -28,6 +28,10 @@ public:
 private:
   static NAN_METHOD(SetResult);
 
+  static NAN_METHOD(DispatchSync);
+
+  static NAN_METHOD(DispatchAsync);
+
   static NAN_METHOD(SetTimeout);
 
   static NAN_METHOD(ClearTimeout);

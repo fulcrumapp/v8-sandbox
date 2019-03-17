@@ -45,16 +45,18 @@ void Sandbox::RunIsolate(const char *code) {
 
   Nan::Set(context->Global(), Nan::New("global").ToLocalChecked(), context->Global());
   Nan::SetMethod(context->Global(), "_setResult", SetResult);
+  Nan::SetMethod(context->Global(), "_dispatchSync", DispatchSync);
+  Nan::SetMethod(context->Global(), "_dispatchAsync", DispatchAsync);
   Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
   Nan::SetMethod(context->Global(), "_clearTimeout", ClearTimeout);
   Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
   Nan::SetMethod(context->Global(), "_log", ConsoleLog);
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
+  Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
 
-  std::string prologue = "global._tryCallback(() => {\n";
-  std::string epilogue = "\n});";
+  std::string execute = "global._execute();";
 
-  std::string js = std::string(SandboxRuntime) + prologue + code + epilogue;
+  std::string js = std::string(SandboxRuntime) + execute;
 
   Local<String> source = Nan::New(js.c_str()).ToLocalChecked();
 
@@ -95,11 +97,28 @@ Sandbox *UnwrapSandbox(Isolate *isolate) {
 }
 
 NAN_METHOD(Sandbox::SetResult) {
-  String::Utf8Value value(info[0]->ToString());
+  Nan::Utf8String value(info[0]->ToString());
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
   sandbox->result_ = *value;
+}
+
+NAN_METHOD(Sandbox::DispatchSync) {
+  const char *arguments = *Nan::Utf8String(info[0]);
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  std::string result = sandbox->DispatchSync("dispatchSync", arguments);
+  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+}
+
+NAN_METHOD(Sandbox::DispatchAsync) {
+  const char *arguments = *Nan::Utf8String(info[0]);
+
+  Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
+
+  sandbox->DispatchAsync("dispatchAsync", arguments, info[1].As<v8::Function>());
 }
 
 void Sandbox::OnHandleClose(uv_handle_t *handle) {

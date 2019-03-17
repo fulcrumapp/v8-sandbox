@@ -41,6 +41,15 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     });
   });
 
+  it('should handle syntax errors', (done) => {
+    const js = `}`;
+
+    run(js, (err, result) => {
+      assert.ok(err && err.stack.indexOf('SyntaxError') >= 0);
+      done();
+    });
+  });
+
   it('should run simple script', (done) => {
     const js = `setResult({value: 1337});`;
 
