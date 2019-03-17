@@ -80,7 +80,13 @@ class Sandbox {
   }
 
   httpRequest(options, callback) {
-    (0, _request2.default)(options, callback);
+    (0, _request2.default)(options, (err, response, body) => {
+      if (Buffer.isBuffer(response.body)) {
+        response.body = body = response.body.toString('base64');
+      }
+
+      callback(err, response, body);
+    });
   }
 
   dispatchSync(args, callback) {

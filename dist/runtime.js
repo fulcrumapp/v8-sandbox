@@ -27,22 +27,22 @@ global.dispatchSync = (name, args) => {
 
   const result = global._dispatchSync.apply(global, parameters);
 
-  if (result != null) {
-    var _JSON$parse = JSON.parse(result),
-        _JSON$parse2 = _slicedToArray(_JSON$parse, 2);
-
-    const error = _JSON$parse2[0],
-          value = _JSON$parse2[1];
-
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return value;
+  if (result == null) {
+    return null;
   }
 
-  return null;
+  var _JSON$parse = JSON.parse(result),
+      _JSON$parse2 = _slicedToArray(_JSON$parse, 2);
+
+  const error = _JSON$parse2[0],
+        value = _JSON$parse2[1];
+
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return value;
 };
 
 global.dispatchAsync = (name, args, callback) => {
@@ -80,23 +80,22 @@ global.httpRequest = (options, callback) => {
 
   const result = global._httpRequest.apply(global, parameters);
 
-  const parsed = result != null ? JSON.parse(result) : null;
-
-  if (!callback) {
-    var _parsed = _slicedToArray(parsed, 2);
-
-    const error = _parsed[0],
-          response = _parsed[1];
-
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return response;
+  if (result == null) {
+    return null;
   }
 
-  return parsed;
+  var _JSON$parse3 = JSON.parse(result),
+      _JSON$parse4 = _slicedToArray(_JSON$parse3, 2);
+
+  const error = _JSON$parse4[0],
+        response = _JSON$parse4[1];
+
+
+  if (!callback && error) {
+    throw new Error(error.message);
+  }
+
+  return response;
 };
 
 global.setResult = result => {
