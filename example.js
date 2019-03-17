@@ -25,7 +25,7 @@ dispatchAsync('testAsync', [1, 2], function(error, value) {
 
 // synchronous http request
 const example4 = `
-var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'});
+const response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'});
 setResult({value: response.body});
 `;
 
