@@ -14,6 +14,14 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
 let nextObjectID = 0;
 
+function tryParseJSON(value) {
+  try {
+    return JSON.parse(value);
+  } catch (ex) {
+    return null;
+  }
+}
+
 class Sandbox {
   constructor() {
     this._native = new NativeSandbox();
@@ -26,7 +34,7 @@ class Sandbox {
 
   execute(code, callback) {
     this._native.execute(code, json => {
-      let result = JSON.parse(json);
+      let result = tryParseJSON(json);
 
       if (result == null) {
         result = { error: new Error('no result') };
@@ -52,7 +60,11 @@ class Sandbox {
       invocation.callback(invocation, JSON.stringify(serialized));
     };
 
-    const parameters = JSON.parse(invocation.args);
+    const parameters = tryParseJSON(invocation.args);
+
+    if (parameters == null) {
+      return finish(new Error('invalid invocation parameters'));
+    }
 
     if (invocation.name === 'dispatchSync') {
       return this.dispatchSync(parameters, finish);
