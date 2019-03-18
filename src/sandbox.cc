@@ -1,6 +1,7 @@
 #include <uv.h>
 #include "sandbox.h"
 #include "sandbox-wrap.h"
+#include "common.h"
 #include <iostream>
 
 void Debug(const char *msg) {
@@ -97,6 +98,8 @@ Sandbox *UnwrapSandbox(Isolate *isolate) {
 }
 
 NAN_METHOD(Sandbox::SetResult) {
+  NODE_ARG_STRING(0, "result");
+
   Nan::Utf8String value(info[0]->ToString());
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
@@ -105,6 +108,8 @@ NAN_METHOD(Sandbox::SetResult) {
 }
 
 NAN_METHOD(Sandbox::DispatchSync) {
+  NODE_ARG_STRING(0, "parameters");
+
   const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
@@ -114,6 +119,9 @@ NAN_METHOD(Sandbox::DispatchSync) {
 }
 
 NAN_METHOD(Sandbox::DispatchAsync) {
+  NODE_ARG_STRING(0, "parameters");
+  NODE_ARG_FUNCTION(1, "callback");
+
   const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
@@ -157,7 +165,10 @@ void Sandbox::OnTimerClose(uv_handle_t *timer) {
 }
 
 NAN_METHOD(Sandbox::SetTimeout) {
-  auto timeout = Nan::To<int>(info[1]).FromJust();
+  NODE_ARG_FUNCTION(0, "callback");
+  NODE_ARG_NUMBER(1, "timeout");
+
+  auto timeout = Nan::To<int64_t>(info[1]).FromJust();
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
@@ -178,10 +189,7 @@ NAN_METHOD(Sandbox::SetTimeout) {
 }
 
 NAN_METHOD(Sandbox::ClearTimeout) {
-  if (!info[0]->IsInt32()) {
-    Nan::ThrowTypeError("first argument must be an integer");
-    return;
-  }
+  NODE_ARG_INTEGER(0, "timer id");
 
   auto timerID = Nan::To<int>(info[0]).FromJust();
 
@@ -265,6 +273,8 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 }
 
 NAN_METHOD(Sandbox::HttpRequest) {
+  NODE_ARG_STRING(0, "parameters");
+
   const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
@@ -275,6 +285,8 @@ NAN_METHOD(Sandbox::HttpRequest) {
     std::string result = sandbox->DispatchSync("httpRequest", arguments);
     info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
   } else {
+    NODE_ARG_FUNCTION(1, "callback");
+
     sandbox->DispatchAsync("httpRequest", arguments, info[1].As<v8::Function>());
   }
 }
@@ -346,6 +358,8 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
 }
 
 NAN_METHOD(Sandbox::ConsoleError) {
+  NODE_ARG_STRING(0, "parameters");
+
   const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
@@ -356,6 +370,8 @@ NAN_METHOD(Sandbox::ConsoleError) {
 }
 
 NAN_METHOD(Sandbox::ConsoleLog) {
+  NODE_ARG_STRING(0, "parameters");
+
   const char *arguments = *Nan::Utf8String(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());

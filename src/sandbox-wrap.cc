@@ -1,6 +1,7 @@
 #include "sandbox-wrap.h"
 #include "sandbox-execute-worker.h"
 #include "sandbox-terminate-worker.h"
+#include "common.h"
 
 #include <iostream>
 #include <memory>
@@ -47,6 +48,9 @@ NAN_METHOD(SandboxWrap::New) {
 }
 
 NAN_METHOD(SandboxWrap::Execute) {
+  NODE_ARG_STRING(0, "code");
+  NODE_ARG_FUNCTION(1, "callback");
+
   const char *code = *Nan::Utf8String(info[0]);
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
@@ -61,6 +65,8 @@ NAN_METHOD(SandboxWrap::Execute) {
 }
 
 NAN_METHOD(SandboxWrap::Terminate) {
+  NODE_ARG_FUNCTION(0, "callback");
+
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
 
   Nan::Callback *callback = new Nan::Callback(info[0].As<v8::Function>());

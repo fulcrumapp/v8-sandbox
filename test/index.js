@@ -188,6 +188,43 @@ setTimeout(() => {
     });
   });
 
+  it('should not crash when calling native functions with invalid arguments', (done) => {
+    const js = `
+      function invoke(fn) {
+        try {
+          return fn();
+        } catch (ex) {
+          return ex.message;
+        }
+      }
+
+      setResult({value: [
+        invoke(() => _setTimeout()),
+        invoke(() => _setTimeout(null)),
+        invoke(() => _setTimeout(7, 7)),
+        invoke(() => _clearTimeout()),
+        invoke(() => _clearTimeout(null)),
+        invoke(() => _setResult(null)),
+        invoke(() => _setResult(7)),
+        invoke(() => _dispatchSync()),
+        invoke(() => _dispatchSync(null)),
+        invoke(() => _dispatchSync('test')),
+        invoke(() => _dispatchAsync()),
+        invoke(() => _dispatchAsync(null)),
+        invoke(() => _dispatchAsync('test')),
+        invoke(() => _httpRequest(8)),
+        invoke(() => _httpRequest('test', 7)),
+        invoke(() => _log()),
+        invoke(() => _error())
+      ]});
+`;
+
+    run(js, (err, result) => {
+      assert.equal(result.length, 17);
+      done();
+    });
+  });
+
   it('should handle stress', (done) => {
     const iterations = 500;
 
