@@ -55,13 +55,9 @@ void Sandbox::RunIsolate(const char *code) {
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
   Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
 
-  std::string execute = "global._execute();";
+  Local<String> runtime = Nan::New(SandboxRuntime).ToLocalChecked();
 
-  std::string js = std::string(SandboxRuntime) + execute;
-
-  Local<String> source = Nan::New(js.c_str()).ToLocalChecked();
-
-  Local<Script> script = Script::Compile(context, source).ToLocalChecked();
+  Local<Script> script = Script::Compile(context, runtime).ToLocalChecked();
 
   (void)script->Run(context);
 }
@@ -100,7 +96,7 @@ Sandbox *UnwrapSandbox(Isolate *isolate) {
 NAN_METHOD(Sandbox::SetResult) {
   NODE_ARG_STRING(0, "result");
 
-  Nan::Utf8String value(info[0]->ToString());
+  Nan::Utf8String value(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
@@ -110,11 +106,11 @@ NAN_METHOD(Sandbox::SetResult) {
 NAN_METHOD(Sandbox::DispatchSync) {
   NODE_ARG_STRING(0, "parameters");
 
-  const char *arguments = *Nan::Utf8String(info[0]);
+  Nan::Utf8String arguments(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  std::string result = sandbox->DispatchSync("dispatchSync", arguments);
+  std::string result = sandbox->DispatchSync("dispatchSync", *arguments);
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
@@ -122,11 +118,11 @@ NAN_METHOD(Sandbox::DispatchAsync) {
   NODE_ARG_STRING(0, "parameters");
   NODE_ARG_FUNCTION(1, "callback");
 
-  const char *arguments = *Nan::Utf8String(info[0]);
+  Nan::Utf8String arguments(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  sandbox->DispatchAsync("dispatchAsync", arguments, info[1].As<v8::Function>());
+  sandbox->DispatchAsync("dispatchAsync", *arguments, info[1].As<v8::Function>());
 }
 
 void Sandbox::OnHandleClose(uv_handle_t *handle) {
@@ -208,7 +204,8 @@ NAN_METHOD(Sandbox::ClearTimeout) {
 
 NAN_METHOD(Sandbox::AsyncNodeCallback) {
   auto object = Nan::To<Object>(info[0]).ToLocalChecked();
-  const char *result = *Nan::Utf8String(info[1]);
+
+  Nan::Utf8String result(info[1]);
 
   auto hidden = Nan::GetPrivate(object, Nan::New("baton").ToLocalChecked()).ToLocalChecked();
 
@@ -216,7 +213,7 @@ NAN_METHOD(Sandbox::AsyncNodeCallback) {
 
   SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)field->Value();
 
-  baton->result = result;
+  baton->result = *result;
 
   if (baton->condition) {
     // signal the wait condition to end the synchronous call on the other thread
@@ -275,19 +272,19 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 NAN_METHOD(Sandbox::HttpRequest) {
   NODE_ARG_STRING(0, "parameters");
 
-  const char *arguments = *Nan::Utf8String(info[0]);
+  Nan::Utf8String arguments(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
   bool synchronous = info[1]->IsNull() || info[1]->IsUndefined();
 
   if (synchronous) {
-    std::string result = sandbox->DispatchSync("httpRequest", arguments);
+    std::string result = sandbox->DispatchSync("httpRequest", *arguments);
     info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
   } else {
     NODE_ARG_FUNCTION(1, "callback");
 
-    sandbox->DispatchAsync("httpRequest", arguments, info[1].As<v8::Function>());
+    sandbox->DispatchAsync("httpRequest", *arguments, info[1].As<v8::Function>());
   }
 }
 
@@ -360,11 +357,11 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
 NAN_METHOD(Sandbox::ConsoleError) {
   NODE_ARG_STRING(0, "parameters");
 
-  const char *arguments = *Nan::Utf8String(info[0]);
+  Nan::Utf8String arguments(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  std::string result = sandbox->DispatchSync("error", arguments);
+  std::string result = sandbox->DispatchSync("error", *arguments);
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
@@ -372,11 +369,11 @@ NAN_METHOD(Sandbox::ConsoleError) {
 NAN_METHOD(Sandbox::ConsoleLog) {
   NODE_ARG_STRING(0, "parameters");
 
-  const char *arguments = *Nan::Utf8String(info[0]);
+  Nan::Utf8String arguments(info[0]);
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  std::string result = sandbox->DispatchSync("log", arguments);
+  std::string result = sandbox->DispatchSync("log", *arguments);
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }

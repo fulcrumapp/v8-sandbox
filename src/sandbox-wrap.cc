@@ -51,7 +51,7 @@ NAN_METHOD(SandboxWrap::Execute) {
   NODE_ARG_STRING(0, "code");
   NODE_ARG_FUNCTION(1, "callback");
 
-  const char *code = *Nan::Utf8String(info[0]);
+  Nan::Utf8String code(info[0]);
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
 
@@ -59,7 +59,7 @@ NAN_METHOD(SandboxWrap::Execute) {
 
   sandbox->bridge_.Reset(info[2].As<v8::Function>());
 
-  Nan::AsyncQueueWorker(new SandboxExecuteWorker(callback, sandbox, code));
+  Nan::AsyncQueueWorker(new SandboxExecuteWorker(callback, sandbox, *code));
 
   info.GetReturnValue().Set(info.This());
 }
