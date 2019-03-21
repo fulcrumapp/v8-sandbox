@@ -120,6 +120,7 @@ class Sandbox {
   removeWorker(worker) {
     clearTimeout(worker.executionTimeout);
     worker.executionTimeout = null;
+    worker.removeAllListeners();
     remove(this._activeWorkers, worker);
     remove(this._inactiveWorkers, worker);
     this.ensureWorkers();
