@@ -10,7 +10,7 @@ global.$exports = {};
 
 process.on('message', message => {
   if (message.require) {
-    require(message.require);
+    Object.assign(global.$exports, require(message.require));
     return;
   }
 
