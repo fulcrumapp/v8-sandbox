@@ -23,7 +23,7 @@ global._execute = () => {
 };
 
 global.dispatchSync = (name, args) => {
-  const parameters = [JSON.stringify([name, ...args])];
+  const parameters = [JSON.stringify([name, ...(args || [])])];
 
   const result = global._dispatchSync.apply(global, parameters);
 
@@ -50,7 +50,7 @@ global.dispatchAsync = (name, args, callback) => {
     callback = () => {};
   }
 
-  const parameters = [JSON.stringify([name, ...args])];
+  const parameters = [JSON.stringify([name, ...(args || [])])];
 
   const wrappedCallback = args => {
     global._tryCallback(() => {
