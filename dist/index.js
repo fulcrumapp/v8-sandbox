@@ -14,6 +14,10 @@ var _async = require('async');
 
 var _async2 = _interopRequireDefault(_async);
 
+var _os = require('os');
+
+var _os2 = _interopRequireDefault(_os);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 class TimeoutError extends Error {
@@ -35,10 +39,10 @@ class Sandbox {
     let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     this.worker = (task, callback) => {
-      this._execute(task.code, task.timeout, callback);
+      this._execute(task, callback);
     };
 
-    this._workerCount = options.workers || 4;
+    this._workerCount = options.workers || Math.max(_os2.default.cpus().length, 4);
     this._require = options.require;
     this.start();
   }
@@ -126,9 +130,13 @@ class Sandbox {
     this.ensureWorkers();
   }
 
-  execute(code, timeout, callback) {
+  execute(_ref, callback) {
+    let code = _ref.code,
+        context = _ref.context,
+        timeout = _ref.timeout;
+
     const item = {
-      code: code, timeout: timeout
+      code: code, timeout: timeout, context: context
     };
 
     let promise = null;
@@ -156,7 +164,11 @@ class Sandbox {
     return promise;
   }
 
-  _execute(code, timeout, callback) {
+  _execute(_ref2, callback) {
+    let code = _ref2.code,
+        context = _ref2.context,
+        timeout = _ref2.timeout;
+
     this.popWorker(worker => {
       worker.removeAllListeners();
 
@@ -185,7 +197,7 @@ class Sandbox {
         }, timeout);
       }
 
-      worker.send({ code: code });
+      worker.send({ code: code, context: JSON.stringify(context || {}) });
     });
   }
 }

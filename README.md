@@ -19,14 +19,14 @@ import Sandbox from 'v8-sandbox';
 
 const sandbox = new Sandbox();
 
-const js = `
+const code = `
 
 // arbitrary JS, call setResult to set the final result of the script to accommodate async code
 setResult({value: 1});
 
 `;
 
-sandbox.execute(js, 3000, (err, value) => {
+sandbox.execute({code, timeout: 3000}, (err, value) => {
   console.log(value);
 });
 ```
@@ -36,13 +36,13 @@ import Sandbox from 'v8-sandbox';
 
 const sandbox = new Sandbox();
 
-const js = `
+const code = `
 
 while (true) {}
 
 `;
 
-sandbox.execute(js, 3000, (err, value) => {
+sandbox.execute({code, timeout: 3000}, (err, value) => {
   // timeout
   console.log(err.isTimeout);
 });

@@ -3,8 +3,10 @@ import path from 'path';
 
 const sandbox = new Sandbox({require: path.join(process.cwd(), 'example-functions.js')});
 
+const timeout = 1000;
+
 const run = (code, callback) => {
-  sandbox.execute(code, 1000, callback);
+  sandbox.execute({code, timeout}, callback);
 };
 
 const example1 = `

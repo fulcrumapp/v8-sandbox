@@ -3,7 +3,7 @@ import Sandbox from './dist';
 import assert from 'assert';
 
 const run = (code, timeout, callback) => {
-  return new Sandbox().execute(code, timeout, callback);
+  return new Sandbox().execute({code, timeout}, callback);
 };
 
 const jsAsync = `

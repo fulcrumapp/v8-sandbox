@@ -5,7 +5,7 @@ import assert from 'assert';
 const sandbox = new Sandbox();
 
 const runWithTimeout = (code, timeout, callback) => {
-  return sandbox.execute(code, timeout, callback);
+  return sandbox.execute({code, timeout}, callback);
 };
 
 const run = (code, callback) => {

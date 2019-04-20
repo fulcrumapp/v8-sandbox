@@ -16,6 +16,8 @@ process.on('message', message => {
 
   const sandbox = new _sandbox2.default();
 
+  global.context = JSON.parse(message.context);
+
   sandbox.execute(message.code, (err, value) => {
     process.send({ err: err, value: value });
   });
