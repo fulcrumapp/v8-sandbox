@@ -152,7 +152,7 @@ class Sandbox {
 
       callback = (err, value) => {
         if (err) {
-          return itemReject(value);
+          return itemReject(err);
         }
 
         return itemResolve(value);
