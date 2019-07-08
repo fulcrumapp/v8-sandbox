@@ -93,7 +93,7 @@ class Sandbox {
 
   httpRequest(options, callback) {
     (0, _request2.default)(options, (err, response, body) => {
-      if (Buffer.isBuffer(response.body)) {
+      if (response && Buffer.isBuffer(response.body)) {
         response.body = body = response.body.toString('base64');
       }
 

@@ -76,7 +76,7 @@ class Sandbox {
   }
 
   ensureWorkers() {
-    const total = this._inactiveWorkers.length + this._activeWorkers;
+    const total = this._inactiveWorkers.length + this._activeWorkers.length;
 
     for (let i = 0; i < this._workerCount - total; ++i) {
       const worker = this.forkWorker();
@@ -108,7 +108,7 @@ class Sandbox {
     this._activeWorkers.push(worker);
 
     if (this._activeWorkers.length + this._inactiveWorkers.length !== this._workerCount) {
-      throw new Error('invalid worker count');
+      throw new Error('invalid worker count', 'active:', this._activeWorkers.length, 'inactive:', this._inactiveWorkers.length);
     }
 
     callback(worker);

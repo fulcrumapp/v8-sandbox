@@ -1,1 +1,0 @@
-{"version":3,"sources":["../lib/worker-babel.js"],"names":["require"],"mappings":";;AAAAA,QAAQ,qBAAR;AACAA,QAAQ,UAAR","file":"worker-babel.js","sourcesContent":["require('babel-core/register')();\nrequire('./worker');\n"]}
