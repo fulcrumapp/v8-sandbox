@@ -41,6 +41,25 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     });
   });
 
+  it('should collect garbage', (done) => {
+    const js = `
+let objects = []
+
+for (let i = 0; i < 100000; ++i) {
+  objects.push(JSON.stringify({test: 1, value: 'two'}));
+}
+
+objects = [];
+
+setResult({value: 1});
+`;
+
+    run(js, (err, result) => {
+      assert.equal(result, 1);
+      done();
+    });
+  });
+
   it('should handle syntax errors', (done) => {
     const js = `}`;
 
@@ -164,6 +183,24 @@ setTimeout(() => {
       assert.equal(err.isTimeout, true);
       done();
     });
+  });
+
+  it('should timeout many times', (done) => {
+    const js = `while (true) {}`;
+
+    let count = 20;
+
+    for (let i = count; i > 0; --i) {
+      runWithTimeout(js, 300, (err, result) => {
+        assert.equal(err.isTimeout, true);
+
+        --count;
+
+        if (count === 0) {
+          done();
+        }
+      });
+    }
   });
 
   it('should throw errors from top level script', (done) => {
