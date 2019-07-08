@@ -29,9 +29,11 @@ void SandboxWrap::Init(v8::Local<v8::Object> exports) {
   Nan::SetPrototypeMethod(tpl, "execute", Execute);
   Nan::SetPrototypeMethod(tpl, "terminate", Terminate);
 
-  constructor.Reset(tpl->GetFunction());
+  auto function = Nan::GetFunction(tpl).ToLocalChecked();
 
-  exports->Set(Nan::New("Sandbox").ToLocalChecked(), tpl->GetFunction());
+  constructor.Reset(function);
+
+  Nan::Set(exports, Nan::New("Sandbox").ToLocalChecked(), function);
 }
 
 NAN_METHOD(SandboxWrap::New) {

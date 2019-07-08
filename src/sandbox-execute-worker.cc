@@ -28,6 +28,6 @@ void SandboxExecuteWorker::HandleOKCallback() {
   };
 
   if (!callback->IsEmpty()) {
-    callback->Call(1, argv);
+    Nan::Call(*callback, 1, argv);
   }
 }
