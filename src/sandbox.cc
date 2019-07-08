@@ -16,11 +16,8 @@ Sandbox::Sandbox()
   global_(nullptr),
   result_("null"),
   loop_(nullptr),
-  timers_()
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
-#else
-  ,isolateData_(nullptr)
-#endif
+  timers_(),
+  isolateData_(nullptr)
 {}
 
 Sandbox::~Sandbox() {
@@ -74,11 +71,20 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
 
   params_.array_buffer_allocator = (ArrayBuffer::Allocator *)allocator;
 
-  isolate_ = Isolate::Allocate();
+  isolate_ = node::NewIsolate(allocator,
+                              loop_,
+                              node::GetMainThreadMultiIsolatePlatform());
 
-  node::GetMainThreadMultiIsolatePlatform()->RegisterIsolate(isolate_, loop_);
+  {
+    Locker locker(isolate_);
+    Isolate::Scope isolate_scope(isolate_);
+    HandleScope handle_scope(isolate_);
 
-  Isolate::Initialize(isolate_, params_);
+    isolateData_ = node::CreateIsolateData(isolate_,
+                                           loop_,
+                                           node::GetMainThreadMultiIsolatePlatform(),
+                                           allocator);
+  }
 #elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
   auto allocator = node::CreateArrayBufferAllocator();
 
@@ -510,11 +516,9 @@ void Sandbox::Dispose() {
 
 #if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
     node::GetMainThreadMultiIsolatePlatform()->UnregisterIsolate(isolate_);
-/* #elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION */
-#else
+#endif
     node::FreeIsolateData(isolateData_);
     isolateData_ = nullptr;
-#endif
 
     isolate_ = nullptr;
   }

@@ -108,11 +108,7 @@ private:
   // need to clean up pending operations on abrupt termination
   InvocationMap pendingOperations_;
 
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
-/* #elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION */
-#else
   node::IsolateData *isolateData_;
-#endif
 };
 
 #endif
