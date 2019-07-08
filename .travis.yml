@@ -17,15 +17,11 @@ matrix:
   fast_finish: true
   include:
   - os: linux
-    env: export NODE_VERSION="6" TARGET_ARCH="x64" RUNTIME="node"
-  - os: linux
     env: export NODE_VERSION="8" TARGET_ARCH="x64" RUNTIME="node"
   - os: linux
     env: export NODE_VERSION="10" TARGET_ARCH="x64" RUNTIME="node"
   - os: linux
     env: export NODE_VERSION="12" TARGET_ARCH="x64" RUNTIME="node"
-  - os: osx
-    env: export NODE_VERSION="6" TARGET_ARCH="x64" RUNTIME="node"
   - os: osx
     env: export NODE_VERSION="8" TARGET_ARCH="x64" RUNTIME="node"
   - os: osx
