@@ -66,7 +66,7 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
 
   uv_loop_init(loop_);
 
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
+#if NODE_MAJOR_VERSION >= 11
   auto allocator = node::CreateArrayBufferAllocator();
 
   params_.array_buffer_allocator = (ArrayBuffer::Allocator *)allocator;
@@ -85,7 +85,7 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
                                            node::GetMainThreadMultiIsolatePlatform(),
                                            allocator);
   }
-#elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
+#elif NODE_MAJOR_VERSION >= 9
   auto allocator = node::CreateArrayBufferAllocator();
 
   params_.array_buffer_allocator = (ArrayBuffer::Allocator *)allocator;
@@ -103,7 +103,7 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
                                            allocator);
   }
 
-#else
+#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
   params_.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
 
   isolate_ = Isolate::New(params_);
@@ -118,6 +118,19 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
     isolateData_ = node::CreateIsolateData(isolate_,
                                            loop_,
                                            platform);
+  }
+#else
+  params_.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
+
+  isolate_ = Isolate::New(params_);
+
+  {
+    Locker locker(isolate_);
+    Isolate::Scope isolate_scope(isolate_);
+    HandleScope handle_scope(isolate_);
+
+    isolateData_ = node::CreateIsolateData(isolate_,
+                                           loop_);
   }
 #endif
 
@@ -473,19 +486,23 @@ void Sandbox::Dispose() {
   CancelPendingOperations();
 
   if (isolate_) {
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
+#if NODE_MAJOR_VERSION >= 11
     node::GetMainThreadMultiIsolatePlatform()->DrainTasks(isolate_);
-#elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
+#elif NODE_MAJOR_VERSION >= 9
     node::GetMainThreadMultiIsolatePlatform()->DrainBackgroundTasks(isolate_);
-#else
+#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
     node::MultiIsolatePlatform *platform = (node::MultiIsolatePlatform *)v8::internal::V8::GetCurrentPlatform();
 
     platform->DrainBackgroundTasks(isolate_);
+#else
+    node::NodePlatform *platform = (node::NodePlatform *)v8::internal::V8::GetCurrentPlatform();
+
+    platform->DrainBackgroundTasks();
 #endif
 
-#if NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
+#if NODE_MAJOR_VERSION >= 9
     node::GetMainThreadMultiIsolatePlatform()->CancelPendingDelayedTasks(isolate_);
-#else
+#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
     platform->CancelPendingDelayedTasks(isolate_);
 #endif
 
@@ -514,7 +531,7 @@ void Sandbox::Dispose() {
 
     isolate_->Dispose();
 
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
+#if NODE_MAJOR_VERSION >= 11
     node::GetMainThreadMultiIsolatePlatform()->UnregisterIsolate(isolate_);
 #endif
     node::FreeIsolateData(isolateData_);
@@ -524,7 +541,7 @@ void Sandbox::Dispose() {
   }
 
   if (params_.array_buffer_allocator) {
-#if NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
+#if NODE_MAJOR_VERSION >= 9
     node::FreeArrayBufferAllocator((node::ArrayBufferAllocator *)params_.array_buffer_allocator);
 #else
     delete params_.array_buffer_allocator;

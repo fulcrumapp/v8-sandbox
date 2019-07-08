@@ -4,23 +4,11 @@
 #include <map>
 #include <nan.h>
 #include "baton.h"
+#include "internal.h"
 
 extern const char *SandboxRuntime;
 
 using namespace v8;
-
-#if NODE_MODULE_VERSION >= NODE_11_0_MODULE_VERSION
-#elif NODE_MODULE_VERSION >= NODE_9_0_MODULE_VERSION
-#else
-namespace v8 {
-  namespace internal {
-    class V8 {
-     public:
-       static Platform* GetCurrentPlatform();
-    };
-  }
-}
-#endif
 
 class Sandbox;
 class SandboxWrap;
