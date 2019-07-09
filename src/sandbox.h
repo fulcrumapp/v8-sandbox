@@ -4,7 +4,10 @@
 #include <map>
 #include <nan.h>
 #include "baton.h"
-#include "internal.h"
+
+#if NODE_MAJOR_VERSION < 9
+#error "Node version must be >= 9"
+#endif
 
 extern const char *SandboxRuntime;
 

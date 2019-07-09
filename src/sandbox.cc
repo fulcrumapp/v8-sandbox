@@ -102,36 +102,6 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
                                            node::GetMainThreadMultiIsolatePlatform(),
                                            allocator);
   }
-
-#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
-  params_.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
-
-  isolate_ = Isolate::New(params_);
-
-  node::MultiIsolatePlatform *platform = (node::MultiIsolatePlatform *)v8::internal::V8::GetCurrentPlatform();
-
-  {
-    Locker locker(isolate_);
-    Isolate::Scope isolate_scope(isolate_);
-    HandleScope handle_scope(isolate_);
-
-    isolateData_ = node::CreateIsolateData(isolate_,
-                                           loop_,
-                                           platform);
-  }
-#else
-  params_.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
-
-  isolate_ = Isolate::New(params_);
-
-  {
-    Locker locker(isolate_);
-    Isolate::Scope isolate_scope(isolate_);
-    HandleScope handle_scope(isolate_);
-
-    isolateData_ = node::CreateIsolateData(isolate_,
-                                           loop_);
-  }
 #endif
 
   RunIsolate(code);
@@ -490,20 +460,10 @@ void Sandbox::Dispose() {
     node::GetMainThreadMultiIsolatePlatform()->DrainTasks(isolate_);
 #elif NODE_MAJOR_VERSION >= 9
     node::GetMainThreadMultiIsolatePlatform()->DrainBackgroundTasks(isolate_);
-#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
-    node::MultiIsolatePlatform *platform = (node::MultiIsolatePlatform *)v8::internal::V8::GetCurrentPlatform();
-
-    platform->DrainBackgroundTasks(isolate_);
-#else
-    node::NodePlatform *platform = (node::NodePlatform *)v8::internal::V8::GetCurrentPlatform();
-
-    platform->DrainBackgroundTasks();
 #endif
 
 #if NODE_MAJOR_VERSION >= 9
     node::GetMainThreadMultiIsolatePlatform()->CancelPendingDelayedTasks(isolate_);
-#elif NODE_MAJOR_VERSION >= 8 && NODE_MINOR_VERSION >= 12
-    platform->CancelPendingDelayedTasks(isolate_);
 #endif
 
     {
@@ -543,8 +503,6 @@ void Sandbox::Dispose() {
   if (params_.array_buffer_allocator) {
 #if NODE_MAJOR_VERSION >= 9
     node::FreeArrayBufferAllocator((node::ArrayBufferAllocator *)params_.array_buffer_allocator);
-#else
-    delete params_.array_buffer_allocator;
 #endif
 
     params_.array_buffer_allocator = nullptr;
