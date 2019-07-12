@@ -13,11 +13,7 @@ SandboxExecuteWorker::~SandboxExecuteWorker()
 {}
 
 void SandboxExecuteWorker::Execute() {
-  Sandbox box;
-
-  sandbox_->sandbox_ = &box;
-
-  result_ = box.RunInSandbox(code_.c_str(), sandbox_);
+  result_ = sandbox_->sandbox_->RunInSandbox(code_.c_str());
 }
 
 void SandboxExecuteWorker::HandleOKCallback() {

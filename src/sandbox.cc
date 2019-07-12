@@ -2,18 +2,16 @@
 #include "sandbox.h"
 #include "sandbox-wrap.h"
 #include "common.h"
+#include <unistd.h>
 #include <iostream>
 
 void Debug(const char *msg) {
-  std::cout << msg << std::endl;
+  std::cout << getpid() << " : " << msg << std::endl;
 }
 
 Sandbox::Sandbox()
 : params_(),
   isolate_(nullptr),
-  locker_(nullptr),
-  context_(nullptr),
-  global_(nullptr),
   result_("null"),
   loop_(nullptr),
   timers_(),
@@ -25,41 +23,24 @@ Sandbox::~Sandbox() {
 }
 
 void Sandbox::RunIsolate(const char *code) {
-  locker_ = new Locker(isolate_);
-
-  isolate_->Enter();
-
+  Locker locker(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
   HandleScope scope(isolate_);
 
-  context_ = new Nan::Persistent<Context>(Context::New(isolate_));
+  Local<v8::Context> context = Nan::New(context_);
 
-  auto context = Nan::New(context_->As<Context>());
+  Context::Scope context_scope(context);
 
-  global_ = new Nan::Persistent<Object>(context->Global());
-
-  context->Enter();
-
-  Nan::SetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked(), External::New(isolate_, this));
-
-  Nan::Set(context->Global(), Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(context->Global(), "_setResult", SetResult);
-  Nan::SetMethod(context->Global(), "_dispatchSync", DispatchSync);
-  Nan::SetMethod(context->Global(), "_dispatchAsync", DispatchAsync);
-  Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
-  Nan::SetMethod(context->Global(), "_clearTimeout", ClearTimeout);
-  Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
-  Nan::SetMethod(context->Global(), "_log", ConsoleLog);
-  Nan::SetMethod(context->Global(), "_error", ConsoleError);
   Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
 
-  Local<String> runtime = Nan::New(SandboxRuntime).ToLocalChecked();
+  Local<String> execute = Nan::New("global._execute();").ToLocalChecked();
 
-  Local<Script> script = Script::Compile(context, runtime).ToLocalChecked();
+  Local<Script> script = Script::Compile(context, execute).ToLocalChecked();
 
   (void)script->Run(context);
 }
 
-std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
+void Sandbox::Initialize(SandboxWrap *wrap) {
   wrap_ = wrap;
 
   loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
@@ -104,16 +85,47 @@ std::string Sandbox::RunInSandbox(const char *code, SandboxWrap *wrap) {
   }
 #endif
 
+  Locker locker(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  HandleScope scope(isolate_);
+
+  context_.Reset(Context::New(isolate_));
+
+  auto context = GetContext();
+
+  Context::Scope context_scope(context);
+
+  global_.Reset(context->Global());
+
+  Nan::SetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked(), External::New(isolate_, this));
+
+  Nan::Set(context->Global(), Nan::New("global").ToLocalChecked(), context->Global());
+  Nan::SetMethod(context->Global(), "_setResult", SetResult);
+  Nan::SetMethod(context->Global(), "_dispatchSync", DispatchSync);
+  Nan::SetMethod(context->Global(), "_dispatchAsync", DispatchAsync);
+  Nan::SetMethod(context->Global(), "_setTimeout", SetTimeout);
+  Nan::SetMethod(context->Global(), "_clearTimeout", ClearTimeout);
+  Nan::SetMethod(context->Global(), "_httpRequest", HttpRequest);
+  Nan::SetMethod(context->Global(), "_log", ConsoleLog);
+  Nan::SetMethod(context->Global(), "_error", ConsoleError);
+
+  Local<String> runtime = Nan::New(SandboxRuntime).ToLocalChecked();
+
+  Local<Script> script = Script::Compile(context, runtime).ToLocalChecked();
+
+  (void)script->Run(context);
+}
+
+std::string Sandbox::RunInSandbox(const char *code) {
   RunIsolate(code);
 
   uv_run(loop_, UV_RUN_DEFAULT);
-  uv_loop_close(loop_);
-  free(loop_);
-  loop_ = nullptr;
-
-  Dispose();
 
   return result_;
+}
+
+void Sandbox::Finalize() {
+  Dispose();
 }
 
 Sandbox *UnwrapSandbox(Isolate *isolate) {
@@ -169,15 +181,19 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
 
   Isolate *isolate = baton->instance->isolate_;
 
+  Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
   HandleScope scope(isolate);
 
   Local<Function> cb = Nan::New(baton->callback->As<Function>());
-  Local<Context> context = Nan::New(baton->instance->context_->As<Context>());
-  Local<Object> global = Nan::New(baton->instance->global_->As<Object>());
+  Local<Context> context = Nan::New(baton->instance->context_);
+  Local<Object> global = Nan::New(baton->instance->global_);
 
   uv_timer_stop(timer);
 
   uv_close((uv_handle_t *)timer, OnTimerClose);
+
+  Context::Scope context_scope(context);
 
   (void)cb->Call(context, global, 0, 0);
 }
@@ -267,7 +283,13 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
   // enter the sandbox isolate
   Isolate *sandboxIsolate = baton->instance->isolate_;
 
+  Locker locker(sandboxIsolate);
+  Isolate::Scope isolate_scope(sandboxIsolate);
   HandleScope scope(sandboxIsolate);
+
+  Local<Context> context = Nan::New(baton->instance->context_);
+
+  Context::Scope context_scope(context);
 
   Local<Function> cb = Nan::New(baton->callback->As<Function>());
 
@@ -277,7 +299,7 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 
   baton->instance->pendingOperations_.erase(baton->id);
 
-  (void)cb->Call(sandboxIsolate->GetCurrentContext(), sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
+  (void)cb->Call(context, sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
 }
 
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
@@ -286,6 +308,8 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
   // enter the node isolate
   Isolate *nodeIsolate = Isolate::GetCurrent();
 
+  Locker locker(nodeIsolate);
+  Isolate::Scope isolate_scope(nodeIsolate);
   HandleScope scope(nodeIsolate);
 
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
@@ -413,18 +437,6 @@ NAN_METHOD(Sandbox::ConsoleLog) {
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
-void Sandbox::Terminate() {
-  if (isolate_) {
-    isolate_->TerminateExecution();
-
-    CancelPendingOperations();
-
-    if (loop_) {
-      uv_stop(loop_);
-    }
-  }
-}
-
 void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
   Sandbox *sandbox = (Sandbox *)handle->data;
 
@@ -456,38 +468,25 @@ void Sandbox::Dispose() {
   CancelPendingOperations();
 
   if (isolate_) {
+
+    {
+      Locker locker(isolate_);
+      Isolate::Scope isolate_scope(isolate_);
+      HandleScope scope(isolate_);
+
 #if NODE_MAJOR_VERSION >= 11
-    node::GetMainThreadMultiIsolatePlatform()->DrainTasks(isolate_);
+      node::GetMainThreadMultiIsolatePlatform()->DrainTasks(isolate_);
 #elif NODE_MAJOR_VERSION >= 9
-    node::GetMainThreadMultiIsolatePlatform()->DrainBackgroundTasks(isolate_);
+      node::GetMainThreadMultiIsolatePlatform()->DrainBackgroundTasks(isolate_);
 #endif
 
 #if NODE_MAJOR_VERSION >= 9
-    node::GetMainThreadMultiIsolatePlatform()->CancelPendingDelayedTasks(isolate_);
+      node::GetMainThreadMultiIsolatePlatform()->CancelPendingDelayedTasks(isolate_);
 #endif
-
-    {
-      HandleScope scope(isolate_);
-
-      isolate_->GetCurrentContext()->Exit();
     }
 
-    if (global_) {
-      global_->Reset();
-      global_ = nullptr;
-    }
-
-    if (context_) {
-      context_->Reset();
-      context_ = nullptr;
-    }
-
-    isolate_->Exit();
-
-    if (locker_) {
-      delete locker_;
-      locker_ = nullptr;
-    }
+    global_.Reset();
+    context_.Reset();
 
     isolate_->Dispose();
 
@@ -506,5 +505,11 @@ void Sandbox::Dispose() {
 #endif
 
     params_.array_buffer_allocator = nullptr;
+  }
+
+  if (loop_) {
+    uv_loop_close(loop_);
+    free(loop_);
+    loop_ = nullptr;
   }
 }

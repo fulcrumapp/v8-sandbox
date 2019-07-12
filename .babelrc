@@ -1,3 +1,16 @@
 {
-  "presets": ["es2015-node5", "stage-1"]
+  "presets": [
+    [
+      "@babel/env",
+      {
+        "targets": {
+          "node": "10"
+        },
+        "useBuiltIns": false
+      }
+    ]
+  ],
+  "plugins": [
+    ["@babel/plugin-proposal-class-properties", { "loose": false }]
+  ]
 }

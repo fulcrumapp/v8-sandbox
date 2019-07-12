@@ -110,7 +110,5 @@ global.console = {
     global._error(JSON.stringify(args));
   }
 };
-
-global._execute();
 })();
 )JSRUNTIME";

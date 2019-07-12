@@ -6,8 +6,9 @@
 #include "sandbox.h"
 
 class SandboxWrap : public Nan::ObjectWrap {
+  friend class SandboxInitializeWorker;
   friend class SandboxExecuteWorker;
-  friend class SandboxTerminateWorker;
+  friend class SandboxFinalizeWorker;
 
 public:
   static void Init(v8::Local<v8::Object> exports);
@@ -23,9 +24,11 @@ private:
 
   static NAN_METHOD(New);
 
+  static NAN_METHOD(Initialize);
+
   static NAN_METHOD(Execute);
 
-  static NAN_METHOD(Terminate);
+  static NAN_METHOD(Finalize);
 
   Nan::Persistent<v8::Function> bridge_;
 

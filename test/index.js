@@ -191,7 +191,7 @@ setTimeout(() => {
     let count = 20;
 
     for (let i = count; i > 0; --i) {
-      runWithTimeout(js, 300, (err, result) => {
+      runWithTimeout(js, 30, (err, result) => {
         assert.equal(err.isTimeout, true);
 
         --count;
@@ -262,7 +262,7 @@ setTimeout(() => {
     });
   });
 
-  it('should handle stress', (done) => {
+  it('should handle stress', function (done) {
     const iterations = 500;
 
     let count = 0;
@@ -285,7 +285,7 @@ setTimeout(() => {
     }
   });
 
-  it('should handle queued stress', (done) => {
+  it('should handle queued stress', function (done) {
     const iterations = 500;
 
     let count = 0;
@@ -311,8 +311,6 @@ setTimeout(() => {
   });
 
   it('should handle recursive stress', function (done) {
-    this.timeout(10000000);
-
     const iterations = 500;
 
     const executeNext = (i) => {
@@ -334,5 +332,25 @@ setResult({value: ${i}});
     };
 
     executeNext(0);
+  });
+
+
+  it('should handle template scripts', (done) => {
+    const template = `
+global.testValue = 1;
+`;
+
+    const sandbox = new Sandbox({template});
+
+    const code = `
+setTimeout(() => {
+  setResult({value: ++global.testValue});
+}, 1);
+`;
+
+    sandbox.execute({code, timeout: 3000}, (err, value) => {
+      assert.equal(value, 2);
+      done();
+    });
   });
 });

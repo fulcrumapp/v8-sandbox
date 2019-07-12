@@ -25,9 +25,11 @@ public:
 
   ~Sandbox();
 
-  std::string RunInSandbox(const char *code, SandboxWrap *wrap);
+  void Initialize(SandboxWrap *wrap);
 
-  void Terminate();
+  std::string RunInSandbox(const char *code);
+
+  void Finalize();
 
 private:
   static NAN_METHOD(SetResult);
@@ -70,15 +72,17 @@ private:
 
   void RunIsolate(const char *code);
 
+  inline Local<Context> GetContext() {
+    return Nan::New(context_);
+  }
+
   Isolate::CreateParams params_;
 
   Isolate *isolate_;
 
-  Locker *locker_;
+  Nan::Global<Context> context_;
 
-  Nan::Persistent<Context> *context_;
-
-  Nan::Persistent<Object> *global_;
+  Nan::Global<Object> global_;
 
   std::string result_;
 
