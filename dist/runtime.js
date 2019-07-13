@@ -1,8 +1,6 @@
-'use strict';
+"use strict";
 
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
-
-global._tryCallback = func => {
+global._try = func => {
   try {
     func();
   } catch (ex) {
@@ -17,7 +15,7 @@ global._tryCallback = func => {
 };
 
 global._execute = () => {
-  global._tryCallback(() => {
+  global._try(() => {
     eval(global._code);
   });
 };
@@ -31,12 +29,7 @@ global.dispatchSync = (name, args) => {
     return null;
   }
 
-  var _JSON$parse = JSON.parse(result),
-      _JSON$parse2 = _slicedToArray(_JSON$parse, 2);
-
-  const error = _JSON$parse2[0],
-        value = _JSON$parse2[1];
-
+  const [error, value] = JSON.parse(result);
 
   if (error) {
     throw new Error(error.message);
@@ -53,7 +46,7 @@ global.dispatchAsync = (name, args, callback) => {
   const parameters = [JSON.stringify([name, ...(args || [])])];
 
   const wrappedCallback = args => {
-    global._tryCallback(() => {
+    global._try(() => {
       callback.apply(null, JSON.parse(args));
     });
   };
@@ -70,7 +63,7 @@ global.httpRequest = (options, callback) => {
 
   if (callback) {
     const wrappedCallback = args => {
-      global._tryCallback(() => {
+      global._try(() => {
         callback.apply(null, JSON.parse(args));
       });
     };
@@ -84,12 +77,7 @@ global.httpRequest = (options, callback) => {
     return null;
   }
 
-  var _JSON$parse3 = JSON.parse(result),
-      _JSON$parse4 = _slicedToArray(_JSON$parse3, 2);
-
-  const error = _JSON$parse4[0],
-        response = _JSON$parse4[1];
-
+  const [error, response] = JSON.parse(result);
 
   if (!callback && error) {
     throw new Error(error.message);
@@ -104,7 +92,7 @@ global.setResult = result => {
 
 global.setTimeout = (callback, timeout) => {
   const handler = () => {
-    global._tryCallback(callback);
+    global._try(callback);
   };
 
   return global._setTimeout(handler, timeout);
@@ -115,21 +103,11 @@ global.clearTimeout = id => {
 };
 
 global.console = {
-  log: function log() {
-    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
-    }
-
+  log: (...args) => {
     global._log(JSON.stringify(args));
   },
-  error: function error() {
-    for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-      args[_key2] = arguments[_key2];
-    }
-
+  error: (...args) => {
     global._error(JSON.stringify(args));
   }
 };
-
-global._execute();
 //# sourceMappingURL=runtime.js.map

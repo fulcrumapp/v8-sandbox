@@ -1,12 +1,11 @@
-'use strict';
+"use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.default = void 0;
 
-var _request = require('request');
-
-var _request2 = _interopRequireDefault(_request);
+var _request = _interopRequireDefault(require("request"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -28,30 +27,53 @@ class Sandbox {
     this.id = ++nextObjectID;
   }
 
-  terminate(callback) {
-    this._native.terminate(callback);
+  initialize() {
+    return new Promise(resolve => {
+      this._native.initialize(() => {
+        setImmediate(resolve);
+      }, this.dispatch.bind(this));
+    });
+  }
+
+  async eval(code) {
+    await this.initialize();
+    const result = await this.execute(code);
+    await this.finalize();
+    return result;
   }
 
   execute(code, callback) {
-    this._native.execute(code, json => {
-      let result = tryParseJSON(json);
+    return new Promise((resolve, reject) => {
+      this._native.execute(code, json => {
+        let result = tryParseJSON(json);
 
-      if (result == null) {
-        result = { error: new Error('no result') };
-      }
+        if (result == null) {
+          result = {
+            error: new Error('no result')
+          };
+        }
 
-      callback(result.error, result.value);
-    }, this.dispatch.bind(this));
+        setImmediate(() => {
+          resolve(result);
+        });
+      }, this.dispatch.bind(this));
+    });
   }
 
-  // handle function calls from the sandbox
-  dispatch(invocation) {
-    const finish = function finish(err) {
-      for (var _len = arguments.length, results = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-        results[_key - 1] = arguments[_key];
-      }
+  finalize() {
+    return new Promise(resolve => {
+      this._native.finalize(() => {
+        setImmediate(resolve);
+      }, this.dispatch.bind(this));
+    });
+  } // handle function calls from the sandbox
 
-      const serialized = [err != null ? { message: err.message } : null];
+
+  dispatch(invocation) {
+    const finish = (err, ...results) => {
+      const serialized = [err != null ? {
+        message: err.message
+      } : null];
 
       if (results && results.length) {
         serialized.push.apply(serialized, results);
@@ -83,16 +105,16 @@ class Sandbox {
     return finish(null);
   }
 
-  log() {
-    console.log(...arguments);
+  log(...args) {
+    console.log(...args);
   }
 
-  error() {
-    console.error(...arguments);
+  error(...args) {
+    console.error(...args);
   }
 
   httpRequest(options, callback) {
-    (0, _request2.default)(options, (err, response, body) => {
+    (0, _request.default)(options, (err, response, body) => {
       if (response && Buffer.isBuffer(response.body)) {
         response.body = body = response.body.toString('base64');
       }
@@ -105,7 +127,6 @@ class Sandbox {
     try {
       const name = args[0];
       const parameters = args.slice(1);
-
       callback(null, global.$exports[name](...parameters));
     } catch (err) {
       callback(err);
@@ -116,12 +137,13 @@ class Sandbox {
     try {
       const name = args[0];
       const parameters = args.slice(1);
-
       global.$exports[name](...[...parameters, callback]);
     } catch (err) {
       callback(err);
     }
   }
+
 }
+
 exports.default = Sandbox;
 //# sourceMappingURL=sandbox.js.map

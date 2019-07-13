@@ -1,29 +1,35 @@
-'use strict';
+"use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+Object.defineProperty(exports, "Sandbox", {
+  enumerable: true,
+  get: function () {
+    return _sandbox.default;
+  }
+});
+exports.default = void 0;
 
-var _child_process = require('child_process');
+var _child_process = require("child_process");
 
-var _path = require('path');
+var _path = _interopRequireDefault(require("path"));
 
-var _path2 = _interopRequireDefault(_path);
+var _async = _interopRequireDefault(require("async"));
 
-var _async = require('async');
+var _os = _interopRequireDefault(require("os"));
 
-var _async2 = _interopRequireDefault(_async);
-
-var _os = require('os');
-
-var _os2 = _interopRequireDefault(_os);
+var _sandbox = _interopRequireDefault(require("./sandbox"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 class TimeoutError extends Error {
   get isTimeout() {
     return true;
   }
+
 }
 
 function remove(array, object) {
@@ -34,23 +40,22 @@ function remove(array, object) {
   }
 }
 
-class Sandbox {
-  constructor() {
-    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-
-    this.worker = (task, callback) => {
+class SandboxCluster {
+  constructor(options = {}) {
+    _defineProperty(this, "worker", (task, callback) => {
       this._execute(task, callback);
-    };
+    });
 
-    this._workerCount = options.workers || Math.max(_os2.default.cpus().length, 4);
+    this._workerCount = options.workers || Math.max(_os.default.cpus().length, 4);
     this._require = options.require;
+    this._template = options.template;
     this.start();
   }
 
   start() {
     this._inactiveWorkers = [];
     this._activeWorkers = [];
-    this._queue = _async2.default.queue(this.worker, this._workerCount);
+    this._queue = _async.default.queue(this.worker, this._workerCount);
     this.ensureWorkers();
   }
 
@@ -72,7 +77,7 @@ class Sandbox {
       this._queue.kill();
     }
 
-    this._queue = _async2.default.queue(this.worker, this._workerCount);
+    this._queue = _async.default.queue(this.worker, this._workerCount);
   }
 
   ensureWorkers() {
@@ -80,31 +85,32 @@ class Sandbox {
 
     for (let i = 0; i < this._workerCount - total; ++i) {
       const worker = this.forkWorker();
-
-      if (this._require) {
-        worker.send({ require: this._require });
-      }
+      worker.send({
+        initialize: true,
+        require: this._require,
+        template: this._template
+      });
 
       this._inactiveWorkers.push(worker);
     }
   }
 
   forkWorker() {
-    return (0, _child_process.fork)(_path2.default.join(__dirname, 'worker'));
+    return (0, _child_process.fork)(_path.default.join(__dirname, 'worker'));
   }
 
   popWorker(callback) {
     this.ensureWorkers();
 
     if (this._inactiveWorkers.length === 0) {
-      setTimeout(() => {
+      setImmediate(() => {
         this.popWorker(callback);
-      }, 1);
-
+      });
       return;
     }
 
     const worker = this._inactiveWorkers.shift();
+
     this._activeWorkers.push(worker);
 
     if (this._activeWorkers.length + this._inactiveWorkers.length !== this._workerCount) {
@@ -114,77 +120,64 @@ class Sandbox {
     callback(worker);
   }
 
-  finishWorker(worker) {
+  clearWorkerTimeout(worker) {
     clearTimeout(worker.executionTimeout);
     worker.executionTimeout = null;
+  }
+
+  finishWorker(worker) {
+    this.clearWorkerTimeout(worker);
     remove(this._activeWorkers, worker);
+
     this._inactiveWorkers.push(worker);
   }
 
   removeWorker(worker) {
-    clearTimeout(worker.executionTimeout);
-    worker.executionTimeout = null;
+    this.clearWorkerTimeout(worker);
     worker.removeAllListeners();
     remove(this._activeWorkers, worker);
     remove(this._inactiveWorkers, worker);
     this.ensureWorkers();
   }
 
-  execute(_ref, callback) {
-    let code = _ref.code,
-        context = _ref.context,
-        timeout = _ref.timeout;
-
+  execute({
+    code,
+    context,
+    timeout
+  }) {
     const item = {
-      code: code, timeout: timeout, context: context
+      code,
+      timeout,
+      context
     };
-
-    let promise = null;
-
-    if (callback == null) {
-      let itemResolve = null;
-      let itemReject = null;
-
-      promise = new Promise((resolve, reject) => {
-        itemResolve = resolve;
-        itemReject = reject;
-      });
-
-      callback = (err, value) => {
-        if (err) {
-          return itemReject(err);
-        }
-
-        return itemResolve(value);
-      };
-    }
-
-    this._queue.push(item, callback);
-
-    return promise;
+    return new Promise((resolve, reject) => {
+      this._queue.push(item, resolve);
+    });
   }
 
-  _execute(_ref2, callback) {
-    let code = _ref2.code,
-        context = _ref2.context,
-        timeout = _ref2.timeout;
-
+  _execute({
+    code,
+    context,
+    timeout
+  }, callback) {
     this.popWorker(worker => {
       worker.removeAllListeners();
-
       worker.on('message', message => {
         this.finishWorker(worker);
-        callback(message.err, message.value);
+        callback(message);
       });
-
       worker.on('error', message => {
         this.removeWorker(worker);
+        callback({
+          error: new Error('worker error')
+        });
       });
-
       worker.on('disconnect', () => {
         this.removeWorker(worker);
+        callback({
+          error: new Error('worker disconnected')
+        });
       });
-
       worker.on('exit', message => {
         this.removeWorker(worker);
       });
@@ -193,13 +186,20 @@ class Sandbox {
         worker.executionTimeout = setTimeout(() => {
           this.removeWorker(worker);
           worker.kill();
-          callback(new TimeoutError('timeout'));
+          callback({
+            error: new TimeoutError('timeout')
+          });
         }, timeout);
       }
 
-      worker.send({ code: code, context: JSON.stringify(context || {}) });
+      worker.send({
+        code,
+        context: JSON.stringify(context || {})
+      });
     });
   }
+
 }
-exports.default = Sandbox;
+
+exports.default = SandboxCluster;
 //# sourceMappingURL=index.js.map
