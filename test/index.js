@@ -4,44 +4,46 @@ import assert from 'assert';
 
 const sandbox = new Sandbox();
 
-const runWithTimeout = (code, timeout, callback) => {
-  return sandbox.execute({code, timeout}, callback);
+const runWithTimeout = (code, timeout) => {
+  return sandbox.execute({code, timeout});
 };
 
-const run = (code, callback) => {
-  return runWithTimeout(code, 3000, callback);
+const run = (code) => {
+  return runWithTimeout(code, 3000);
 };
 
 const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt';
 
 describe('sandbox', () => {
-  it('should execute httpRequest', (done) => {
+  after(() => {
+    sandbox.shutdown();
+  });
+
+  it('should execute httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   setResult({value: body});
 });
 `;
 
-    run(js, (err, result) => {
-      assert.equal(result, 'hi there');
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 'hi there');
   });
 
-  it('should handle errors from httpRequest', (done) => {
+  it('should handle errors from httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   throw new Error('yoyo');
 });
 `;
 
-    run(js, (err, result) => {
-      assert.equal(err.message, 'yoyo');
-      done();
-    });
+    const {error} = await run(js);
+
+    assert.equal(error.message, 'yoyo');
   });
 
-  it('should collect garbage', (done) => {
+  it('should collect garbage', async () => {
     const js = `
 let objects = []
 
@@ -54,44 +56,40 @@ objects = [];
 setResult({value: 1});
 `;
 
-    run(js, (err, result) => {
-      assert.equal(result, 1);
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
   });
 
-  it('should handle syntax errors', (done) => {
+  it('should handle syntax errors', async () => {
     const js = `}`;
 
-    run(js, (err, result) => {
-      assert.ok(err && err.stack.indexOf('SyntaxError') >= 0);
-      done();
-    });
+    const {error} = await run(js);
+
+    assert.ok(error && error.stack.indexOf('SyntaxError') >= 0);
   });
 
-  it('should run simple script', (done) => {
+  it('should run simple script', async () => {
     const js = `setResult({value: 1337});`;
 
-    run(js, (err, result) => {
-      assert.equal(result, 1337);
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 1337);
   });
 
-  it('should execute setTimeout', (done) => {
+  it('should execute setTimeout', async () => {
     const js = `
 setTimeout(() => {
   setResult({value: 1});
 }, 1);
 `;
 
-    run(js, (err, result) => {
-      assert.equal(result, 1);
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
   });
 
-  it('should execute setTimeout multiple times', (done) => {
+  it('should execute setTimeout multiple times', async () => {
     const js = `
 setTimeout(() => {
   setTimeout(() => {
@@ -102,13 +100,12 @@ setTimeout(() => {
 }, 1);
 `;
 
-    run(js, (err, result) => {
-      assert.equal(result, 1);
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
   });
 
-  it('should execute setTimeout multiple times with clearTimeout', (done) => {
+  it('should execute setTimeout multiple times with clearTimeout', async () => {
     const js = `
 let value = 1;
 
@@ -122,13 +119,13 @@ setTimeout(() => {
   setResult({value});
 }, 5);
 `;
-    run(js, (err, result) => {
-      assert.equal(result, 1);
-      done();
-    });
+
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
   });
 
-  it('should clearTimeout multiple times', (done) => {
+  it('should clearTimeout multiple times', async () => {
     const js = `
 let value = 1;
 
@@ -143,13 +140,12 @@ setTimeout(() => {
   setResult({value});
 }, 15);
 `;
-    run(js, (err, result) => {
-      assert.equal(result, 1);
-      done();
-    });
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
   });
 
-  it('should setTimeout with setResult', (done) => {
+  it('should setTimeout with setResult', async () => {
     const js = `
 let value = 1;
 
@@ -161,71 +157,69 @@ setTimeout(() => {
   setResult({value});
 }, 15);
 `;
-    run(js, (err, result) => {
-      assert.equal(result, 2);
-      done();
-    });
+
+    const {value} = await run(js);
+
+    assert.equal(value, 2);
   });
 
-  it('should timeout when locked up in js', (done) => {
+  it('should timeout when locked up in js', async () => {
     const js = `while (true) {}`;
 
-    runWithTimeout(js, 30, (err, result) => {
-      assert.equal(err.isTimeout, true);
-      done();
-    });
+    const {error} = await runWithTimeout(js, 30);
+
+    assert.equal(error.isTimeout, true);
   });
 
-  it('should timeout when idling in the run loop', (done) => {
+  it('should timeout when idling in the run loop', async () => {
     const js = `setTimeout(() => {}, 10000)`;
 
-    runWithTimeout(js, 30, (err, result) => {
-      assert.equal(err.isTimeout, true);
-      done();
-    });
+    const {error} = await runWithTimeout(js, 30);
+
+    assert.equal(error.isTimeout, true);
   });
 
-  it('should timeout many times', (done) => {
+  it('should timeout many times', async () => {
     const js = `while (true) {}`;
 
     let count = 20;
 
+    const operations = [];
+
     for (let i = count; i > 0; --i) {
-      runWithTimeout(js, 30, (err, result) => {
-        assert.equal(err.isTimeout, true);
-
-        --count;
-
-        if (count === 0) {
-          done();
-        }
-      });
+      operations.push(runWithTimeout(js, 30));
     }
+
+    const results = await Promise.all(operations);
+
+    for (const {error} of results) {
+      assert.equal(error.isTimeout, true);
+    }
+
+    assert.equal(results.length, 20);
   });
 
-  it('should throw errors from top level script', (done) => {
+  it('should throw errors from top level script', async () => {
     const js = `throw new Error('yoyo')`;
 
-    run(js, (err, result) => {
-      assert.equal(err.message, 'yoyo');
-      done();
-    });
+    const {error} = await run(js);
+
+    assert.equal(error.message, 'yoyo');
   });
 
-  it('should throw errors from setTimeout callbacks', (done) => {
+  it('should throw errors from setTimeout callbacks', async () => {
     const js = `
 setTimeout(() => {
   throw new Error('yoyo');
 }, 1);
 `;
 
-    run(js, (err, result) => {
-      assert.equal(err.message, 'yoyo');
-      done();
-    });
+    const {error} = await run(js);
+
+    assert.equal(error.message, 'yoyo');
   });
 
-  it('should not crash when calling native functions with invalid arguments', (done) => {
+  it('should not crash when calling native functions with invalid arguments', async () => {
     const js = `
       function invoke(fn) {
         try {
@@ -256,61 +250,64 @@ setTimeout(() => {
       ]});
 `;
 
-    run(js, (err, result) => {
-      assert.equal(result.length, 17);
-      done();
+    const {value} = await run(js);
+
+    assert.equal(value.length, 17);
+  });
+
+  it('should handle stress', async () => {
+    const iterations = 500;
+
+    let count = 0;
+    const operations = [];
+
+    for (let i = 0; i < iterations; ++i) {
+      const js = `
+setTimeout(() => {
+  setResult({value: ${i}});
+}, 1);
+`;
+
+      operations.push(run(js));
+    }
+
+    const results = await Promise.all(operations);
+
+    for (let i = 0; i < results.length; ++i) {
+      assert.equal(results[i].value, i);
+    }
+  });
+
+  it('should handle queued stress', async () => {
+    const iterations = 500;
+
+    let count = 0;
+
+    const operations = [];
+
+    return new Promise((resolve) => {
+      for (let i = 0; i < iterations; ++i) {
+        const js = `
+  setTimeout(() => {
+    setResult({value: ${i}});
+  }, 1);
+  `;
+
+        setImmediate(() => {
+          run(js).then(({error, value}) => {
+            count++;
+            assert.equal(value, i);
+
+            if (count === iterations) {
+              resolve();
+            }
+          });
+        });
+      }
     });
   });
 
-  it('should handle stress', function (done) {
-    const iterations = 500;
-
-    let count = 0;
-
-    for (let i = 0; i < iterations; ++i) {
-      const js = `
-setTimeout(() => {
-  setResult({value: ${i}});
-}, 1);
-`;
-
-      run(js, (err, value) => {
-        count++;
-        assert.equal(value, i);
-
-        if (count === iterations) {
-          done();
-        }
-      });
-    }
-  });
-
-  it('should handle queued stress', function (done) {
-    const iterations = 500;
-
-    let count = 0;
-
-    for (let i = 0; i < iterations; ++i) {
-      const js = `
-setTimeout(() => {
-  setResult({value: ${i}});
-}, 1);
-`;
-
-      setImmediate(() => {
-        run(js, (err, value) => {
-          count++;
-          assert.equal(value, i);
-
-          if (count === iterations) {
-            done();
-          }
-        });
-      });
-    }
-  });
-
-  it('should handle recursive stress', function (done) {
+  it('should handle recursive stress', (done) => {
     const iterations = 500;
 
     const executeNext = (i) => {
@@ -318,7 +315,7 @@ setTimeout(() => {
 setResult({value: ${i}});
 `;
 
-      run(js, (err, value) => {
+      run(js).then(({error, value}) => {
         assert.equal(value, i);
 
         if (i === iterations) {
@@ -335,7 +332,7 @@ setResult({value: ${i}});
   });
 
 
-  it('should handle template scripts', (done) => {
+  it('should handle template scripts', async () => {
     const template = `
 global.testValue = 1;
 `;
@@ -348,9 +345,10 @@ setTimeout(() => {
 }, 1);
 `;
 
-    sandbox.execute({code, timeout: 3000}, (err, value) => {
-      assert.equal(value, 2);
-      done();
-    });
+    const {value} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(value, 2);
+
+    sandbox.shutdown();
   });
 });

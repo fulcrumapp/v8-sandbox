@@ -1,6 +1,6 @@
 const char *SandboxRuntime = R"JSRUNTIME(
 (function() {
-global._tryCallback = (func) => {
+global._try = (func) => {
   try {
     func();
   } catch (ex) {
@@ -15,7 +15,7 @@ global._tryCallback = (func) => {
 };
 
 global._execute = () => {
-  global._tryCallback(() => {
+  global._try(() => {
     eval(global._code);
   });
 };
@@ -46,7 +46,7 @@ global.dispatchAsync = (name, args, callback) => {
   const parameters = [ JSON.stringify([ name, ...(args || []) ]) ];
 
   const wrappedCallback = (args) => {
-    global._tryCallback(() => {
+    global._try(() => {
       callback.apply(null, JSON.parse(args));
     });
   };
@@ -63,7 +63,7 @@ global.httpRequest = (options, callback) => {
 
   if (callback) {
     const wrappedCallback = (args) => {
-      global._tryCallback(() => {
+      global._try(() => {
         callback.apply(null, JSON.parse(args));
       });
     };
@@ -92,7 +92,7 @@ global.setResult = (result) => {
 
 global.setTimeout = (callback, timeout) => {
   const handler = () => {
-    global._tryCallback(callback);
+    global._try(callback);
   };
 
   return global._setTimeout(handler, timeout);
