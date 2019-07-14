@@ -1,11 +1,13 @@
 // these functions have access to node and are callable from the sandbox
 
-$exports.testSync = function(v1, v2) {
-  return [20 + v1, 20 + v2];
-}
+// Example of a synchronous function
+define('addNumbers', (value1, value2) => {
+  return value1 + value2;
+});
 
-$exports.testAsync = function(v1, v2, callback) {
+// Example of an asynchronous function
+defineAsync('addNumbersAsync', (value1, value2, callback) => {
   setTimeout(() => {
-    callback(null, [20 + v1, 20 + v2]);
-  }, 500);
-}
+    callback(null, value1 + value2);
+  }, 20);
+});

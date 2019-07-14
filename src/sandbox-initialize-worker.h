@@ -6,7 +6,7 @@
 
 class SandboxInitializeWorker : public Nan::AsyncWorker {
 public:
-  SandboxInitializeWorker(Nan::Callback *callback, SandboxWrap *sandbox);
+  SandboxInitializeWorker(Nan::Callback *callback, SandboxWrap *sandbox, const char *runtime);
 
   virtual ~SandboxInitializeWorker();
 
@@ -16,8 +16,10 @@ public:
 
 private:
   SandboxWrap *sandbox_;
+
+  std::string runtime_;
+
+  std::string result_;
 };
 
 #endif
-
-

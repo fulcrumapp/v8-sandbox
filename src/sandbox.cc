@@ -40,7 +40,7 @@ void Sandbox::RunIsolate(const char *code) {
   (void)script->Run(context);
 }
 
-void Sandbox::Initialize(SandboxWrap *wrap) {
+std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
   wrap_ = wrap;
 
   loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
@@ -109,11 +109,13 @@ void Sandbox::Initialize(SandboxWrap *wrap) {
   Nan::SetMethod(context->Global(), "_log", ConsoleLog);
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
 
-  Local<String> runtime = Nan::New(SandboxRuntime).ToLocalChecked();
+  Local<String> code = Nan::New(runtime).ToLocalChecked();
 
-  Local<Script> script = Script::Compile(context, runtime).ToLocalChecked();
+  MaybeLocal<Script> script = Script::Compile(context, code);
 
-  (void)script->Run(context);
+  (void)script.ToLocalChecked()->Run(context);
+
+  return result_;
 }
 
 std::string Sandbox::RunInSandbox(const char *code) {

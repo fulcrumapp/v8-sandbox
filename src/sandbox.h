@@ -9,8 +9,6 @@
 #error "Node version must be >= 9"
 #endif
 
-extern const char *SandboxRuntime;
-
 using namespace v8;
 
 class Sandbox;
@@ -25,7 +23,7 @@ public:
 
   ~Sandbox();
 
-  void Initialize(SandboxWrap *wrap);
+  std::string Initialize(SandboxWrap *wrap, const char *runtime);
 
   std::string RunInSandbox(const char *code);
 

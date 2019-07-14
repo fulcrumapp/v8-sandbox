@@ -55,15 +55,18 @@ NAN_METHOD(SandboxWrap::New) {
 }
 
 NAN_METHOD(SandboxWrap::Initialize) {
-  NODE_ARG_FUNCTION(0, "callback");
+  NODE_ARG_STRING(0, "runtime");
+  NODE_ARG_FUNCTION(1, "callback");
+
+  Nan::Utf8String runtime(info[0]);
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
 
-  Nan::Callback *callback = new Nan::Callback(info[0].As<v8::Function>());
+  Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
 
-  sandbox->bridge_.Reset(info[1].As<v8::Function>());
+  sandbox->bridge_.Reset(info[2].As<v8::Function>());
 
-  Nan::AsyncQueueWorker(new SandboxInitializeWorker(callback, sandbox));
+  Nan::AsyncQueueWorker(new SandboxInitializeWorker(callback, sandbox, *runtime));
 
   info.GetReturnValue().Set(info.This());
 }

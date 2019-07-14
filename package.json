@@ -1,6 +1,6 @@
 {
   "name": "v8-sandbox",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "V8 Sandbox",
   "homepage": "http://github.com/fulcrumapp/v8-sandbox",
   "main": "dist/index.js",
@@ -36,15 +36,14 @@
     "eslint-config-fulcrum": "^1.0.1",
     "eslint-plugin-react": "^5.1.1",
     "mocha": "^6.1.4",
+    "nan": "^2.14.0",
     "prettysize": "0.0.3"
   },
   "dependencies": {
-    "async": "^2.6.2",
+    "async": "^3.1.0",
     "bindings": "^1.5.0",
-    "eslint-plugin-babel": "^4.1.1",
-    "nan": "^2.13.1",
-    "node-gyp": "^3.8.0",
-    "node-pre-gyp": "^0.12.0",
+    "node-gyp": "^5.0.2",
+    "node-pre-gyp": "^0.13.0",
     "request": "^2.88.0"
   },
   "binary": {

@@ -43,6 +43,38 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     assert.equal(error.message, 'yoyo');
   });
 
+  it('should handle promises', async () => {
+    const js = `
+new Promise((resolve) => {
+  setTimeout(() => {
+    setResult({value: 1});
+    resolve();
+  }, 20);
+});
+`;
+
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
+  });
+
+  it('should handle async functions', async () => {
+    const js = `
+(async () => {
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      setResult({value: 1});
+      resolve();
+    }, 20);
+  });
+})();
+`;
+
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
+  });
+
   it('should collect garbage', async () => {
     const js = `
 let objects = []
@@ -67,6 +99,14 @@ setResult({value: 1});
     const {error} = await run(js);
 
     assert.ok(error && error.stack.indexOf('SyntaxError') >= 0);
+  });
+
+  it('should capture logs', async () => {
+    const js = `console.log('hi'); console.error('there'); console.log('yo')`;
+
+    const {output} = await runWithTimeout(js, 30);
+
+    assert.deepStrictEqual(output.map(o => o.message), ['hi', 'there', 'yo']);
   });
 
   it('should run simple script', async () => {
@@ -240,6 +280,8 @@ setTimeout(() => {
         invoke(() => _dispatchSync()),
         invoke(() => _dispatchSync(null)),
         invoke(() => _dispatchSync('test')),
+        invoke(() => _dispatchSync(() => {}, () => {})),
+        invoke(() => _dispatchSync(new Promise(() => {}))),
         invoke(() => _dispatchAsync()),
         invoke(() => _dispatchAsync(null)),
         invoke(() => _dispatchAsync('test')),
@@ -250,9 +292,9 @@ setTimeout(() => {
       ]});
 `;
 
-    const {value} = await run(js);
+    const {value, error} = await run(js);
 
-    assert.equal(value.length, 17);
+    assert.equal(value.length, 19);
   });
 
   it('should handle stress', async () => {
@@ -331,7 +373,6 @@ setResult({value: ${i}});
     executeNext(0);
   });
 
-
   it('should handle template scripts', async () => {
     const template = `
 global.testValue = 1;
@@ -348,6 +389,20 @@ setTimeout(() => {
     const {value} = await sandbox.execute({code, timeout: 3000});
 
     assert.equal(value, 2);
+
+    sandbox.shutdown();
+  });
+
+  it('should handle syntax errors in template scripts', async () => {
+    const template = `{`;
+
+    const sandbox = new Sandbox({template});
+
+    const code = `setResult({value: 1});`;
+
+    const {error} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(error.message, 'error initializing sandbox. Unexpected end of input');
 
     sandbox.shutdown();
   });

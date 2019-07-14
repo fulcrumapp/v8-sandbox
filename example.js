@@ -1,12 +1,12 @@
-import Sandbox from './dist';
-import path from 'path';
+const Sandbox = require('./dist').default;
+const path = require('path');
 
 const sandbox = new Sandbox({require: path.join(process.cwd(), 'example-functions.js')});
 
 const timeout = 1000;
 
-const run = (code, callback) => {
-  sandbox.execute({code, timeout}, callback);
+const run = (code) => {
+  return sandbox.execute({code, timeout});
 };
 
 const example1 = `
@@ -15,12 +15,12 @@ setResult({value: [21, 22]});
 
 // call a custom synchronous host function
 const example2 = `
-setResult({value: dispatchSync('testSync', [1, 2])});
+setResult({value: addNumbers(1, 2)});
 `;
 
 // call a custom asynchronous host function
 const example3 = `
-dispatchAsync('testAsync', [1, 2], function(error, value) {
+addNumbersAsync(1, 2, function(error, value) {
   setResult({error, value});
 });
 `;
@@ -38,24 +38,23 @@ var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de
 });
 `;
 
-run(example1, (err, result) => {
-  console.log('example 1:', result);
+const runExample = async (code) => {
+  const {error, value} = await run(code);
 
-  run(example2, (err, result) => {
-    console.log('example 2:', result);
+  if (error) {
+    console.error(error);
+  }
 
-    run(example3, (err, result) => {
-      console.log('example 3:', result);
+  return value;
+};
 
-      run(example4, (err, result) => {
-        console.log('example 4:', result);
+(async () => {
+  console.log('example 1:', await runExample(example1));
+  console.log('example 2:', await runExample(example2));
+  console.log('example 3:', await runExample(example3));
+  console.log('example 4:', await runExample(example4));
+  console.log('example 5:', await runExample(example5));
 
-        run(example5, (err, result) => {
-          console.log('example 5:', result);
+  sandbox.shutdown();
+})();
 
-          sandbox.shutdown();
-        });
-      });
-    });
-  });
-});
