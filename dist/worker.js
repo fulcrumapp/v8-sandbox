@@ -12,7 +12,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 global.$exports = {};
 let globalSandbox = null;
-let globalTemplate = null;
 
 class AsyncSandbox {
   constructor() {
@@ -25,11 +24,8 @@ class AsyncSandbox {
     });
 
     _defineProperty(this, "onInitialize", async message => {
-      if (message.require) {
-        Object.assign(global.$exports, require(message.require));
-      }
-
-      this.template = `setResult({value: null});\n${message.template || ''}`;
+      this.require = message.require;
+      this.template = message.template;
       await this.create();
     });
 
@@ -43,17 +39,25 @@ class AsyncSandbox {
   }
 
   create() {
-    this.sandbox = new _sandbox.default();
+    this.sandbox = new _sandbox.default({
+      require: this.require,
+      template: this.template
+    });
     this.initialized = false;
     return this.initialize();
   }
 
   async initialize() {
     (0, _assert.default)(!this.initialized);
-    await this.sandbox.initialize();
-    const result = await this.sandbox.execute(this.template);
+
+    try {
+      await this.sandbox.initialize();
+    } catch (ex) {
+      ex.message = `error initializing sandbox. ${ex.message}`;
+      this.error = ex;
+    }
+
     this.initialized = true;
-    return result;
   }
 
   wait() {
@@ -72,7 +76,16 @@ class AsyncSandbox {
 
   async execute(code) {
     (0, _assert.default)(this.initialized);
-    const result = await this.sandbox.execute(code);
+    let result;
+
+    if (!this.error) {
+      result = await this.sandbox.execute(code);
+    } else {
+      result = {
+        error: this.error
+      };
+    }
+
     await this.sandbox.finalize();
     process.send(result); // start creating the next sandbox *after* posting the completion message. This operation happens with coordination from
     // the calling process, but that's OK because we wait for it's initialization.

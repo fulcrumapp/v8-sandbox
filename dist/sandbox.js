@@ -5,13 +5,19 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
+var _fs = _interopRequireDefault(require("fs"));
+
+var _path = _interopRequireDefault(require("path"));
+
 var _request = _interopRequireDefault(require("request"));
+
+var _util = _interopRequireDefault(require("util"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
-let nextObjectID = 0;
+const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString();
 
 function tryParseJSON(value) {
   try {
@@ -22,15 +28,59 @@ function tryParseJSON(value) {
 }
 
 class Sandbox {
-  constructor() {
-    this._native = new NativeSandbox();
-    this.id = ++nextObjectID;
+  constructor({
+    require,
+    template
+  } = {}) {
+    this.native = new NativeSandbox();
+    this.require = require;
+    this.template = template;
+    this.load();
+  }
+
+  load() {
+    this.syncFunctions = {};
+    this.asyncFunctions = {};
+    global.define = this.define.bind(this);
+    global.defineAsync = this.defineAsync.bind(this);
+
+    if (this.require) {
+      require(this.require);
+    }
+  }
+
+  define(name, fn) {
+    this.syncFunctions[name] = fn;
+  }
+
+  defineAsync(name, fn) {
+    this.asyncFunctions[name] = fn;
+  }
+
+  bootstrap() {
+    const code = `
+      ${Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');`).join('\n')}
+      ${Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');`).join('\n')}
+      ${this.template}
+    `.trim();
+    return `
+      global._code = ${JSON.stringify(code)};
+      global._execute();
+    `;
   }
 
   initialize() {
-    return new Promise(resolve => {
-      this._native.initialize(() => {
-        setImmediate(resolve);
+    return new Promise((resolve, reject) => {
+      this.output = [];
+      this.native.initialize(RUNTIME + this.bootstrap(), json => {
+        const result = tryParseJSON(json);
+        setImmediate(() => {
+          if (result && result.error) {
+            reject(result.error);
+          } else {
+            resolve(result && result.value);
+          }
+        });
       }, this.dispatch.bind(this));
     });
   }
@@ -39,22 +89,27 @@ class Sandbox {
     await this.initialize();
     const result = await this.execute(code);
     await this.finalize();
-    return result;
+    return { ...result,
+      output: this.output
+    };
   }
 
   execute(code, callback) {
     return new Promise((resolve, reject) => {
-      this._native.execute(code, json => {
+      this.native.execute(code, json => {
         let result = tryParseJSON(json);
 
         if (result == null) {
           result = {
-            error: new Error('no result')
+            error: new Error('no result'),
+            output: this.output
           };
         }
 
         setImmediate(() => {
-          resolve(result);
+          resolve({ ...result,
+            output: this.output
+          });
         });
       }, this.dispatch.bind(this));
     });
@@ -62,7 +117,7 @@ class Sandbox {
 
   finalize() {
     return new Promise(resolve => {
-      this._native.finalize(() => {
+      this.native.finalize(() => {
         setImmediate(resolve);
       }, this.dispatch.bind(this));
     });
@@ -106,11 +161,30 @@ class Sandbox {
   }
 
   log(...args) {
+    this.write({
+      type: 'log',
+      args
+    });
     console.log(...args);
   }
 
   error(...args) {
+    this.write({
+      type: 'error',
+      args
+    });
     console.error(...args);
+  }
+
+  write({
+    type,
+    args
+  }) {
+    this.output.push({
+      type,
+      time: new Date(),
+      message: _util.default.format(...args)
+    });
   }
 
   httpRequest(options, callback) {
@@ -127,7 +201,13 @@ class Sandbox {
     try {
       const name = args[0];
       const parameters = args.slice(1);
-      callback(null, global.$exports[name](...parameters));
+      const fn = name && this.syncFunctions[name];
+
+      if (!fn) {
+        throw new Error(`function named '${name}' does not exist`);
+      }
+
+      callback(null, fn(...parameters));
     } catch (err) {
       callback(err);
     }
@@ -137,7 +217,13 @@ class Sandbox {
     try {
       const name = args[0];
       const parameters = args.slice(1);
-      global.$exports[name](...[...parameters, callback]);
+      const fn = name && this.asyncFunctions[name];
+
+      if (!fn) {
+        throw new Error(`function named '${name}' does not exist`);
+      }
+
+      fn(...[...parameters, callback]);
     } catch (err) {
       callback(err);
     }

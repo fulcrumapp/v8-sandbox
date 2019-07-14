@@ -110,4 +110,17 @@ global.console = {
     global._error(JSON.stringify(args));
   }
 };
+
+global.define = name => {
+  global[name] = (...args) => {
+    return global.dispatchSync(name, args);
+  };
+};
+
+global.defineAsync = name => {
+  global[name] = (...args) => {
+    const callback = args.pop();
+    return global.dispatchAsync(name, args, callback);
+  };
+};
 //# sourceMappingURL=runtime.js.map
