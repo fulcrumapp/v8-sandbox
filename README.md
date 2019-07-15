@@ -30,10 +30,14 @@ setTimeout(() => {
 }, 20);
 `;
 
-const {error, value} = await sandbox.execute({code, timeout: 3000});
+(async () => {
+  const {error, value} = await sandbox.execute({code, timeout: 3000});
 
-console.log(value);
-//=> 2
+  sandbox.shutdown();
+
+  console.log(value);
+  //=> 2
+})();
 ```
 
 ```js
@@ -43,8 +47,10 @@ const sandbox = new Sandbox();
 
 const code = 'while (true) {}';
 
-const {error, value} = await sandbox.execute({code, timeout: 3000});
+(async () => {
+  const {error, value} = await sandbox.execute({code, timeout: 3000});
 
-console.log(error.isTimeout);
-//=> true
+  console.log(error.isTimeout);
+  //=> true
+})();
 ```
