@@ -70,6 +70,8 @@ private:
 
   void RunIsolate(const char *code);
 
+  void MaybeHandleError(Nan::TryCatch &trycatch, Local<Context> &context);
+
   inline Local<Context> GetContext() {
     return Nan::New(context_);
   }

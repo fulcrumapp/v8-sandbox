@@ -1,4 +1,6 @@
 import Sandbox from '../dist';
+import fs from 'fs';
+import path from 'path';
 
 import assert from 'assert';
 
@@ -11,6 +13,8 @@ const runWithTimeout = (code, timeout) => {
 const run = (code) => {
   return runWithTimeout(code, 3000);
 };
+
+const REQUIRE = path.join(__dirname, 'test-functions.js');
 
 const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt';
 
@@ -403,6 +407,47 @@ setTimeout(() => {
     const {error} = await sandbox.execute({code, timeout: 3000});
 
     assert.equal(error.message, 'error initializing sandbox. Uncaught SyntaxError: Unexpected end of input');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle errors when crossing between nodejs and sandbox', async () => {
+    const template = '';
+
+    const sandbox = new Sandbox({template});
+
+    // must use the raw _setTimeout which doesn't wrap in try/catch. Assume everything in the sandbox
+    // can be overwritten or called manually. This test exercises the TryCatch in OnTimer from C++.
+    const code = `_setTimeout(() => { throw new Error('hi'); }, 1);`;
+
+    const {error} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(error.message, 'Uncaught Error: hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle errors when crossing between nodejs and sandbox with custom functions', async () => {
+    const template = '';
+
+    const sandbox = new Sandbox({template, require: REQUIRE});
+
+    // hack the _try method to directly invoke the function. This would only be possible if someone stomped
+    // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
+    // test exercises the TryCatch on the OnEndNodeInvocation from C++
+    const code = `
+global._try = (fn) => fn();
+
+setTimeout(() => {
+  addNumbersAsync(1, 2, (err, value) => {
+    throw new Error('uh oh: ' + value);
+  });
+}, 20);
+`;
+
+    const {error} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(error.message, 'Uncaught Error: uh oh: 3');
 
     sandbox.shutdown();
   });

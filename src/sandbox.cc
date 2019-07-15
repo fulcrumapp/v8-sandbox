@@ -39,24 +39,7 @@ void Sandbox::RunIsolate(const char *code) {
     (void)script.ToLocalChecked()->Run(context);
   }
 
-  if (tryCatch.HasCaught()) {
-    auto result = Nan::New<Object>();
-    auto error = Nan::New<Object>();
-
-    Nan::Utf8String message(tryCatch.Message()->Get());
-    Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
-    int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
-
-    Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
-
-    Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
-    Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
-    Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
-
-    auto json = JSON::Stringify(context, result).ToLocalChecked();
-
-    result_ = *Nan::Utf8String(json);
-  }
+  MaybeHandleError(tryCatch, context);
 }
 
 std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
@@ -147,6 +130,29 @@ void Sandbox::Finalize() {
   Dispose();
 }
 
+void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
+  if (!tryCatch.HasCaught()) {
+    return;
+  }
+
+  auto result = Nan::New<Object>();
+  auto error = Nan::New<Object>();
+
+  Nan::Utf8String message(tryCatch.Message()->Get());
+  Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
+  int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
+
+  Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
+
+  Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
+  Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
+  Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
+
+  auto json = JSON::Stringify(context, result).ToLocalChecked();
+
+  result_ = *Nan::Utf8String(json);
+}
+
 Sandbox *UnwrapSandbox(Isolate *isolate) {
   auto context = isolate->GetCurrentContext();
 
@@ -214,7 +220,11 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
 
   Context::Scope context_scope(context);
 
+  Nan::TryCatch tryCatch;
+
   (void)cb->Call(context, global, 0, 0);
+
+  baton->instance->MaybeHandleError(tryCatch, context);
 }
 
 void Sandbox::OnTimerClose(uv_handle_t *timer) {
@@ -318,7 +328,11 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 
   baton->instance->pendingOperations_.erase(baton->id);
 
+  Nan::TryCatch tryCatch;
+
   (void)cb->Call(context, sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
+
+  baton->instance->MaybeHandleError(tryCatch, context);
 }
 
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
