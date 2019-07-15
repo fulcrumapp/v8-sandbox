@@ -19,6 +19,8 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
 const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString();
 
+const LINECOUNT = RUNTIME.split('\n').length;
+
 function tryParseJSON(value) {
   try {
     return JSON.parse(value);
@@ -57,25 +59,23 @@ class Sandbox {
     this.asyncFunctions[name] = fn;
   }
 
-  bootstrap() {
-    const code = `
-      ${Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');`).join('\n')}
-      ${Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');`).join('\n')}
-      ${this.template}
-    `.trim();
-    return `
-      global._code = ${JSON.stringify(code)};
-      global._execute();
-    `;
+  defines() {
+    return [...Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');\n`), ...Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');\n`)];
   }
 
   initialize() {
     return new Promise((resolve, reject) => {
       this.output = [];
-      this.native.initialize(RUNTIME + this.bootstrap(), json => {
+      const defines = this.defines();
+      const code = RUNTIME + '\n' + this.defines().join('\n') + this.template;
+      this.native.initialize(code, json => {
         const result = tryParseJSON(json);
         setImmediate(() => {
           if (result && result.error) {
+            if (result.error.lineNumber != null) {
+              result.error.lineNumber -= LINECOUNT + defines.length;
+            }
+
             reject(result.error);
           } else {
             resolve(result && result.value);
