@@ -204,7 +204,7 @@ class Sandbox {
       const fn = name && this.syncFunctions[name];
 
       if (!fn) {
-        throw new Error(`function named '${name}' does not exist`);
+        return callback(new Error(`function named '${name}' does not exist`));
       }
 
       callback(null, fn(...parameters));
@@ -220,7 +220,7 @@ class Sandbox {
       const fn = name && this.asyncFunctions[name];
 
       if (!fn) {
-        throw new Error(`function named '${name}' does not exist`);
+        return callback(new Error(`function named '${name}' does not exist`));
       }
 
       fn(...[...parameters, callback]);
