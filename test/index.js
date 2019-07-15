@@ -244,7 +244,7 @@ setTimeout(() => {
 
     const {error} = await run(js);
 
-    assert.equal(error.message, 'yoyo');
+    assert.equal(error.message, 'Uncaught Error: yoyo');
   });
 
   it('should throw errors from setTimeout callbacks', async () => {
@@ -402,7 +402,7 @@ setTimeout(() => {
 
     const {error} = await sandbox.execute({code, timeout: 3000});
 
-    assert.equal(error.message, 'error initializing sandbox. Unexpected end of input');
+    assert.equal(error.message, 'error initializing sandbox. Uncaught SyntaxError: Unexpected end of input');
 
     sandbox.shutdown();
   });

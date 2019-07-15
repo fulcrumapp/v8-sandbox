@@ -27,17 +27,36 @@ void Sandbox::RunIsolate(const char *code) {
   Isolate::Scope isolate_scope(isolate_);
   HandleScope scope(isolate_);
 
-  Local<v8::Context> context = Nan::New(context_);
+  Local<Context> context = Nan::New(context_);
 
   Context::Scope context_scope(context);
 
-  Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
+  Nan::TryCatch tryCatch;
 
-  Local<String> execute = Nan::New("global._execute();").ToLocalChecked();
+  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 
-  Local<Script> script = Script::Compile(context, execute).ToLocalChecked();
+  if (!tryCatch.HasCaught()) {
+    (void)script.ToLocalChecked()->Run(context);
+  }
 
-  (void)script->Run(context);
+  if (tryCatch.HasCaught()) {
+    auto result = Nan::New<Object>();
+    auto error = Nan::New<Object>();
+
+    Nan::Utf8String message(tryCatch.Message()->Get());
+    Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
+    int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
+
+    Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
+
+    Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
+    Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
+    Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
+
+    auto json = JSON::Stringify(context, result).ToLocalChecked();
+
+    result_ = *Nan::Utf8String(json);
+  }
 }
 
 std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
@@ -109,11 +128,9 @@ std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
   Nan::SetMethod(context->Global(), "_log", ConsoleLog);
   Nan::SetMethod(context->Global(), "_error", ConsoleError);
 
-  Local<String> code = Nan::New(runtime).ToLocalChecked();
+  result_= "";
 
-  MaybeLocal<Script> script = Script::Compile(context, code);
-
-  (void)script.ToLocalChecked()->Run(context);
+  RunIsolate(runtime);
 
   return result_;
 }
@@ -171,7 +188,7 @@ NAN_METHOD(Sandbox::DispatchAsync) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  sandbox->DispatchAsync("dispatchAsync", *arguments, info[1].As<v8::Function>());
+  sandbox->DispatchAsync("dispatchAsync", *arguments, info[1].As<Function>());
 }
 
 void Sandbox::OnHandleClose(uv_handle_t *handle) {
@@ -221,7 +238,7 @@ NAN_METHOD(Sandbox::SetTimeout) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
-  auto persistentCallback = std::make_shared<Nan::Persistent<Function>>(info[0].As<v8::Function>());
+  auto persistentCallback = std::make_shared<Nan::Persistent<Function>>(info[0].As<Function>());
 
   auto baton = new SandboxBaton(sandbox, persistentCallback);
 
@@ -316,7 +333,7 @@ void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
 
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
-  auto argumentObject = Nan::New<v8::Object>();
+  auto argumentObject = Nan::New<Object>();
 
   Nan::SetPrivate(argumentObject, Nan::New("baton").ToLocalChecked(), External::New(nodeIsolate, baton));
   Nan::SetMethod(argumentObject, "callback", AsyncNodeCallback);
@@ -345,7 +362,7 @@ NAN_METHOD(Sandbox::HttpRequest) {
   } else {
     NODE_ARG_FUNCTION(1, "callback");
 
-    sandbox->DispatchAsync("httpRequest", *arguments, info[1].As<v8::Function>());
+    sandbox->DispatchAsync("httpRequest", *arguments, info[1].As<Function>());
   }
 }
 
