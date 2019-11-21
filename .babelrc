@@ -6,10 +6,11 @@
         "targets": {
           "node": "10"
         },
-        "useBuiltIns": false
+        "useBuiltIns": false,
       }
     ]
   ],
+  "sourceType": "unambiguous",
   "plugins": [
     ["@babel/plugin-proposal-class-properties", { "loose": false }]
   ]
