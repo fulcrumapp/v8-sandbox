@@ -1,6 +1,6 @@
 {
   "name": "v8-sandbox",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "V8 Sandbox",
   "homepage": "http://github.com/fulcrumapp/v8-sandbox",
   "main": "dist/index.js",

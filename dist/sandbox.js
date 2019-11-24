@@ -29,6 +29,9 @@ function tryParseJSON(value) {
   }
 }
 
+const SYNC_FUNCTIONS = {};
+const ASYNC_FUNCTIONS = {};
+
 class Sandbox {
   constructor({
     require,
@@ -41,12 +44,15 @@ class Sandbox {
   }
 
   load() {
-    this.syncFunctions = {};
-    this.asyncFunctions = {};
     global.define = this.define.bind(this);
     global.defineAsync = this.defineAsync.bind(this);
+    this.syncFunctions = {};
+    this.asyncFunctions = {};
 
     if (this.require) {
+      this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
+      this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
+
       require(this.require);
     }
   }

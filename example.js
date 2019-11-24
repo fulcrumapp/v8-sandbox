@@ -55,6 +55,10 @@ const runExample = async (code) => {
   console.log('example 4:', await runExample(example4));
   console.log('example 5:', await runExample(example5));
 
+  for (let i = 0; i < 100; ++i) {
+    console.log('example 2:', await runExample(example2));
+  }
+
   sandbox.shutdown();
 })();
 
