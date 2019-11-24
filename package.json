@@ -7,6 +7,7 @@
   "scripts": {
     "configure": "./node_modules/node-gyp/bin/node-gyp.js configure",
     "build": "./node_modules/node-gyp/bin/node-gyp.js configure build && node_modules/.bin/babel lib --out-dir dist --source-maps",
+    "build-debug": "./node_modules/node-gyp/bin/node-gyp.js --debug configure build && node_modules/.bin/babel lib --out-dir dist --source-maps",
     "rebuild": "./node_modules/node-gyp/bin/node-gyp.js configure rebuild",
     "test": "mocha test/setup.js test/index.js",
     "clean": "rm -rf dist build",

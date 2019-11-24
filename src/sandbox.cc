@@ -67,6 +67,8 @@ std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
                                            loop_,
                                            node::GetMainThreadMultiIsolatePlatform(),
                                            allocator);
+
+    isolate_->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
   }
 #elif NODE_MAJOR_VERSION >= 9
   auto allocator = node::CreateArrayBufferAllocator();
@@ -84,6 +86,8 @@ std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
                                            loop_,
                                            node::GetMainThreadMultiIsolatePlatform(),
                                            allocator);
+
+    isolate_->SetMicrotasksPolicy(v8::MicrotasksPolicy::kAuto);
   }
 #endif
 
@@ -326,13 +330,13 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
     Nan::New(baton->result).ToLocalChecked()
   };
 
-  baton->instance->pendingOperations_.erase(baton->id);
-
   Nan::TryCatch tryCatch;
 
   (void)cb->Call(context, sandboxIsolate->GetCurrentContext()->Global(), 1, argv);
 
   baton->instance->MaybeHandleError(tryCatch, context);
+
+  baton->instance->pendingOperations_.erase(baton->id);
 }
 
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {

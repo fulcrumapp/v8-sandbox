@@ -67,10 +67,41 @@ new Promise((resolve) => {
 (async () => {
   await new Promise((resolve) => {
     setTimeout(() => {
-      setResult({value: 1});
       resolve();
     }, 20);
   });
+
+  setResult({value: 1});
+})();
+`;
+
+    const {value} = await run(js);
+
+    assert.equal(value, 1);
+  });
+
+  it('should handle multiple async functions', async () => {
+    const js = `
+(async () => {
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, 20);
+  });
+
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, 20);
+  });
+
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, 20);
+  });
+
+  setResult({value: 1});
 })();
 `;
 
