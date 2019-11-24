@@ -47,6 +47,28 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     assert.equal(error.message, 'yoyo');
   });
 
+  it('should execute httpRequest within a timeout and async function', async () => {
+    const js = `
+setTimeout(() => {
+  httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
+    (async () => {
+      await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, 1);
+      });
+
+      setResult({value: body});
+    })();
+  });
+}, 1);
+`;
+
+    const {value} = await run(js);
+
+    assert.equal(value, 'hi there');
+  });
+
   it('should handle promises', async () => {
     const js = `
 new Promise((resolve) => {
@@ -108,6 +130,38 @@ new Promise((resolve) => {
     const {value} = await run(js);
 
     assert.equal(value, 1);
+  });
+
+  it('should handle multiple async functions nested within timeouts', async () => {
+    const js = `
+setTimeout(() => {
+  (async () => {
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 20);
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 20);
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 20);
+    });
+
+    setResult({value: 12});
+  })();
+}, 1);
+`;
+
+    const {value} = await run(js);
+
+    assert.equal(value, 12);
   });
 
   it('should collect garbage', async () => {
@@ -454,6 +508,44 @@ setTimeout(() => {
     const {error} = await sandbox.execute({code, timeout: 3000});
 
     assert.equal(error.message, 'Uncaught Error: hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should allow crossing between nodejs and sandbox with custom sync functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
+
+    const code = `
+setTimeout(() => {
+  setResult({value: addNumbers(1, 2)});
+}, 1);
+`;
+
+    for (let count = 0; count < 20; ++count) {
+      const {value} = await sandbox.execute({code, timeout: 3000});
+
+      assert.equal(value, 3);
+    }
+
+    sandbox.shutdown();
+  });
+
+  it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
+
+    const code = `
+setTimeout(() => {
+  addNumbersAsync(1, 2, (err, value) => {
+    setResult({value});
+  });
+}, 1);
+`;
+
+    for (let count = 0; count < 20; ++count) {
+      const {value} = await sandbox.execute({code, timeout: 3000});
+
+      assert.equal(value, 3);
+    }
 
     sandbox.shutdown();
   });
