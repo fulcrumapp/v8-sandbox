@@ -72,6 +72,14 @@ private:
 
   void MaybeHandleError(Nan::TryCatch &trycatch, Local<Context> &context);
 
+  void LockTimers();
+
+  void UnlockTimers();
+
+  void LockPendingOperations();
+
+  void UnlockPendingOperations();
+
   inline Local<Context> GetContext() {
     return Nan::New(context_);
   }
@@ -102,6 +110,10 @@ private:
 
   // need to clean up pending operations on abrupt termination
   InvocationMap pendingOperations_;
+
+  uv_mutex_t timerLock_;
+
+  uv_mutex_t pendingOperationsLock_;
 
   node::IsolateData *isolateData_;
 };

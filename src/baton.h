@@ -43,7 +43,10 @@ public:
   {}
 
   virtual ~NodeInvocationBaton() {
-    Dispose();
+    closeNodeDispatch();
+    closeAsyncDispatch();
+    closeMutex();
+    closeCondition();
   }
 
   // function name, arguments, and its result
@@ -61,24 +64,32 @@ public:
   uv_mutex_t *mutex;
   uv_cond_t *condition;
 
-  void Dispose() {
+  void closeNodeDispatch() {
     if (dispatchNode) {
       uv_close((uv_handle_t *)dispatchNode, OnClose);
       dispatchNode = nullptr;
     }
+  }
 
+  void closeAsyncDispatch() {
     if (dispatchAsync) {
       uv_close((uv_handle_t *)dispatchAsync, OnClose);
       dispatchAsync = nullptr;
     }
+  }
 
+  void closeMutex() {
     if (mutex) {
       uv_mutex_destroy(mutex);
+      delete mutex;
       mutex = nullptr;
     }
+  }
 
+  void closeCondition() {
     if (condition) {
       uv_cond_destroy(condition);
+      delete condition;
       condition = nullptr;
     }
   }

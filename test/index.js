@@ -530,6 +530,26 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
+  it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
+
+    const code = `
+const randomTimeout = () => Math.floor(Math.random() * 5) + 1;
+
+for (let i = 0; i < 5000; ++i) {
+  setTimeout(() => {
+    setResult({value: addNumbers(1, 2)});
+  }, randomTimeout());
+}
+`;
+
+    const {value} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(value, 3);
+
+    sandbox.shutdown();
+  });
+
   it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
     const sandbox = new Sandbox({require: REQUIRE});
 

@@ -16,10 +16,15 @@ Sandbox::Sandbox()
   loop_(nullptr),
   timers_(),
   isolateData_(nullptr)
-{}
+{
+  uv_mutex_init(&timerLock_);
+  uv_mutex_init(&pendingOperationsLock_);
+}
 
 Sandbox::~Sandbox() {
   Dispose();
+  uv_mutex_destroy(&timerLock_);
+  uv_mutex_destroy(&pendingOperationsLock_);
 }
 
 void Sandbox::RunIsolate(const char *code) {
@@ -234,12 +239,16 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
 void Sandbox::OnTimerClose(uv_handle_t *timer) {
   SandboxBaton *baton = (SandboxBaton *)timer->data;
 
+  baton->instance->LockTimers();
+
   for (auto& item : baton->instance->timers_) {
     if (item.second.get() == (uv_timer_t *)timer) {
       baton->instance->timers_.erase(item.first);
       break;
     }
   }
+
+  baton->instance->UnlockTimers();
 
   delete baton;
 }
@@ -260,8 +269,12 @@ NAN_METHOD(Sandbox::SetTimeout) {
   uv_timer_init(sandbox->loop_, timer.get());
   timer->data = baton;
 
+  sandbox->LockTimers();
+
   sandbox->timers_[baton->id] = timer;
   sandbox->activeTimers_[baton->id] = timer;
+
+  sandbox->UnlockTimers();
 
   uv_timer_start(timer.get(), OnTimer, timeout, 0);
 
@@ -275,6 +288,8 @@ NAN_METHOD(Sandbox::ClearTimeout) {
 
   Sandbox *sandbox = UnwrapSandbox(info.GetIsolate());
 
+  sandbox->LockTimers();
+
   TimerMap &timers = sandbox->activeTimers_;
 
   auto iter = timers.find(timerID);
@@ -284,6 +299,8 @@ NAN_METHOD(Sandbox::ClearTimeout) {
     uv_timer_stop((*iter).second.get());
     uv_close((uv_handle_t *)((*iter).second.get()), OnTimerClose);
   }
+
+  sandbox->UnlockTimers();
 }
 
 NAN_METHOD(Sandbox::AsyncNodeCallback) {
@@ -336,7 +353,11 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 
   baton->instance->MaybeHandleError(tryCatch, context);
 
+  baton->instance->LockPendingOperations();
+
   baton->instance->pendingOperations_.erase(baton->id);
+
+  baton->instance->UnlockPendingOperations();
 }
 
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
@@ -389,12 +410,14 @@ void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Funct
 
   auto baton = std::make_shared<SandboxNodeInvocationBaton>(this, cb);
 
+  LockPendingOperations();
+
   pendingOperations_[baton->id] = baton;
+
+  UnlockPendingOperations();
 
   baton->name = name;
   baton->arguments = arguments;
-  baton->mutex = nullptr;
-  baton->condition = nullptr;
 
   // wake up the nodejs loop
   baton->dispatchNode = new uv_async_t;
@@ -414,7 +437,11 @@ void Sandbox::DispatchAsync(const char *name, const char *arguments, Local<Funct
 std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
   auto baton = std::make_shared<SandboxNodeInvocationBaton>(this,  PersistentCallback());
 
+  LockPendingOperations();
+
   pendingOperations_[baton->id] = baton;
+
+  UnlockPendingOperations();
 
   baton->name = name;
   baton->arguments = arguments;
@@ -433,19 +460,22 @@ std::string Sandbox::DispatchSync(const char *name, const char *arguments) {
   uv_mutex_init(baton->mutex);
   uv_cond_init(baton->condition);
 
+  // lock the mutex before entering the node context to avoid a race condition
+  uv_mutex_lock(baton->mutex);
+
   // dispatch the actual call on the node message loop
   uv_async_send(baton->dispatchNode);
 
-  uv_mutex_lock(baton->mutex);
   uv_cond_wait(baton->condition, baton->mutex);
   uv_mutex_unlock(baton->mutex);
-  baton->mutex = nullptr;
-
-  baton->Dispose();
 
   std::string result = baton->result;
 
+  LockPendingOperations();
+
   pendingOperations_.erase(baton->id);
+
+  UnlockPendingOperations();
 
   return result;
 }
@@ -477,7 +507,13 @@ NAN_METHOD(Sandbox::ConsoleLog) {
 void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
   Sandbox *sandbox = (Sandbox *)handle->data;
 
+  sandbox->LockPendingOperations();
+
   sandbox->pendingOperations_.clear();
+
+  sandbox->UnlockPendingOperations();
+
+  sandbox->LockTimers();
 
   for (auto &item : sandbox->timers_) {
     uv_timer_stop(item.second.get());
@@ -488,6 +524,8 @@ void Sandbox::OnCancelPendingOperations(uv_async_t *handle) {
   }
 
   uv_close((uv_handle_t *)handle, OnHandleClose);
+
+  sandbox->UnlockTimers();
 }
 
 void Sandbox::CancelPendingOperations() {
@@ -549,4 +587,20 @@ void Sandbox::Dispose() {
     free(loop_);
     loop_ = nullptr;
   }
+}
+
+void Sandbox::LockTimers() {
+  uv_mutex_lock(&timerLock_);
+}
+
+void Sandbox::UnlockTimers() {
+  uv_mutex_unlock(&timerLock_);
+}
+
+void Sandbox::LockPendingOperations() {
+  uv_mutex_lock(&pendingOperationsLock_);
+}
+
+void Sandbox::UnlockPendingOperations() {
+  uv_mutex_unlock(&pendingOperationsLock_);
 }
