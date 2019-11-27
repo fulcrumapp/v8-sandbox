@@ -544,6 +544,8 @@ void Sandbox::Dispose() {
 
   if (isolate_) {
 
+    /* Let the main node process handle this
+
     {
       Locker locker(isolate_);
       Isolate::Scope isolate_scope(isolate_);
@@ -559,6 +561,8 @@ void Sandbox::Dispose() {
       node::GetMainThreadMultiIsolatePlatform()->CancelPendingDelayedTasks(isolate_);
 #endif
     }
+
+    */
 
     global_.Reset();
     context_.Reset();
