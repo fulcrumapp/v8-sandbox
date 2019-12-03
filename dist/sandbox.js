@@ -31,6 +31,8 @@ function tryParseJSON(value) {
 
 const SYNC_FUNCTIONS = {};
 const ASYNC_FUNCTIONS = {};
+const BLOCKING_FUNCTIONS = {};
+const BLOCKING = Symbol('v8-sandbox-blocking');
 
 class Sandbox {
   constructor({
@@ -46,12 +48,15 @@ class Sandbox {
   load() {
     global.define = this.define.bind(this);
     global.defineAsync = this.defineAsync.bind(this);
+    global.defineBlocking = this.defineBlocking.bind(this);
     this.syncFunctions = {};
     this.asyncFunctions = {};
+    this.blockingFunctions = {};
 
     if (this.require) {
       this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
       this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
+      this.blockingFunctions = BLOCKING_FUNCTIONS[this.require] = BLOCKING_FUNCTIONS[this.require] || {};
 
       require(this.require);
     }
@@ -65,8 +70,15 @@ class Sandbox {
     this.asyncFunctions[name] = fn;
   }
 
+  defineBlocking(name, fn) {
+    this.blockingFunctions[name] = (...args) => {
+      fn(...args);
+      return BLOCKING;
+    };
+  }
+
   defines() {
-    return [...Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');\n`), ...Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');\n`)];
+    return [...Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');\n`), ...Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');\n`), ...Object.entries(this.blockingFunctions).map(([name, fn]) => `defineBlocking('${name}');\n`)];
   }
 
   initialize() {
@@ -207,13 +219,17 @@ class Sandbox {
     try {
       const name = args[0];
       const parameters = args.slice(1);
-      const fn = name && this.syncFunctions[name];
+      const fn = name && (this.syncFunctions[name] || this.blockingFunctions[name]);
 
       if (!fn) {
         return callback(new Error(`function named '${name}' does not exist`));
       }
 
-      callback(null, fn(...parameters));
+      const result = fn(...[...parameters, callback]);
+
+      if (result !== BLOCKING) {
+        callback(null, result);
+      }
     } catch (err) {
       callback(err);
     }

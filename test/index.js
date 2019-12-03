@@ -530,6 +530,24 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
+  it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
+
+    const code = `
+setTimeout(() => {
+  setResult({value: addNumbersBlocking(1, 2)});
+}, 1);
+`;
+
+    for (let count = 0; count < 20; ++count) {
+      const {value} = await sandbox.execute({code, timeout: 3000});
+
+      assert.equal(value, 3);
+    }
+
+    sandbox.shutdown();
+  });
+
   it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
     const sandbox = new Sandbox({require: REQUIRE});
 
