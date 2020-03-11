@@ -15,6 +15,14 @@ public:
 
   Nan::Persistent<v8::Function>& GetBridge() { return bridge_; }
 
+  node::Environment *GetEnvironment() { return environment_; }
+
+  Isolate *GetNodeIsolate() { return nodeIsolate_; }
+
+  Nan::Global<Context>& GetNodeContext() { return nodeContext_; }
+
+  void *GetContextTag() { return contextTag_; }
+
 private:
   Sandbox *sandbox_;
 
@@ -31,6 +39,14 @@ private:
   static NAN_METHOD(Finalize);
 
   Nan::Persistent<v8::Function> bridge_;
+
+  node::Environment *environment_;
+
+  Isolate *nodeIsolate_;
+
+  Nan::Global<Context> nodeContext_;
+
+  void *contextTag_;
 
   static Nan::Persistent<v8::Function> constructor;
 };

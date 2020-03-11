@@ -17,6 +17,13 @@ class SandboxWrap;
 typedef Baton<Sandbox> SandboxBaton;
 typedef NodeInvocationBaton<Sandbox> SandboxNodeInvocationBaton;
 
+#define ENTER_ISOLATE(I, C) \
+  Locker locker(I); \
+  Isolate::Scope isolate_scope(I); \
+  HandleScope scope(I); \
+  Local<Context> context = Nan::New(C); \
+  Context::Scope context_scope(context); \
+
 class Sandbox {
 public:
   Sandbox();
@@ -88,7 +95,11 @@ private:
 
   Isolate *isolate_;
 
+  Isolate *nodeIsolate_;
+
   Nan::Global<Context> context_;
+
+  Nan::Global<Context> nodeContext_;
 
   Nan::Global<Object> global_;
 

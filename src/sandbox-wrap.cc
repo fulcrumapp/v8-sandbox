@@ -15,7 +15,9 @@ using namespace v8;
 Nan::Persistent<v8::Function> SandboxWrap::constructor;
 
 SandboxWrap::SandboxWrap()
-  : sandbox_(new Sandbox())
+  : sandbox_(new Sandbox()),
+    environment_(nullptr),
+    nodeIsolate_(nullptr)
 {
 }
 
@@ -61,6 +63,14 @@ NAN_METHOD(SandboxWrap::Initialize) {
   Nan::Utf8String runtime(info[0]);
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
+
+  auto nodeContext = Nan::GetCurrentContext();
+
+  sandbox->environment_ = node::GetCurrentEnvironment(nodeContext);
+  sandbox->nodeIsolate_ = Isolate::GetCurrent();
+  sandbox->nodeContext_.Reset(sandbox->nodeIsolate_->GetCurrentContext());
+  sandbox->contextTag_ = nodeContext->GetAlignedPointerFromEmbedderData(35 /* ContextEmbedderIndex::kContextTag */);
+
 
   Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
 

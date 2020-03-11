@@ -12,6 +12,7 @@ void Debug(const char *msg) {
 Sandbox::Sandbox()
 : params_(),
   isolate_(nullptr),
+  nodeIsolate_(nullptr),
   result_("null"),
   loop_(nullptr),
   timers_(),
@@ -28,8 +29,6 @@ Sandbox::~Sandbox() {
 }
 
 void Sandbox::RunIsolate(const char *code) {
-  Locker locker(isolate_);
-  Isolate::Scope isolate_scope(isolate_);
   HandleScope scope(isolate_);
 
   Local<Context> context = Nan::New(context_);
@@ -101,10 +100,19 @@ std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
   HandleScope scope(isolate_);
 
   context_.Reset(Context::New(isolate_));
+  nodeContext_.Reset(Nan::New(wrap->GetNodeContext()));
+  nodeIsolate_ = wrap->GetNodeIsolate();
 
   auto context = GetContext();
 
   Context::Scope context_scope(context);
+
+  isolate_->GetCurrentContext()->SetAlignedPointerInEmbedderData(
+    32 /* ContextEmbedderIndex::kEnvironment */, wrap->GetEnvironment());
+
+  // // Used by EnvPromiseHook to know that we are on a node context.
+  isolate_->GetCurrentContext()->SetAlignedPointerInEmbedderData(
+    35 /* ContextEmbedderIndex::kContextTag */, wrap->GetContextTag());
 
   global_.Reset(context->Global());
 
@@ -128,6 +136,14 @@ std::string Sandbox::Initialize(SandboxWrap *wrap, const char *runtime) {
 }
 
 std::string Sandbox::RunInSandbox(const char *code) {
+  ENTER_ISOLATE(isolate_, context_);
+
+  // Locker locker(isolate_);
+  // Isolate::Scope isolate_scope(isolate_);
+  // HandleScope scope(isolate_);
+  // Local<Context> context = Nan::New(context_);
+  // Context::Scope context_scope(context);
+
   RunIsolate(code);
 
   uv_run(loop_, UV_RUN_DEFAULT);
@@ -214,6 +230,8 @@ void Sandbox::OnTimer(uv_timer_t *timer) {
   SandboxBaton *baton = (SandboxBaton *)timer->data;
 
   Isolate *isolate = baton->instance->isolate_;
+
+  // ENTER_ISOLATE(isolate, baton->instance->context_);
 
   Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
@@ -330,6 +348,8 @@ NAN_METHOD(Sandbox::AsyncNodeCallback) {
 void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
   SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)handle->data;
 
+  // ENTER_ISOLATE(baton->instance->isolate_, baton->instance->context_);
+
   // enter the sandbox isolate
   Isolate *sandboxIsolate = baton->instance->isolate_;
 
@@ -363,12 +383,16 @@ void Sandbox::OnEndNodeInvocation(uv_async_t *handle) {
 void Sandbox::OnStartNodeInvocation(uv_async_t *handle) {
   SandboxNodeInvocationBaton *baton = (SandboxNodeInvocationBaton *)handle->data;
 
+  // ENTER_ISOLATE(baton->instance->nodeIsolate_, baton->instance->nodeContext_);
+
   // enter the node isolate
   Isolate *nodeIsolate = Isolate::GetCurrent();
 
   Locker locker(nodeIsolate);
   Isolate::Scope isolate_scope(nodeIsolate);
   HandleScope scope(nodeIsolate);
+
+  Context::Scope context_scope(nodeIsolate->GetCurrentContext());
 
   Local<Function> cb = Nan::New(baton->instance->wrap_->GetBridge().As<Function>());
 
@@ -566,6 +590,7 @@ void Sandbox::Dispose() {
 
     global_.Reset();
     context_.Reset();
+    nodeContext_.Reset();
 
     isolate_->Dispose();
 
