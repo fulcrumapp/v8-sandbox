@@ -82,8 +82,6 @@ private:
 
   uv_loop_t *loop_;
 
-  Nan::Persistent<v8::Function> connectCallback_;
-
   static Nan::Persistent<v8::Function> constructor;
 
   static void AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer);

@@ -64,6 +64,9 @@ NAN_METHOD(SandboxWrap::New) {
     Nan::Utf8String socket(info[0]);
 
     obj->socket_ = *socket;
+    obj->nodeContext_ = Nan::GetCurrentContext();
+    obj->nodeContext_.Reset(Nan::New(obj->nodeContext_));
+    obj->sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
 
     info.GetReturnValue().Set(info.This());
   } else {
@@ -87,13 +90,7 @@ NAN_METHOD(SandboxWrap::Execute) {
   info.GetReturnValue().Set(info.This());
 }
 
-void SandboxWrap::Execute(const char *code) {
-  nodeContext_ = Nan::GetCurrentContext();
-
-  nodeContext_.Reset(Nan::New(nodeContext_));
-
-  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
-  
+void SandboxWrap::Execute(const char *code) {  
   auto context = Nan::New(sandboxContext_);
   auto global = context->Global();
 
@@ -108,7 +105,6 @@ void SandboxWrap::Execute(const char *code) {
   Nan::SetMethod(global, "_dispatchSync", DispatchSync);
   Nan::SetMethod(global, "_dispatchAsync", DispatchAsync);
   Nan::SetMethod(global, "_debug", DebugLog);
-  // Nan::SetMethod(global, "_dispatchAsync", DispatchAsync);
 
   result_= "";
 
@@ -208,23 +204,15 @@ NAN_METHOD(SandboxWrap::DebugLog) {
 }
 
 NAN_METHOD(SandboxWrap::Connect) {
-  NODE_ARG_FUNCTION(0, "callback");
-
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
-
-  Debug("Connect1");
 
   if (sandbox->loop_) {
     return;
   }
 
-  sandbox->connectCallback_.Reset(info[0].As<v8::Function>());
-
   sandbox->loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 
   uv_loop_init(sandbox->loop_);
-
-  Debug("Connect2");
 
   uv_connect_t *request = (uv_connect_t *)malloc(sizeof(uv_connect_t));
 
@@ -232,19 +220,11 @@ NAN_METHOD(SandboxWrap::Connect) {
 
   uv_pipe_init(sandbox->loop_, sandbox->pipe_, 0);
 
-  sandbox->pipe_->data = sandbox;
+  sandbox->pipe_->data = (void *)sandbox;
 
-  Debug("Connect3");
-  
   uv_pipe_connect(request, sandbox->pipe_, sandbox->socket_.c_str(), OnConnected);
 
-  // Local<Function> callback = Nan::New(sandbox->connectCallback_.As<Function>());
-
-  // v8::Local<v8::Value> argv[] = {};
-
-  // Nan::Call(callback,  Nan::New(sandbox->nodeContext_)->Global(), 0, argv);
-
-  Debug("Connect4");
+  uv_run(sandbox->loop_, UV_RUN_DEFAULT);
 }
 
 NAN_METHOD(SandboxWrap::Disconnect) {
@@ -300,55 +280,16 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
   return sandbox;
 }
 
-// std::string SandboxWrap::DispatchSync(const char *arguments) {
-//   bytesRead_ = -1;
-//   bytesExpected_ = -1;
-//   buffers_.clear();
-//   message_ = arguments;
-//   dispatchResult_ = "";
-  
-//   Debug("here");
-//   Debug(arguments);
-
-//   WriteData((uv_stream_t *)pipe_, message_);
-
-//   uv_run(loop_, UV_RUN_DEFAULT);
-//   Debug("here2");
-
-//   return dispatchResult_;
-// }
-
 std::string SandboxWrap::DispatchSync(const char *arguments) {
-  uv_pipe_t *pipe = nullptr;
-  uv_loop_t *loop = nullptr;
-
   bytesRead_ = -1;
   bytesExpected_ = -1;
   buffers_.clear();
   message_ = arguments;
   dispatchResult_ = "";
-  
-  loop = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 
-  uv_loop_init(loop);
+  WriteData((uv_stream_t *)pipe_, message_);
 
-  uv_connect_t *request = (uv_connect_t *)malloc(sizeof(uv_connect_t));
-
-  pipe = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
-
-  uv_pipe_init(loop, pipe, 0);
-
-  pipe->data = (void *)this;
-
-  uv_pipe_connect(request, pipe, socket_.c_str(), OnConnected);
-
-  uv_run(loop, UV_RUN_DEFAULT);
-
-  uv_loop_close(loop);
-
-  // free(request);
-  // free(pipe);
-  free(loop);
+  uv_run(loop_, UV_RUN_DEFAULT);
 
   return dispatchResult_;
 }
@@ -373,13 +314,9 @@ void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buf
 }
 
 void SandboxWrap::OnConnected(uv_connect_t *request, int status) {
-  Debug("OnConnected got here2");
-
   assert(status == 0);
 
-  SandboxWrap *sandbox = (SandboxWrap *)request->handle->data;
-
-  uv_read_start((uv_stream_t *)request->handle, AllocateBuffer, OnRead);
+  // SandboxWrap *sandbox = (SandboxWrap *)request->handle->data;
 
   // Debug("got here");
 
@@ -389,7 +326,7 @@ void SandboxWrap::OnConnected(uv_connect_t *request, int status) {
 
   // Nan::Call(callback,  Nan::New(sandbox->nodeContext_)->Global(), 0, argv);
 
-  WriteData((uv_stream_t *)request->handle, sandbox->message_);
+  // WriteData((uv_stream_t *)request->handle, sandbox->message_);
 }
 
 void SandboxWrap::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffer) {
@@ -442,7 +379,7 @@ void SandboxWrap::WriteData(uv_stream_t *pipe, std::string &message) {
 
   char *data = (char *)malloc(message.length());
 
-  std::cout << getpid() << " : writing " << message.c_str() << std::endl;
+  // std::cout << getpid() << " : writing " << message.c_str() << std::endl;
 
   memcpy((void *)data, message.c_str(), message.length());
 
@@ -453,6 +390,8 @@ void SandboxWrap::WriteData(uv_stream_t *pipe, std::string &message) {
   write->data = data;
 
   uv_write(write, pipe, buffers, 1, OnWriteComplete);
+
+  uv_read_start((uv_stream_t *)pipe, AllocateBuffer, OnRead);
 }
 
 void SandboxWrap::OnWriteComplete(uv_write_t *request, int status) {
