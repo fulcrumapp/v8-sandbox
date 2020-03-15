@@ -8,13 +8,11 @@ using namespace v8;
 
 typedef std::shared_ptr<Nan::Persistent<Function>> PersistentCallback;
 
-extern int nextBatonID;
-
 template<class T>
 class Baton {
 public:
-  Baton(T *object, PersistentCallback callback)
-    : id(++nextBatonID),
+  Baton(int id, T *object, PersistentCallback callback)
+    : id(id),
       instance(object),
       callback(callback)
   {}
@@ -29,72 +27,20 @@ public:
 };
 
 template<class T>
-class NodeInvocationBaton : public Baton<T> {
+class AsyncOperationBaton : public Baton<T> {
 public:
-  NodeInvocationBaton(T *object, PersistentCallback callback)
-    : Baton<T>(object, callback),
-      name(),
+  AsyncOperationBaton(int id, T *object, PersistentCallback callback)
+    : Baton<T>(id, object, callback),
       arguments(),
-      result(),
-      dispatchNode(nullptr),
-      dispatchAsync(nullptr),
-      mutex(nullptr),
-      condition(nullptr)
+      result()
   {}
 
-  virtual ~NodeInvocationBaton() {
-    closeNodeDispatch();
-    closeAsyncDispatch();
-    closeMutex();
-    closeCondition();
+  virtual ~AsyncOperationBaton() {
   }
 
   // function name, arguments, and its result
-  std::string name;
   std::string arguments;
   std::string result;
-
-  // node dispatch
-  uv_async_t *dispatchNode;
-
-  // async mode, used to signal the sandbox loop to wake up after the node call finishes
-  uv_async_t *dispatchAsync;
-
-  // sync mode, used to synchronously wait for the nodejs thread to provide a result
-  uv_mutex_t *mutex;
-  uv_cond_t *condition;
-
-  void closeNodeDispatch() {
-    if (dispatchNode) {
-      uv_close((uv_handle_t *)dispatchNode, OnClose);
-      dispatchNode = nullptr;
-    }
-  }
-
-  void closeAsyncDispatch() {
-    if (dispatchAsync) {
-      uv_close((uv_handle_t *)dispatchAsync, OnClose);
-      dispatchAsync = nullptr;
-    }
-  }
-
-  void closeMutex() {
-    if (mutex) {
-      uv_mutex_destroy(mutex);
-      delete mutex;
-      mutex = nullptr;
-    }
-  }
-
-  void closeCondition() {
-    if (condition) {
-      uv_cond_destroy(condition);
-      delete condition;
-      condition = nullptr;
-    }
-  }
-
-  static void OnClose(uv_handle_t *handle) { delete handle; }
 };
 
 #endif

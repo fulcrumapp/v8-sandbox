@@ -3,7 +3,7 @@
     return Nan::ThrowTypeError((std::string(name) + " must be given").c_str());     \
   }                                                                                 \
   if (!info[num]->IsString()) {                                                     \
-    return Nan::ThrowTypeError((std::string(name) + " must be an string").c_str()); \
+    return Nan::ThrowTypeError((std::string(name) + " must be a string").c_str()); \
   }
 
 #define NODE_ARG_NUMBER(num, name)                                                  \

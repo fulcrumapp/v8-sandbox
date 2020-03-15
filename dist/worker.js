@@ -1,104 +1,70 @@
 "use strict";
 
-var _sandbox = _interopRequireDefault(require("./sandbox"));
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
 
-var _async = _interopRequireDefault(require("async"));
+var _fs = _interopRequireDefault(require("fs"));
 
-var _assert = _interopRequireDefault(require("assert"));
+var _path = _interopRequireDefault(require("path"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-global.$exports = {};
-let globalSandbox = null;
+const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
-class AsyncSandbox {
+const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString(); // const LINECOUNT = RUNTIME.split('\n').length;
+
+
+class Worker {
   constructor() {
-    _defineProperty(this, "worker", async message => {
-      if (message.initialize) {
-        await this.onInitialize(message);
-      } else {
-        await this.onExecute(message);
+    _defineProperty(this, "send", message => {
+      console.log('GOT HERE!!!!!!!', message);
+      message = JSON.parse(message);
+      process.send({
+        type: 'dispatch',
+        message
+      });
+    });
+
+    _defineProperty(this, "handleMessage", message => {
+      console.log('got a message', message);
+
+      if (message.type === 'execute') {
+        this.execute(message);
+      } else if (message.type === 'callback') {
+        console.log('worker.callback!');
+        this.callback(message.id, JSON.stringify(message.args));
+      } else if (message.type === 'exit') {
+        console.log('exiting');
+        process.off('message', worker.handleMessage);
       }
     });
 
-    _defineProperty(this, "onInitialize", async message => {
-      this.require = message.require;
-      this.template = message.template;
-      await this.create();
-    });
-
-    _defineProperty(this, "onExecute", async message => {
-      await this.wait();
-      global.context = JSON.parse(message.context);
-      await this.execute(message.code);
-    });
-
-    this.queue = _async.default.queue(this.worker, 1);
+    this.native = new NativeSandbox(process.argv[2]);
   }
 
-  create() {
-    this.sandbox = new _sandbox.default({
-      require: this.require,
-      template: this.template
-    });
-    this.initialized = false;
-    return this.initialize();
+  execute(message) {
+    console.log('executing', process.argv[2], message);
+    const code = [RUNTIME, message.code].join('\n');
+    this.native.execute(code, result => {
+      console.log('finished', result);
+      process.send({
+        type: 'result',
+        result
+      });
+    }, this.send);
   }
 
-  async initialize() {
-    (0, _assert.default)(!this.initialized);
-
-    try {
-      await this.sandbox.initialize();
-    } catch (ex) {
-      ex.message = `error initializing sandbox. ${ex.message}`;
-      this.error = ex;
-    }
-
-    this.initialized = true;
-  }
-
-  wait() {
-    return new Promise((resolve, reject) => {
-      const check = () => {
-        if (this.initialized) {
-          resolve();
-        } else {
-          setImmediate(check);
-        }
-      };
-
-      check();
-    });
-  }
-
-  async execute(code) {
-    (0, _assert.default)(this.initialized);
-    let result;
-
-    if (!this.error) {
-      result = await this.sandbox.execute(code);
-    } else {
-      result = {
-        error: this.error
-      };
-    }
-
-    await this.sandbox.finalize();
-    process.send(result); // start creating the next sandbox *after* posting the completion message. This operation happens with coordination from
-    // the calling process, but that's OK because we wait for it's initialization.
-
-    setImmediate(() => {
-      this.create();
-    });
+  callback(id, message) {
+    this.native.callback(id, message);
   }
 
 }
 
-const asyncSandbox = new AsyncSandbox();
-process.on('message', message => {
-  asyncSandbox.queue.push(message);
-});
+exports.default = Worker;
+const worker = new Worker();
+process.on('message', worker.handleMessage);
 //# sourceMappingURL=worker.js.map

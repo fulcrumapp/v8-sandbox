@@ -46,7 +46,7 @@ class SandboxCluster {
       this._execute(task, callback);
     });
 
-    this._workerCount = options.workers || Math.max(_os.default.cpus().length, 4);
+    this._workerCount = options.workers || Math.max(_os.default.cpus().length, 1);
     this._require = options.require;
     this._template = options.template;
     this.start();

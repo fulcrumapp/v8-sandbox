@@ -5,250 +5,200 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-var _fs = _interopRequireDefault(require("fs"));
-
 var _path = _interopRequireDefault(require("path"));
 
-var _request = _interopRequireDefault(require("request"));
+var _child_process = require("child_process");
 
-var _util = _interopRequireDefault(require("util"));
+var _net = _interopRequireDefault(require("net"));
+
+var _uuid = require("uuid");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const NativeSandbox = require('bindings')('sandbox').Sandbox;
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString();
+class Socket {
+  constructor(socket, sandbox) {
+    _defineProperty(this, "handleClose", () => {
+      console.log('socket closed');
+    });
 
-const LINECOUNT = RUNTIME.split('\n').length;
+    _defineProperty(this, "handleData", data => {
+      console.log('socket data', data.toString());
+      const message = JSON.parse(data);
 
-function tryParseJSON(value) {
-  try {
-    return JSON.parse(value);
-  } catch (ex) {
-    return null;
+      const callback = (...args) => {
+        this.sandbox.worker.send({
+          type: 'callback',
+          id: message.id,
+          args
+        });
+      };
+
+      const respond = result => {
+        const json = JSON.stringify({
+          id: message.id,
+          result
+        });
+        const length = Buffer.byteLength(json, 'utf8');
+        const buffer = Buffer.alloc(length + 4);
+        buffer.writeInt32LE(length);
+        buffer.write(json, 4);
+        this.socket.write(buffer);
+      };
+
+      this.sandbox.dispatch(message, respond, callback);
+    });
+
+    _defineProperty(this, "handleError", error => {
+      console.log('socket error', error);
+    });
+
+    _defineProperty(this, "handleTimeout", () => {
+      console.log('socket timeout');
+    });
+
+    _defineProperty(this, "handleDrain", () => {
+      console.log('socket drain');
+      this.socket.resume();
+    });
+
+    _defineProperty(this, "handleEnd", () => {
+      console.log('socket end');
+    });
+
+    this.sandbox = sandbox;
+    this.socket = socket;
+    this.socket.on('close', this.handleClose);
+    this.socket.on('data', this.handleData);
+    this.socket.on('error', this.handleError);
+    this.socket.on('drain', this.handleDrain);
+    this.socket.on('timeout', this.handleTimeout);
+    this.socket.on('end', this.handleEnd);
   }
+
 }
 
-const SYNC_FUNCTIONS = {};
-const ASYNC_FUNCTIONS = {};
-const BLOCKING_FUNCTIONS = {};
-const BLOCKING = Symbol('v8-sandbox-blocking');
-
 class Sandbox {
-  constructor({
-    require,
-    template
-  } = {}) {
-    this.native = new NativeSandbox();
-    this.require = require;
-    this.template = template;
-    this.load();
+  constructor() {
+    _defineProperty(this, "handleClose", () => {
+      console.log('server closed');
+    });
+
+    _defineProperty(this, "handleConnection", socket => {
+      console.log('server connection');
+      this.socket = new Socket(socket, this);
+    });
+
+    _defineProperty(this, "handleError", error => {
+      console.log('server error', error);
+    });
+
+    _defineProperty(this, "handleListening", () => {
+      console.log('server listening', this.socketName);
+    });
+
+    this.id = (0, _uuid.v4)();
+    this.server = _net.default.createServer();
+    this.server.on('close', this.handleClose);
+    this.server.on('connection', this.handleConnection);
+    this.server.on('error', this.handleError);
+    this.server.on('listening', this.handleListening);
+    this.server.listen(this.socketName);
+    this.worker = this.forkWorker();
   }
 
-  load() {
-    global.define = this.define.bind(this);
-    global.defineAsync = this.defineAsync.bind(this);
-    global.defineBlocking = this.defineBlocking.bind(this);
-    this.syncFunctions = {};
-    this.asyncFunctions = {};
-    this.blockingFunctions = {};
-
-    if (this.require) {
-      this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
-      this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
-      this.blockingFunctions = BLOCKING_FUNCTIONS[this.require] = BLOCKING_FUNCTIONS[this.require] || {};
-
-      require(this.require);
-    }
+  forkWorker() {
+    return (0, _child_process.fork)(_path.default.join(__dirname, 'worker'), [this.socketName]);
   }
 
-  define(name, fn) {
-    this.syncFunctions[name] = fn;
+  get socketName() {
+    return process.platform === 'win32' ? _path.default.join('\\\\?\\pipe', process.cwd(), this.id) : `/tmp/${this.id}`;
   }
 
-  defineAsync(name, fn) {
-    this.asyncFunctions[name] = fn;
-  }
+  execute({
+    code,
+    context,
+    timeout
+  }, callback) {
+    this.worker.removeAllListeners();
+    this._callback = callback;
+    this.worker.on('message', message => {
+      // this.finishWorker(worker);
+      console.log('worker:onmessage');
+    });
+    this.worker.on('error', message => {
+      // this.removeWorker(worker);
+      console.log('worker:error');
+      callback({
+        error: new Error('worker error')
+      });
+    });
+    this.worker.on('disconnect', () => {
+      // this.removeWorker(worker);
+      console.log('worker:disconnect', this.worker.pid); // if (this.worker.exitedAfterDisconnect === true) {
+      //   console.log('Oh, it was just voluntary – no need to worry');
+      // }
+      // callback({error: new Error('worker disconnected')});
+    });
+    this.worker.on('exit', message => {
+      console.log('worker:exit', this.worker.exitCode); // this.worker.kill();
+      // this.removeWorker(worker);
 
-  defineBlocking(name, fn) {
-    this.blockingFunctions[name] = (...args) => {
-      fn(...args);
-      return BLOCKING;
-    };
-  }
+      this.server.close(() => {
+        console.log('server closed');
+      });
+    }); // if (timeout > 0) {
+    //   worker.executionTimeout = setTimeout(() => {
+    //     this.removeWorker(worker);
+    //     worker.kill();
+    //     callback({error: new TimeoutError('timeout')});
+    //   }, timeout);
+    // }
 
-  defines() {
-    return [...Object.entries(this.syncFunctions).map(([name, fn]) => `define('${name}');\n`), ...Object.entries(this.asyncFunctions).map(([name, fn]) => `defineAsync('${name}');\n`), ...Object.entries(this.blockingFunctions).map(([name, fn]) => `defineBlocking('${name}');\n`)];
-  }
-
-  initialize() {
-    return new Promise((resolve, reject) => {
-      this.output = [];
-      const defines = this.defines();
-      const code = RUNTIME + '\n' + this.defines().join('\n') + this.template;
-      this.native.initialize(code, json => {
-        const result = tryParseJSON(json);
-        setImmediate(() => {
-          if (result && result.error) {
-            if (result.error.lineNumber != null) {
-              result.error.lineNumber -= LINECOUNT + defines.length;
-            }
-
-            reject(result.error);
-          } else {
-            resolve(result && result.value);
-          }
-        });
-      }, this.dispatch.bind(this));
+    this.worker.send({
+      type: 'execute',
+      code,
+      context: JSON.stringify(context || {})
     });
   }
 
-  async eval(code) {
-    await this.initialize();
-    const result = await this.execute(code);
-    await this.finalize();
-    return { ...result,
-      output: this.output
-    };
-  }
-
-  execute(code, callback) {
-    return new Promise((resolve, reject) => {
-      this.native.execute(code, json => {
-        let result = tryParseJSON(json);
-
-        if (result == null) {
-          result = {
-            error: new Error('no result'),
-            output: this.output
-          };
-        }
-
-        setImmediate(() => {
-          resolve({ ...result,
-            output: this.output
-          });
-        });
-      }, this.dispatch.bind(this));
-    });
-  }
-
-  finalize() {
-    return new Promise(resolve => {
-      this.native.finalize(() => {
-        setImmediate(resolve);
-      }, this.dispatch.bind(this));
-    });
-  } // handle function calls from the sandbox
-
-
-  dispatch(invocation) {
-    const finish = (err, ...results) => {
-      const serialized = [err != null ? {
-        message: err.message
-      } : null];
-
-      if (results && results.length) {
-        serialized.push.apply(serialized, results);
-      }
-
-      invocation.callback(invocation, JSON.stringify(serialized));
-    };
-
-    const parameters = tryParseJSON(invocation.args);
-
-    if (parameters == null) {
-      return finish(new Error('invalid invocation parameters'));
-    }
-
-    if (invocation.name === 'dispatchSync') {
-      return this.dispatchSync(parameters, finish);
-    } else if (invocation.name === 'dispatchAsync') {
-      return this.dispatchAsync(parameters, finish);
-    } else if (invocation.name === 'httpRequest') {
-      return this.httpRequest(...parameters, finish);
-    } else if (invocation.name === 'log') {
-      this.log(...parameters);
-      return finish(null);
-    } else if (invocation.name === 'error') {
-      this.error(...parameters);
-      return finish(null);
-    }
-
-    return finish(null);
-  }
-
-  log(...args) {
-    this.write({
-      type: 'log',
-      args
-    });
-    console.log(...args);
-  }
-
-  error(...args) {
-    this.write({
-      type: 'error',
-      args
-    });
-    console.error(...args);
-  }
-
-  write({
-    type,
+  dispatch({
+    name,
     args
-  }) {
-    this.output.push({
-      type,
-      time: new Date(),
-      message: _util.default.format(...args)
-    });
-  }
+  }, respond, callback) {
+    // console.log('MESSAGE', message);
+    if (name === 'setResult') {
+      respond({
+        value: this.setResult(...args)
+      });
+    }
 
-  httpRequest(options, callback) {
-    (0, _request.default)(options, (err, response, body) => {
-      if (response && Buffer.isBuffer(response.body)) {
-        response.body = body = response.body.toString('base64');
-      }
-
-      callback(err, response, body);
-    });
-  }
-
-  dispatchSync(args, callback) {
-    try {
-      const name = args[0];
-      const parameters = args.slice(1);
-      const fn = name && (this.syncFunctions[name] || this.blockingFunctions[name]);
-
-      if (!fn) {
-        return callback(new Error(`function named '${name}' does not exist`));
-      }
-
-      const result = fn(...[...parameters, callback]);
-
-      if (result !== BLOCKING) {
-        callback(null, result);
-      }
-    } catch (err) {
-      callback(err);
+    if (name === 'test') {
+      respond({
+        value: args
+      });
+    } else if (name === 'testAsync') {
+      const timerID = setTimeout(() => {
+        console.log('calling!!!!!!!');
+        callback(null, 7171717);
+      });
+      respond({
+        value: +timerID
+      });
     }
   }
 
-  dispatchAsync(args, callback) {
-    try {
-      const name = args[0];
-      const parameters = args.slice(1);
-      const fn = name && this.asyncFunctions[name];
+  setResult(result) {
+    console.log('reseres');
+    console.log('sendingkill');
+    this.worker.send({
+      type: 'exit'
+    });
 
-      if (!fn) {
-        return callback(new Error(`function named '${name}' does not exist`));
-      }
+    this._callback(result);
 
-      fn(...[...parameters, callback]);
-    } catch (err) {
-      callback(err);
-    }
+    console.log('reseresyoyoy'); // this._callback(result);
   }
 
 }
