@@ -21,7 +21,7 @@ const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.
 class Worker {
   constructor() {
     _defineProperty(this, "send", message => {
-      console.log('GOT HERE!!!!!!!', message);
+      console.log('SENDING!!!!');
       message = JSON.parse(message);
       process.send({
         type: 'dispatch',
@@ -30,15 +30,11 @@ class Worker {
     });
 
     _defineProperty(this, "handleMessage", message => {
-      console.log('got a message', message);
-
       if (message.type === 'execute') {
         this.execute(message);
       } else if (message.type === 'callback') {
-        console.log('worker.callback!');
         this.callback(message.id, JSON.stringify(message.args));
       } else if (message.type === 'exit') {
-        console.log('exiting');
         process.off('message', worker.handleMessage);
       }
     });
@@ -50,7 +46,6 @@ class Worker {
     console.log('executing', process.argv[2], message);
     const code = [RUNTIME, message.code].join('\n');
     this.native.execute(code, result => {
-      console.log('finished', result);
       process.send({
         type: 'result',
         result

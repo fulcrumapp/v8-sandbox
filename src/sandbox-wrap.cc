@@ -86,10 +86,7 @@ NAN_METHOD(SandboxWrap::Execute) {
 }
 
 void SandboxWrap::Execute(const char *code) {
-  // isolate_ = Isolate::GetCurrent();
   nodeContext_ = Nan::GetCurrentContext();
-
-  Debug("Execute");
 
   nodeContext_.Reset(Nan::New(nodeContext_));
 
@@ -115,23 +112,13 @@ void SandboxWrap::Execute(const char *code) {
 
   Nan::TryCatch tryCatch;
 
-  Debug("Execute2");
-
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 
   if (!tryCatch.HasCaught()) {
-    Debug("Executeing!!!");
     (void)script.ToLocalChecked()->Run(context);
   }
 
-  if (tryCatch.HasCaught()) {
-    Debug("HasCaught");
-  }
-
   MaybeHandleError(tryCatch, context);
-
-  Debug("Execute3");
-  // return result_;
 }
 
 void SandboxWrap::Callback(int id, const char *args) {
@@ -142,20 +129,11 @@ void SandboxWrap::Callback(int id, const char *args) {
 
   Context::Scope context_scope(context);
 
-  // Nan::Set(global, Nan::New("_message").ToLocalChecked(), Nan::New(message).ToLocalChecked());
-
   Nan::TryCatch tryCatch;
 
   Local<Function> callback = Nan::New(baton->callback->As<Function>());
 
-  // auto callback = Nan::Get(global, Nan::New("_callback").ToLocalChecked()).ToLocalChecked(); 
-
-  Debug("ARGSSS");
-  Debug(args);
-
   if (callback->IsFunction()) {
-    Debug("CALLBACKCALLING!!!!");
-
     v8::Local<v8::Value> argv[] = {
       Nan::New(args).ToLocalChecked()
     };
@@ -163,16 +141,9 @@ void SandboxWrap::Callback(int id, const char *args) {
     Nan::Call(callback, global, 1, argv);
   }
 
-  if (tryCatch.HasCaught()) {
-    Debug("HasCaught");
-  }
-
   MaybeHandleError(tryCatch, context);
 
   pendingOperations_.erase(id);
-
-  Debug("Callback::Execute3");
-  // return result_;
 }
 
 NAN_METHOD(SandboxWrap::SetResult) {
@@ -220,9 +191,7 @@ NAN_METHOD(SandboxWrap::DispatchAsync) {
 
   SandboxWrap* sandbox = GetSandboxFromContext();
 
-  Debug("DispatchAsyncING BEFORE");
   std::string result = sandbox->DispatchAsync(id, *arguments, info[2].As<Function>());
-  Debug("DispatchAsyncING AFTER");
   // info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
@@ -276,9 +245,6 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
 std::string SandboxWrap::DispatchSync(const char *arguments) {
   uv_pipe_t *pipe = nullptr;
   uv_loop_t *loop = nullptr;
-
-  Debug("DispatchSync");
-  Debug(arguments);
 
   bytesRead_ = -1;
   bytesExpected_ = -1;

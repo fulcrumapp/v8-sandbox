@@ -41,10 +41,6 @@ global.dispatchSync = (name, args) => {
 
   const result = global._dispatchSync.apply(global, parameters);
 
-  _debug("REZZZZZ");
-
-  _debug(JSON.stringify(result));
-
   if (result == null) {
     return null;
   }
@@ -57,8 +53,6 @@ global.dispatchSync = (name, args) => {
   if (error) {
     throw new Error(error.message);
   }
-
-  global._debug("Hello3");
 
   return value;
 };
@@ -84,15 +78,7 @@ global.dispatchAsync = (name, args, callback) => {
 
   parameters.push(wrappedCallback);
 
-  _debug("yoyoyoyoyoyoyoy");
-
-  _debug(typeof global._dispatchAsync);
-
-  _debug(JSON.stringify(parameters));
-
   const result = global._dispatchAsync.apply(global, parameters);
-
-  _debug("afterit");
 
   return result != null ? JSON.parse(result) : null;
 };

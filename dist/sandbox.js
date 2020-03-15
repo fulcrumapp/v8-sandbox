@@ -105,11 +105,17 @@ class Sandbox {
     this.server.on('error', this.handleError);
     this.server.on('listening', this.handleListening);
     this.server.listen(this.socketName);
-    this.worker = this.forkWorker();
+    this.forkWorker();
+    this.queue = [];
   }
 
   forkWorker() {
-    return (0, _child_process.fork)(_path.default.join(__dirname, 'worker'), [this.socketName]);
+    if (this.worker) {
+      this.worker.kill();
+      this.worker = null;
+    }
+
+    this.worker = (0, _child_process.fork)(_path.default.join(__dirname, 'worker'), [this.socketName]);
   }
 
   get socketName() {
@@ -121,33 +127,50 @@ class Sandbox {
     context,
     timeout
   }, callback) {
-    this.worker.removeAllListeners();
-    this._callback = callback;
-    this.worker.on('message', message => {
-      // this.finishWorker(worker);
-      console.log('worker:onmessage');
+    const wrappedCallback = (...args) => {
+      if (callback == null || callback.called) {
+        return;
+      }
+
+      callback.called = true;
+      callback(...args);
+    };
+
+    this.queue.push({
+      code,
+      context,
+      timeout,
+      callback: wrappedCallback
     });
-    this.worker.on('error', message => {
-      // this.removeWorker(worker);
-      console.log('worker:error');
-      callback({
+    this.executeNext();
+  }
+
+  finishItem() {
+    this.item = null;
+    this.executeNext();
+  }
+
+  executeNext() {
+    if (this.item || this.queue.length === 0) {
+      return;
+    }
+
+    this.item = this.queue.pop();
+    const {
+      worker,
+      item
+    } = this;
+    worker.removeAllListeners();
+    worker.on('error', error => {
+      console.error('worker:error', error);
+      this.forkWorker();
+      item.callback({
         error: new Error('worker error')
       });
+      this.finishItem();
     });
-    this.worker.on('disconnect', () => {
-      // this.removeWorker(worker);
-      console.log('worker:disconnect', this.worker.pid); // if (this.worker.exitedAfterDisconnect === true) {
-      //   console.log('Oh, it was just voluntary – no need to worry');
-      // }
-      // callback({error: new Error('worker disconnected')});
-    });
-    this.worker.on('exit', message => {
-      console.log('worker:exit', this.worker.exitCode); // this.worker.kill();
-      // this.removeWorker(worker);
-
-      this.server.close(() => {
-        console.log('server closed');
-      });
+    this.worker.on('exit', () => {
+      console.error('worker:exit', worker.exitCode);
     }); // if (timeout > 0) {
     //   worker.executionTimeout = setTimeout(() => {
     //     this.removeWorker(worker);
@@ -158,8 +181,17 @@ class Sandbox {
 
     this.worker.send({
       type: 'execute',
-      code,
-      context: JSON.stringify(context || {})
+      code: item.code,
+      context: JSON.stringify(item.context || {})
+    });
+  }
+
+  shutdown() {
+    this.worker.send({
+      type: 'exit'
+    });
+    this.server.close(() => {
+      console.log('server shutdown');
     });
   }
 
@@ -167,7 +199,6 @@ class Sandbox {
     name,
     args
   }, respond, callback) {
-    // console.log('MESSAGE', message);
     if (name === 'setResult') {
       respond({
         value: this.setResult(...args)
@@ -180,7 +211,6 @@ class Sandbox {
       });
     } else if (name === 'testAsync') {
       const timerID = setTimeout(() => {
-        console.log('calling!!!!!!!');
         callback(null, 7171717);
       });
       respond({
@@ -190,15 +220,9 @@ class Sandbox {
   }
 
   setResult(result) {
-    console.log('reseres');
-    console.log('sendingkill');
-    this.worker.send({
-      type: 'exit'
-    });
-
-    this._callback(result);
-
-    console.log('reseresyoyoy'); // this._callback(result);
+    // this.worker.send({ type: 'exit' });
+    this.item.callback(result);
+    this.finishItem();
   }
 
 }
