@@ -20,15 +20,6 @@ const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.
 
 class Worker {
   constructor() {
-    _defineProperty(this, "send", message => {
-      console.log('SENDING!!!!');
-      message = JSON.parse(message);
-      process.send({
-        type: 'dispatch',
-        message
-      });
-    });
-
     _defineProperty(this, "handleMessage", message => {
       if (message.type === 'execute') {
         this.execute(message);
@@ -50,7 +41,7 @@ class Worker {
         type: 'result',
         result
       });
-    }, this.send);
+    });
   }
 
   callback(id, message) {

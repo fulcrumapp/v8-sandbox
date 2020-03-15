@@ -14,14 +14,8 @@ class SandboxWrap;
 typedef AsyncOperationBaton<SandboxWrap> AsyncSandboxOperationBaton;
 
 class SandboxWrap : public Nan::ObjectWrap {
-  friend class SandboxInitializeWorker;
-  friend class SandboxExecuteWorker;
-  friend class SandboxFinalizeWorker;
-
 public:
   static void Init(v8::Local<v8::Object> exports);
-
-  Nan::Persistent<v8::Function>& GetBridge() { return bridge_; }
 
 private:
   explicit SandboxWrap();
@@ -57,10 +51,6 @@ private:
   std::string DispatchAsync(int id, const char *arguments, Local<Function> callback);
 
   static SandboxWrap *GetSandboxFromContext();
-
-  Nan::Persistent<v8::Function> bridge_;
-
-  // Isolate *isolate_;
 
   Nan::Callback *callback_;
 

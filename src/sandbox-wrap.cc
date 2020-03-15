@@ -77,9 +77,6 @@ NAN_METHOD(SandboxWrap::Execute) {
 
   SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
 
-  // Nan::Callback *callback = new Nan::Callback(info[1].As<v8::Function>());
-
-  sandbox->bridge_.Reset(info[2].As<v8::Function>());
   sandbox->Execute(*code);
 
   info.GetReturnValue().Set(info.This());
@@ -284,47 +281,12 @@ std::string SandboxWrap::DispatchAsync(int id, const char *arguments, Local<Func
 
   auto baton = std::make_shared<AsyncSandboxOperationBaton>(id, this, cb);
 
-  // LockPendingOperations();
-
   pendingOperations_[baton->id] = baton;
-
-  // UnlockPendingOperations();
 
   baton->arguments = arguments;
 
   return DispatchSync(arguments);
-  // auto context = Nan::New(nodeContext_);
-  // auto global = context->Global();
-
-  // Context::Scope context_scope(context);
-
-  // Local<Function> cb = Nan::New(bridge_.As<Function>());
-
-  // v8::Local<v8::Value> argv[] = {
-  //   Nan::New(arguments).ToLocalChecked()
-  // };
-
-  // Nan::Call(cb, global, 1, argv);
-
-  // return "";
 }
-
-// std::string SandboxWrap::DispatchAsyncOld(const char *arguments) {
-//   auto context = Nan::New(nodeContext_);
-//   auto global = context->Global();
-
-//   Context::Scope context_scope(context);
-
-//   Local<Function> cb = Nan::New(bridge_.As<Function>());
-
-//   v8::Local<v8::Value> argv[] = {
-//     Nan::New(arguments).ToLocalChecked()
-//   };
-
-//   Nan::Call(cb, global, 1, argv);
-
-//   return "";
-// }
 
 void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {
   buffer->base = (char *)malloc(size);
