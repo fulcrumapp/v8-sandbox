@@ -315,18 +315,6 @@ void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buf
 
 void SandboxWrap::OnConnected(uv_connect_t *request, int status) {
   assert(status == 0);
-
-  // SandboxWrap *sandbox = (SandboxWrap *)request->handle->data;
-
-  // Debug("got here");
-
-  // Local<Function> callback = Nan::New(sandbox->connectCallback_.As<Function>());
-
-  // v8::Local<v8::Value> argv[] = {};
-
-  // Nan::Call(callback,  Nan::New(sandbox->nodeContext_)->Global(), 0, argv);
-
-  // WriteData((uv_stream_t *)request->handle, sandbox->message_);
 }
 
 void SandboxWrap::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffer) {

@@ -81,6 +81,7 @@
     "vector": "cpp",
     "*.tcc": "cpp",
     "memory_resource": "cpp",
-    "cfenv": "cpp"
+    "cfenv": "cpp",
+    "filesystem": "cpp"
   }
 }

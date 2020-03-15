@@ -26,6 +26,7 @@ class Worker {
       } else if (message.type === 'callback') {
         this.callback(message.id, JSON.stringify(message.args));
       } else if (message.type === 'exit') {
+        this.disconnect();
         process.off('message', worker.handleMessage);
       }
     });
@@ -35,6 +36,7 @@ class Worker {
 
   execute(message) {
     console.log('executing', process.argv[2], message);
+    this.connect();
     const code = [RUNTIME, message.code].join('\n');
     this.native.execute(code, result => {
       process.send({
@@ -42,6 +44,24 @@ class Worker {
         result
       });
     });
+  }
+
+  connect() {
+    if (this.connected) {
+      return;
+    }
+
+    this.native.connect();
+    this.connected = true;
+  }
+
+  disconnect() {
+    if (!this.connected) {
+      return;
+    }
+
+    this.native.disconnect();
+    this.connected = false;
   }
 
   callback(id, message) {

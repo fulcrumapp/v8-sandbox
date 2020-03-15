@@ -19,17 +19,6 @@ global._execute = () => {
 };
 
 global._callbackID = 0;
-global._callbacks = {};
-
-global._callback = message => {
-  message = JSON.parse(message);
-  const callback = global._callbacks[message.id];
-
-  if (callback) {
-    delete global._callbacks[message.id];
-    callback.apply(null, message.args);
-  }
-};
 
 global.dispatchSync = (name, args) => {
   const id = global._callbackID++;
