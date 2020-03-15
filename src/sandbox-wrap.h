@@ -24,6 +24,10 @@ private:
 
   static NAN_METHOD(New);
 
+  static NAN_METHOD(Connect);
+
+  static NAN_METHOD(Disconnect);
+
   static NAN_METHOD(Execute);
 
   static NAN_METHOD(SetResult);
@@ -73,6 +77,12 @@ private:
   std::string message_;
 
   std::string socket_;
+
+  uv_pipe_t *pipe_;
+
+  uv_loop_t *loop_;
+
+  Nan::Persistent<v8::Function> connectCallback_;
 
   static Nan::Persistent<v8::Function> constructor;
 

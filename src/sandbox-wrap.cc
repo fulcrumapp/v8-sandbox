@@ -25,7 +25,10 @@ SandboxWrap::SandboxWrap()
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
-    message_("")
+    message_(""),
+    socket_(""),
+    pipe_(nullptr),
+    loop_(nullptr)
 {
 }
 
@@ -41,6 +44,8 @@ void SandboxWrap::Init(v8::Local<v8::Object> exports) {
 
   Nan::SetPrototypeMethod(tpl, "execute", Execute);
   Nan::SetPrototypeMethod(tpl, "callback", Callback);
+  Nan::SetPrototypeMethod(tpl, "connect", Connect);
+  Nan::SetPrototypeMethod(tpl, "disconnect", Disconnect);
 
   auto function = Nan::GetFunction(tpl).ToLocalChecked();
 
@@ -202,6 +207,62 @@ NAN_METHOD(SandboxWrap::DebugLog) {
   // info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
+NAN_METHOD(SandboxWrap::Connect) {
+  NODE_ARG_FUNCTION(0, "callback");
+
+  SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
+
+  Debug("Connect1");
+
+  if (sandbox->loop_) {
+    return;
+  }
+
+  sandbox->connectCallback_.Reset(info[0].As<v8::Function>());
+
+  sandbox->loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
+
+  uv_loop_init(sandbox->loop_);
+
+  Debug("Connect2");
+
+  uv_connect_t *request = (uv_connect_t *)malloc(sizeof(uv_connect_t));
+
+  sandbox->pipe_ = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+
+  uv_pipe_init(sandbox->loop_, sandbox->pipe_, 0);
+
+  sandbox->pipe_->data = sandbox;
+
+  Debug("Connect3");
+  
+  uv_pipe_connect(request, sandbox->pipe_, sandbox->socket_.c_str(), OnConnected);
+
+  // Local<Function> callback = Nan::New(sandbox->connectCallback_.As<Function>());
+
+  // v8::Local<v8::Value> argv[] = {};
+
+  // Nan::Call(callback,  Nan::New(sandbox->nodeContext_)->Global(), 0, argv);
+
+  Debug("Connect4");
+}
+
+NAN_METHOD(SandboxWrap::Disconnect) {
+  SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
+
+  if (!sandbox->loop_) {
+    return;
+  }
+
+  Debug("disconnect");
+
+  uv_loop_close(sandbox->loop_);
+
+  // free(request);
+  // free(pipe);
+  free(sandbox->loop_);
+}
+
 void SandboxWrap::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
   if (!tryCatch.HasCaught()) {
     return;
@@ -238,6 +299,24 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
 
   return sandbox;
 }
+
+// std::string SandboxWrap::DispatchSync(const char *arguments) {
+//   bytesRead_ = -1;
+//   bytesExpected_ = -1;
+//   buffers_.clear();
+//   message_ = arguments;
+//   dispatchResult_ = "";
+  
+//   Debug("here");
+//   Debug(arguments);
+
+//   WriteData((uv_stream_t *)pipe_, message_);
+
+//   uv_run(loop_, UV_RUN_DEFAULT);
+//   Debug("here2");
+
+//   return dispatchResult_;
+// }
 
 std::string SandboxWrap::DispatchSync(const char *arguments) {
   uv_pipe_t *pipe = nullptr;
@@ -294,11 +373,21 @@ void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buf
 }
 
 void SandboxWrap::OnConnected(uv_connect_t *request, int status) {
+  Debug("OnConnected got here2");
+
   assert(status == 0);
 
   SandboxWrap *sandbox = (SandboxWrap *)request->handle->data;
 
   uv_read_start((uv_stream_t *)request->handle, AllocateBuffer, OnRead);
+
+  // Debug("got here");
+
+  // Local<Function> callback = Nan::New(sandbox->connectCallback_.As<Function>());
+
+  // v8::Local<v8::Value> argv[] = {};
+
+  // Nan::Call(callback,  Nan::New(sandbox->nodeContext_)->Global(), 0, argv);
 
   WriteData((uv_stream_t *)request->handle, sandbox->message_);
 }
@@ -334,11 +423,11 @@ void SandboxWrap::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *b
       }
 
       uv_read_stop(pipe);
-      uv_close((uv_handle_t *)pipe, OnClose);
+      // uv_close((uv_handle_t *)pipe, OnClose);
     }
   }
   else if (bytesRead < 0) {
-    uv_close((uv_handle_t *)pipe, OnClose);
+    // uv_close((uv_handle_t *)pipe, OnClose);
   }
 
   free(buffer->base);
@@ -349,11 +438,11 @@ void SandboxWrap::OnClose(uv_handle_t *pipe) {
 }
 
 void SandboxWrap::WriteData(uv_stream_t *pipe, std::string &message) {
-  uv_write_t *write = (uv_write_t *) malloc(sizeof(uv_write_t));
+  uv_write_t *write = (uv_write_t *)malloc(sizeof(uv_write_t));
 
   char *data = (char *)malloc(message.length());
 
-  // std::cout << getpid() << " : writing " << message.length() << std::endl;
+  std::cout << getpid() << " : writing " << message.c_str() << std::endl;
 
   memcpy((void *)data, message.c_str(), message.length());
 
