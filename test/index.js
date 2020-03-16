@@ -10,11 +10,7 @@ const runWithTimeout = (code, timeout) => {
   return new Promise((resolve, reject) => {
     sandbox.execute({code, timeout}, (result) => {
       console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%', result);
-      if (result.error) {
-        reject(result.error);
-      } else {
-        resolve(result.value)
-      }
+      resolve(result);
     });
   });
 };
