@@ -110,6 +110,14 @@ void SandboxWrap::Execute(const char *code) {
 
   Nan::TryCatch tryCatch;
 
+  // Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
+
+  // Local<String> execute = Nan::New("global._execute();").ToLocalChecked();
+
+  // Local<Script> script = Script::Compile(context, execute).ToLocalChecked();
+
+  // (void)script->Run(context);
+
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 
   if (!tryCatch.HasCaught()) {
@@ -190,7 +198,8 @@ NAN_METHOD(SandboxWrap::DispatchAsync) {
   SandboxWrap* sandbox = GetSandboxFromContext();
 
   std::string result = sandbox->DispatchAsync(id, *arguments, info[2].As<Function>());
-  // info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+
+  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
 NAN_METHOD(SandboxWrap::DebugLog) {
@@ -290,6 +299,9 @@ std::string SandboxWrap::DispatchSync(const char *arguments) {
   WriteData((uv_stream_t *)pipe_, message_);
 
   uv_run(loop_, UV_RUN_DEFAULT);
+
+  Debug("itttttt");
+  Debug(dispatchResult_.c_str());
 
   return dispatchResult_;
 }

@@ -1,4 +1,4 @@
-import Sandbox from '../dist';
+import Sandbox from '../dist/sandbox';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,7 +7,16 @@ import assert from 'assert';
 const sandbox = new Sandbox();
 
 const runWithTimeout = (code, timeout) => {
-  return sandbox.execute({code, timeout});
+  return new Promise((resolve, reject) => {
+    sandbox.execute({code, timeout}, (result) => {
+      console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%', result);
+      if (result.error) {
+        reject(result.error);
+      } else {
+        resolve(result.value)
+      }
+    });
+  });
 };
 
 const run = (code) => {
@@ -23,7 +32,7 @@ describe('sandbox', () => {
     sandbox.shutdown();
   });
 
-  it('should execute httpRequest', async () => {
+  it('should execute simple httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   setResult({value: body});

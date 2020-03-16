@@ -37,7 +37,11 @@ class Worker {
   execute(message) {
     console.log('executing', process.argv[2], message);
     this.connect();
-    const code = [RUNTIME, message.code].join('\n');
+    const wrappedCode = `
+      global._code = ${JSON.stringify(message.code)};
+      global._execute();
+    `;
+    const code = [RUNTIME, wrappedCode].join('\n');
     this.native.execute(code, result => {
       process.send({
         type: 'result',

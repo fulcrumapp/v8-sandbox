@@ -17,6 +17,13 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+class TimeoutError extends Error {
+  get isTimeout() {
+    return true;
+  }
+
+}
+
 class Socket {
   constructor(socket, sandbox) {
     _defineProperty(this, "handleClose", () => {
@@ -44,10 +51,21 @@ class Socket {
         const buffer = Buffer.alloc(length + 4);
         buffer.writeInt32LE(length);
         buffer.write(json, 4);
+        console.log('writing json', json);
         this.socket.write(buffer);
       };
 
-      this.sandbox.dispatch(message, respond, callback);
+      try {
+        this.sandbox.dispatch(message, respond, callback);
+      } catch (ex) {
+        return respond({
+          error: {
+            name: ex.name,
+            message: ex.message,
+            stack: ex.stack
+          }
+        });
+      }
     });
 
     _defineProperty(this, "handleError", error => {
@@ -171,13 +189,18 @@ class Sandbox {
     });
     this.worker.on('exit', () => {
       console.error('worker:exit', worker.exitCode);
-    }); // if (timeout > 0) {
-    //   worker.executionTimeout = setTimeout(() => {
-    //     this.removeWorker(worker);
-    //     worker.kill();
-    //     callback({error: new TimeoutError('timeout')});
-    //   }, timeout);
-    // }
+    });
+
+    if (item.timeout > 0) {
+      worker.executionTimeout = setTimeout(() => {
+        worker.kill();
+        this.forkWorker();
+        item.callback({
+          error: new TimeoutError('timeout')
+        });
+        this.finishItem();
+      }, item.timeout);
+    }
 
     this.worker.send({
       type: 'execute',
@@ -200,22 +223,24 @@ class Sandbox {
     args
   }, respond, callback) {
     if (name === 'setResult') {
-      respond({
+      return respond({
         value: this.setResult(...args)
       });
     }
 
     if (name === 'test') {
-      respond({
+      return respond({
         value: args
       });
     } else if (name === 'testAsync') {
       const timerID = setTimeout(() => {
         callback(null, 7171717);
       });
-      respond({
+      return respond({
         value: +timerID
       });
+    } else {
+      throw new Error(`${name} is not a valid method`);
     }
   }
 
