@@ -13,6 +13,8 @@ var _net = _interopRequireDefault(require("net"));
 
 var _uuid = require("uuid");
 
+var _request = _interopRequireDefault(require("request"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -31,7 +33,7 @@ class Socket {
     });
 
     _defineProperty(this, "handleData", data => {
-      console.log('socket data', data.toString());
+      // console.log('socket data', data.toString());
       const message = JSON.parse(data);
 
       const callback = (...args) => {
@@ -50,8 +52,8 @@ class Socket {
         const length = Buffer.byteLength(json, 'utf8');
         const buffer = Buffer.alloc(length + 4);
         buffer.writeInt32LE(length);
-        buffer.write(json, 4);
-        console.log('writing json', json);
+        buffer.write(json, 4); // console.log('writing json', json);
+
         this.socket.write(buffer);
       };
 
@@ -104,7 +106,7 @@ class Sandbox {
     });
 
     _defineProperty(this, "handleConnection", socket => {
-      console.log('server connection');
+      // console.log('server connection');
       this.socket = new Socket(socket, this);
     });
 
@@ -187,8 +189,7 @@ class Sandbox {
       });
       this.finishItem();
     });
-    this.worker.on('exit', () => {
-      console.error('worker:exit', worker.exitCode);
+    this.worker.on('exit', () => {// console.error('worker:exit', worker.exitCode);
     });
 
     if (item.timeout > 0) {
@@ -222,6 +223,35 @@ class Sandbox {
     name,
     args
   }, respond, callback) {
+    const params = [...args, respond, callback];
+
+    switch (name) {
+      case 'setResult':
+        {
+          return this.setResult(...params);
+        }
+
+      case 'httpRequest':
+        {
+          return this.httpRequest(...params);
+        }
+
+      case 'setTimeout':
+        {
+          return this.setTimeout(...params);
+        }
+
+      case 'clearTimeout':
+        {
+          return this.clearTimeout(...params);
+        }
+
+      default:
+        {
+          throw new Error(`${name} is not a valid method`);
+        }
+    }
+
     if (name === 'setResult') {
       return respond({
         value: this.setResult(...args)
@@ -244,10 +274,56 @@ class Sandbox {
     }
   }
 
-  setResult(result) {
+  setResult(result, respond, callback) {
     // this.worker.send({ type: 'exit' });
     this.item.callback(result);
     this.finishItem();
+    respond({
+      value: null
+    });
+  }
+
+  setTimeout(timeout, respond, callback) {
+    const timerID = setTimeout(callback, timeout);
+    respond({
+      value: +timerID
+    });
+  }
+
+  clearTimeout(timerID, respond, callback) {
+    clearTimeout(timerID);
+    respond({
+      value: null
+    });
+  }
+
+  httpRequest(options, respond, callback) {
+    const {
+      sync
+    } = options;
+    (0, _request.default)(options, (err, response, body) => {
+      if (response && Buffer.isBuffer(response.body)) {
+        response.body = body = response.body.toString('base64');
+      }
+
+      if (sync) {
+        respond({
+          value: {
+            err,
+            response,
+            body
+          }
+        });
+      } else {
+        callback(err, response, body);
+      }
+    });
+
+    if (!sync) {
+      respond({
+        value: null
+      });
+    }
   }
 
 }

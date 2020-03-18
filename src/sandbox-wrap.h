@@ -52,7 +52,7 @@ private:
 
   std::string DispatchSync(const char *arguments);
 
-  std::string DispatchAsync(int id, const char *arguments, Local<Function> callback);
+  std::string DispatchAsync(const char *arguments, Local<Function> callback);
 
   static SandboxWrap *GetSandboxFromContext();
 

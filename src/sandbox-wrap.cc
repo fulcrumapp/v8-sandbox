@@ -149,7 +149,7 @@ void SandboxWrap::Callback(int id, const char *args) {
 
   MaybeHandleError(tryCatch, context);
 
-  pendingOperations_.erase(id);
+  // pendingOperations_.erase(id);
 }
 
 NAN_METHOD(SandboxWrap::SetResult) {
@@ -178,11 +178,12 @@ NAN_METHOD(SandboxWrap::DispatchSync) {
   NODE_ARG_INTEGER(0, "id");
   NODE_ARG_STRING(1, "parameters");
 
+  int id = Nan::To<int>(info[0]).FromJust();
   Nan::Utf8String arguments(info[1]);
 
   SandboxWrap* sandbox = GetSandboxFromContext();
 
-  std::string result = sandbox->DispatchSync(*arguments);
+  std::string result = sandbox->DispatchSync(id, *arguments);
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
@@ -289,19 +290,21 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
   return sandbox;
 }
 
-std::string SandboxWrap::DispatchSync(const char *arguments) {
+std::string SandboxWrap::DispatchSync(int id, const char *arguments) {
   bytesRead_ = -1;
   bytesExpected_ = -1;
   buffers_.clear();
   message_ = arguments;
   dispatchResult_ = "";
 
+  std::cout << "||||| " << id << " : " << arguments << std::endl;
+
   WriteData((uv_stream_t *)pipe_, message_);
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
-  Debug("itttttt");
-  Debug(dispatchResult_.c_str());
+  std::cout << "===== " << id << std::endl;
+  // Debug(dispatchResult_.c_str());
 
   return dispatchResult_;
 }
@@ -317,7 +320,7 @@ std::string SandboxWrap::DispatchAsync(int id, const char *arguments, Local<Func
 
   baton->arguments = arguments;
 
-  return DispatchSync(arguments);
+  return DispatchSync(id, arguments);
 }
 
 void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {

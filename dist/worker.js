@@ -35,7 +35,7 @@ class Worker {
   }
 
   execute(message) {
-    console.log('executing', process.argv[2], message);
+    // console.log('executing', process.argv[2], message);
     this.connect();
     const wrappedCode = `
       global._code = ${JSON.stringify(message.code)};

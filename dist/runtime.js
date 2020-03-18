@@ -4,6 +4,7 @@ global._try = func => {
   } catch (ex) {
     global.setResult({
       error: {
+        test: 1,
         name: ex.name,
         message: ex.message,
         stack: ex.stack
@@ -119,15 +120,11 @@ global.setResult = result => {
 };
 
 global.setTimeout = (callback, timeout) => {
-  const handler = () => {
-    global._try(callback);
-  };
-
-  return global._setTimeout(handler, timeout);
+  return global.dispatchAsync('setTimeout', [timeout], callback);
 };
 
 global.clearTimeout = id => {
-  return global._clearTimeout(id);
+  return global.dispatchAsync('clearTimeout', [id]);
 };
 
 global.console = {
