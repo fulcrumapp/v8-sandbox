@@ -409,8 +409,6 @@ setTimeout(() => {
 
     const results = await Promise.all(operations);
 
-    console.log('REZ', results);
-
     for (let i = 0; i < results.length; ++i) {
       assert.equal(results[i].value, i);
     }
@@ -469,25 +467,25 @@ setTimeout(() => {
 //     executeNext(0);
 //   });
 
-  it('should handle template scripts', async () => {
-    const template = `
-global.testValue = 1;
-`;
+//   it('should handle template scripts', async () => {
+//     const template = `
+// global.testValue = 1;
+// `;
 
-    const sandbox = new Sandbox({template});
+//     const sandbox = new Sandbox({template});
 
-    const code = `
-setTimeout(() => {
-  setResult({value: ++global.testValue});
-}, 1);
-`;
+//     const code = `
+// setTimeout(() => {
+//   setResult({value: ++global.testValue});
+// }, 1);
+// `;
 
-    const {value} = await sandbox.execute({code, timeout: 3000});
+//     const {value} = await sandbox.execute({code, timeout: 3000});
 
-    assert.equal(value, 2);
+//     assert.equal(value, 2);
 
-    sandbox.shutdown();
-  });
+//     sandbox.shutdown();
+//   });
 
   // it('should handle syntax errors in template scripts', async () => {
   //   const template = `{`;

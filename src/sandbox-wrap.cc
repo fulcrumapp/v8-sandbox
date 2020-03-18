@@ -12,8 +12,6 @@ void Debug(const char *msg) {
   std::cout << getpid() << " : " << msg << std::endl;
 }
 
-// #include "sandbox.h"
-
 using namespace v8;
 
 Nan::Persistent<v8::Function> SandboxWrap::constructor;
@@ -130,7 +128,10 @@ void SandboxWrap::Execute(const char *code) {
 void SandboxWrap::Callback(int id, const char *args) {
   auto baton = pendingOperations_[id];
 
+  assert(baton);
+
   auto context = Nan::New(sandboxContext_);
+
   auto global = context->Global();
 
   Context::Scope context_scope(context);
@@ -149,7 +150,7 @@ void SandboxWrap::Callback(int id, const char *args) {
 
   MaybeHandleError(tryCatch, context);
 
-  // pendingOperations_.erase(id);
+  pendingOperations_.erase(id);
 }
 
 NAN_METHOD(SandboxWrap::SetResult) {
@@ -175,30 +176,26 @@ NAN_METHOD(SandboxWrap::Callback) {
 }
 
 NAN_METHOD(SandboxWrap::DispatchSync) {
-  NODE_ARG_INTEGER(0, "id");
-  NODE_ARG_STRING(1, "parameters");
+  NODE_ARG_STRING(0, "parameters");
 
-  int id = Nan::To<int>(info[0]).FromJust();
-  Nan::Utf8String arguments(info[1]);
+  Nan::Utf8String arguments(info[0]);
 
   SandboxWrap* sandbox = GetSandboxFromContext();
 
-  std::string result = sandbox->DispatchSync(id, *arguments);
+  std::string result = sandbox->DispatchSync(AsyncSandboxOperationBaton::nextID(), *arguments);
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
 NAN_METHOD(SandboxWrap::DispatchAsync) {
-  NODE_ARG_INTEGER(0, "id");
-  NODE_ARG_STRING(1, "parameters");
-  NODE_ARG_FUNCTION(2, "callback");
+  NODE_ARG_STRING(0, "parameters");
+  NODE_ARG_FUNCTION(1, "callback");
 
-  int id = Nan::To<int>(info[0]).FromJust();
-  Nan::Utf8String arguments(info[1]);
+  Nan::Utf8String arguments(info[0]);
 
   SandboxWrap* sandbox = GetSandboxFromContext();
 
-  std::string result = sandbox->DispatchAsync(id, *arguments, info[2].As<Function>());
+  std::string result = sandbox->DispatchAsync(*arguments, info[1].As<Function>());
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
@@ -297,30 +294,28 @@ std::string SandboxWrap::DispatchSync(int id, const char *arguments) {
   message_ = arguments;
   dispatchResult_ = "";
 
-  std::cout << "||||| " << id << " : " << arguments << std::endl;
-
-  WriteData((uv_stream_t *)pipe_, message_);
+  WriteData((uv_stream_t *)pipe_, id, message_);
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
-  std::cout << "===== " << id << std::endl;
+  // std::cout << "===== " << id << std::endl;
   // Debug(dispatchResult_.c_str());
 
   return dispatchResult_;
 }
 
-// make a single interface with (int id, const char *arguments, Local<Function> callback)
+// make a single interface with (const char *arguments, Local<Function> callback)
 // always dispatch batons the same way, no different with sync or async, just the presence of the callback
-std::string SandboxWrap::DispatchAsync(int id, const char *arguments, Local<Function> callback) {
+std::string SandboxWrap::DispatchAsync(const char *arguments, Local<Function> callback) {
   auto cb = std::make_shared<Nan::Persistent<Function>>(callback);
 
-  auto baton = std::make_shared<AsyncSandboxOperationBaton>(id, this, cb);
+  auto baton = std::make_shared<AsyncSandboxOperationBaton>(this, cb);
 
   pendingOperations_[baton->id] = baton;
 
   baton->arguments = arguments;
 
-  return DispatchSync(id, arguments);
+  return DispatchSync(baton->id, arguments);
 }
 
 void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {
@@ -340,7 +335,7 @@ void SandboxWrap::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *b
     int chunkLength = bytesRead;
     
     if (sandbox->bytesExpected_ == -1) {
-      sandbox->bytesExpected_ = ((int32_t *)chunk)[0];
+      sandbox->bytesExpected_ = ntohl(((int32_t *)chunk)[0]);
       sandbox->bytesRead_ = 0;
       sandbox->dispatchResult_ = "";
 
@@ -377,17 +372,23 @@ void SandboxWrap::OnClose(uv_handle_t *pipe) {
   free(pipe);
 }
 
-void SandboxWrap::WriteData(uv_stream_t *pipe, std::string &message) {
+void SandboxWrap::WriteData(uv_stream_t *pipe, int id, std::string &message) {
   uv_write_t *write = (uv_write_t *)malloc(sizeof(uv_write_t));
 
-  char *data = (char *)malloc(message.length());
+  size_t bufferLength = sizeof(int32_t) + message.length();
+
+  char *data = (char *)malloc(bufferLength);
+
+  uint32_t *base = (uint32_t *)data;
+
+  base[0] = htonl(id);
 
   // std::cout << getpid() << " : writing " << message.c_str() << std::endl;
 
-  memcpy((void *)data, message.c_str(), message.length());
+  memcpy(&base[1], message.c_str(), message.length());
 
   uv_buf_t buffers[] = {
-    { .base = data, .len = message.length() }
+    { .base = data, .len = bufferLength }
   };
 
   write->data = data;

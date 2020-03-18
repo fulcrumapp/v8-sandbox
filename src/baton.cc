@@ -1,1 +1,1 @@
-// int nextBatonID = 0;
+int nextBatonID = 0;

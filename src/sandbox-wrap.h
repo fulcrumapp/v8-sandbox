@@ -50,7 +50,7 @@ private:
 
   void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
 
-  std::string DispatchSync(const char *arguments);
+  std::string DispatchSync(int id, const char *arguments);
 
   std::string DispatchAsync(const char *arguments, Local<Function> callback);
 
@@ -92,7 +92,7 @@ private:
 
   static void OnClose(uv_handle_t *pipe);
 
-  static void WriteData(uv_stream_t *pipe, std::string &message);
+  static void WriteData(uv_stream_t *pipe, int id, std::string &message);
 
   static void OnWriteComplete(uv_write_t *request, int status);
 

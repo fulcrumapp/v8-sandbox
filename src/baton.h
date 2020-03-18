@@ -8,11 +8,13 @@ using namespace v8;
 
 typedef std::shared_ptr<Nan::Persistent<Function>> PersistentCallback;
 
+extern int nextBatonID;
+
 template<class T>
 class Baton {
 public:
-  Baton(int id, T *object, PersistentCallback callback)
-    : id(id),
+  Baton(T *object, PersistentCallback callback)
+    : id(Baton::nextID()),
       instance(object),
       callback(callback)
   {}
@@ -24,13 +26,17 @@ public:
   T *instance;
 
   PersistentCallback callback;
+
+  static int nextID() {
+    return ++nextBatonID;
+  }
 };
 
 template<class T>
 class AsyncOperationBaton : public Baton<T> {
 public:
-  AsyncOperationBaton(int id, T *object, PersistentCallback callback)
-    : Baton<T>(id, object, callback),
+  AsyncOperationBaton(T *object, PersistentCallback callback)
+    : Baton<T>(object, callback),
       arguments(),
       result()
   {}
