@@ -16,7 +16,7 @@ const runWithTimeout = (code, timeout) => {
 };
 
 const run = (code) => {
-  return runWithTimeout(code, 3000);
+  return runWithTimeout(code, 5000);
 };
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
@@ -414,58 +414,59 @@ setTimeout(() => {
     }
   });
 
-  // it('should handle queued stress', async () => {
-  //   const iterations = 500;
+  it('should handle queued stress', async () => {
+    const iterations = 500;
 
-  //   let count = 0;
+    let count = 0;
 
-  //   const operations = [];
+    const operations = [];
 
-  //   return new Promise((resolve) => {
-  //     for (let i = 0; i < iterations; ++i) {
-  //       const js = `
-  // setTimeout(() => {
-  //   setResult({value: ${i}});
-  // }, 1);
-  // `;
+    return new Promise((resolve) => {
+      for (let i = 0; i < iterations; ++i) {
+        const js = `
+  setTimeout(() => {
+    setResult({value: ${i}});
+  }, 1);
+  `;
 
-  //       setImmediate(() => {
-  //         run(js).then(({error, value}) => {
-  //           count++;
-  //           assert.equal(value, i);
+        setImmediate(() => {
+          run(js).then(({error, value}) => {
+            count++;
 
-  //           if (count === iterations) {
-  //             resolve();
-  //           }
-  //         });
-  //       });
-  //     }
-  //   });
-  // });
+            assert.equal(value, i);
 
-//   it('should handle recursive stress', (done) => {
-//     const iterations = 500;
+            if (count === iterations) {
+              resolve();
+            }
+          });
+        });
+      }
+    });
+  });
 
-//     const executeNext = (i) => {
-//       const js = `
-// setResult({value: ${i}});
-// `;
+  it('should handle recursive stress', (done) => {
+    const iterations = 500;
 
-//       run(js).then(({error, value}) => {
-//         assert.equal(value, i);
+    const executeNext = (i) => {
+      const js = `
+setResult({value: ${i}});
+`;
 
-//         if (i === iterations) {
-//           done();
-//         } else {
-//           setImmediate(() => {
-//             executeNext(i + 1);
-//           });
-//         }
-//       });
-//     };
+      run(js).then(({error, value}) => {
+        assert.equal(value, i);
 
-//     executeNext(0);
-//   });
+        if (i === iterations) {
+          done();
+        } else {
+          setImmediate(() => {
+            executeNext(i + 1);
+          });
+        }
+      });
+    };
+
+    executeNext(0);
+  });
 
 //   it('should handle template scripts', async () => {
 //     const template = `
