@@ -12,4 +12,6 @@ dispatchAsync('testAsync', [1, 2, 3], (err, res) => {
 
 sandbox.execute({ code }, (result) => {
   console.log('RESULT', result);
+  sandbox.shutdown();
+  console.log('AFTERRESULT', result);
 });

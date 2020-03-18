@@ -3669,6 +3669,11 @@ write@^0.2.1:
   dependencies:
     mkdirp "^0.5.1"
 
+wtfnode@^0.8.1:
+  version "0.8.1"
+  resolved "https://registry.yarnpkg.com/wtfnode/-/wtfnode-0.8.1.tgz#d16593ae9b39b252dff6931f95569d9365162389"
+  integrity sha512-S7S7D8CGHVCtlTn1IWX+nEbxavpL9+fk3vk02RPZHiExyZFb9oKTTig3nEnMCL2yaJ4047V5lAkuulXuO2OsOw==
+
 xml2js@0.4.17:
   version "0.4.17"
   resolved "https://registry.yarnpkg.com/xml2js/-/xml2js-0.4.17.tgz#17be93eaae3f3b779359c795b419705a8817e868"
