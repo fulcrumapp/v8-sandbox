@@ -126,7 +126,7 @@ void SandboxWrap::Execute(const char *code) {
 
 void SandboxWrap::Callback(int id, const char *args) {
   assert(id > 0);
-  
+
   auto baton = pendingOperations_[id];
 
   assert(baton);
@@ -281,13 +281,11 @@ std::string SandboxWrap::Dispatch(const char *arguments, Local<Function> *callba
   
   if (callback) {
     auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
-    auto baton = std::make_shared<AsyncSandboxOperationBaton>(this, cb);
+    auto baton = std::make_shared<AsyncOperationBaton>(this, cb);
 
     id = baton->id;
 
     pendingOperations_[baton->id] = baton;
-
-    baton->arguments = arguments;
   }
 
   bytesRead_ = -1;

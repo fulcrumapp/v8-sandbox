@@ -5,13 +5,12 @@
 #include <vector>
 #include <map>
 #include "baton.h"
-// #include "sandbox.h"
 
 using namespace v8;
 
 class SandboxWrap;
 
-typedef AsyncOperationBaton<SandboxWrap> AsyncSandboxOperationBaton;
+typedef Baton<SandboxWrap> AsyncOperationBaton;
 
 class SandboxWrap : public Nan::ObjectWrap {
 public:
@@ -90,7 +89,7 @@ private:
 
   static void OnWriteComplete(uv_write_t *request, int status);
 
-  typedef std::map<int, std::shared_ptr<AsyncSandboxOperationBaton>> AsyncOperationMap;
+  typedef std::map<int, std::shared_ptr<AsyncOperationBaton>> AsyncOperationMap;
 
   AsyncOperationMap pendingOperations_;
 };

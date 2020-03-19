@@ -2,7 +2,6 @@
 #define __BATON_H__
 
 #include <nan.h>
-#include <iostream>
 
 using namespace v8;
 
@@ -30,23 +29,6 @@ public:
   static int nextID() {
     return ++nextBatonID;
   }
-};
-
-template<class T>
-class AsyncOperationBaton : public Baton<T> {
-public:
-  AsyncOperationBaton(T *object, PersistentCallback callback)
-    : Baton<T>(object, callback),
-      arguments(),
-      result()
-  {}
-
-  virtual ~AsyncOperationBaton() {
-  }
-
-  // function name, arguments, and its result
-  std::string arguments;
-  std::string result;
 };
 
 #endif
