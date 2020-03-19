@@ -40,6 +40,7 @@ void SandboxWrap::Init(v8::Local<v8::Object> exports) {
   tpl->SetClassName(Nan::New("Sandbox").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
+  Nan::SetPrototypeMethod(tpl, "initialize", Initialize);
   Nan::SetPrototypeMethod(tpl, "execute", Execute);
   Nan::SetPrototypeMethod(tpl, "callback", Callback);
   Nan::SetPrototypeMethod(tpl, "connect", Connect);
@@ -64,7 +65,6 @@ NAN_METHOD(SandboxWrap::New) {
     obj->socket_ = *socket;
     obj->nodeContext_ = Nan::GetCurrentContext();
     obj->nodeContext_.Reset(Nan::New(obj->nodeContext_));
-    obj->sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
 
     info.GetReturnValue().Set(info.This());
   } else {
@@ -73,6 +73,14 @@ NAN_METHOD(SandboxWrap::New) {
     v8::Local<v8::Function> cons = Nan::New<v8::Function>(constructor);
     info.GetReturnValue().Set(Nan::NewInstance(cons, argc, argv).ToLocalChecked());
   }
+}
+
+NAN_METHOD(SandboxWrap::Initialize) {
+  SandboxWrap* sandbox = ObjectWrap::Unwrap<SandboxWrap>(info.Holder());
+
+  sandbox->Initialize();
+
+  info.GetReturnValue().Set(info.This());
 }
 
 NAN_METHOD(SandboxWrap::Execute) {
@@ -88,32 +96,29 @@ NAN_METHOD(SandboxWrap::Execute) {
   info.GetReturnValue().Set(info.This());
 }
 
-void SandboxWrap::Execute(const char *code) {  
-  auto context = Nan::New(sandboxContext_);
-  auto global = context->Global();
+void SandboxWrap::Initialize() {
+  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
 
+  auto context = Nan::New(sandboxContext_);
+  
   Context::Scope context_scope(context);
+
+  auto global = context->Global();
 
   sandboxGlobal_.Reset(global);
 
   Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
-
   Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-
   Nan::SetMethod(global, "_dispatch", Dispatch);
   Nan::SetMethod(global, "_debug", DebugLog);
+}
 
-  result_= "";
+void SandboxWrap::Execute(const char *code) {  
+  auto context = Nan::New(sandboxContext_);
+
+  Context::Scope context_scope(context);
 
   Nan::TryCatch tryCatch;
-
-  // Nan::Set(context->Global(), Nan::New("_code").ToLocalChecked(), Nan::New(code).ToLocalChecked());
-
-  // Local<String> execute = Nan::New("global._execute();").ToLocalChecked();
-
-  // Local<Script> script = Script::Compile(context, execute).ToLocalChecked();
-
-  // (void)script->Run(context);
 
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 

@@ -34,20 +34,30 @@ class Worker {
     this.native = new NativeSandbox(process.argv[2]);
   }
 
-  execute(message) {
-    // console.log('executing', process.argv[2], message);
+  execute({
+    code,
+    template
+  }) {
+    this.reset();
     this.connect();
     const wrappedCode = `
-      global._code = ${JSON.stringify(message.code)};
+      global._code = ${JSON.stringify(code)};
       global._execute();
     `;
-    const code = [RUNTIME, wrappedCode].join('\n');
+    code = [RUNTIME, wrappedCode].join('\n');
     this.native.execute(code, result => {
       process.send({
         type: 'result',
         result
       });
     });
+  }
+
+  reset() {
+    if (!this.native.initialized) {
+      this.native.initialize();
+      this.native.initialized = true;
+    }
   }
 
   connect() {

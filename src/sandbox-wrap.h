@@ -27,6 +27,8 @@ private:
 
   static NAN_METHOD(Disconnect);
 
+  static NAN_METHOD(Initialize);
+
   static NAN_METHOD(Execute);
 
   static NAN_METHOD(Callback);
@@ -35,7 +37,7 @@ private:
 
   static NAN_METHOD(DebugLog);
 
-  void Initialize(const char *runtime);
+  void Initialize();
 
   void Dispose();
 
