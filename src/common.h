@@ -29,3 +29,11 @@
   if (!info[num]->IsFunction()) {                                                    \
     return Nan::ThrowTypeError((std::string(name) + " must be a function").c_str()); \
   }
+
+#define NODE_ARG_FUNCTION_OPTIONAL(num, name)                                        \
+  if (info.Length() < num + 1) {                                                     \
+    return Nan::ThrowTypeError((std::string(name) + " must be given").c_str());      \
+  }                                                                                  \
+  if (!(info[num]->IsFunction() || info[num]->IsNull())) {                            \
+    return Nan::ThrowTypeError((std::string(name) + " must be a function").c_str()); \
+  }

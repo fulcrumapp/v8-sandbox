@@ -32,9 +32,7 @@ private:
 
   static NAN_METHOD(Callback);
 
-  static NAN_METHOD(DispatchSync);
-
-  static NAN_METHOD(DispatchAsync);
+  static NAN_METHOD(Dispatch);
 
   static NAN_METHOD(DebugLog);
 
@@ -48,9 +46,7 @@ private:
 
   void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
 
-  std::string DispatchSync(int id, const char *arguments);
-
-  std::string DispatchAsync(const char *arguments, Local<Function> callback);
+  std::string Dispatch(const char *arguments, Local<Function> *callback);
 
   static SandboxWrap *GetSandboxFromContext();
 

@@ -18,37 +18,13 @@ global._execute = () => {
   });
 };
 
-global.dispatchSync = (name, args) => {
-  const parameters = [JSON.stringify({
-    name,
-    args: args || []
-  })];
-
-  const result = global._dispatchSync.apply(global, parameters);
-
-  if (result == null) {
-    return null;
-  }
-
-  const {
-    error,
-    value
-  } = JSON.parse(result).result;
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return value;
-};
-
 global.debug = (...args) => {
   global._debug(JSON.stringify(args));
 };
 
-global.dispatchAsync = (name, args, callback) => {
+global.dispatch = (name, args, callback) => {
   if (typeof callback !== 'function') {
-    callback = () => {};
+    callback = null;
   }
 
   const parameters = [JSON.stringify({
@@ -64,7 +40,7 @@ global.dispatchAsync = (name, args, callback) => {
 
   parameters.push(wrappedCallback);
 
-  const json = global._dispatchAsync.apply(global, parameters);
+  const json = global._dispatch.apply(global, parameters);
 
   const result = json != null ? JSON.parse(json).result : null;
 
@@ -76,7 +52,7 @@ global.dispatchAsync = (name, args, callback) => {
 };
 
 global.httpRequest = (options, callback) => {
-  return global.dispatchAsync('httpRequest', [options], callback);
+  return global.dispatch('httpRequest', [options], callback);
 };
 
 global.httpRequestOld = (options, callback) => {
@@ -108,29 +84,29 @@ global.httpRequestOld = (options, callback) => {
 };
 
 global.setResult = result => {
-  return dispatchSync('setResult', result != null ? [result] : null);
+  return dispatch('setResult', result != null ? [result] : null);
 };
 
 global.setTimeout = (callback, timeout) => {
-  return global.dispatchAsync('setTimeout', [timeout], callback);
+  return global.dispatch('setTimeout', [timeout], callback);
 };
 
 global.clearTimeout = id => {
-  return global.dispatchAsync('clearTimeout', [id]);
+  return global.dispatch('clearTimeout', [id]);
 };
 
 global.console = {
   log: (...args) => {
-    return global.dispatchAsync('log', [args]);
+    return global.dispatch('log', [args]);
   },
   error: (...args) => {
-    return global.dispatchAsync('error', [args]);
+    return global.dispatch('error', [args]);
   }
 };
 
 global.define = name => {
   global[name] = (...args) => {
-    return global.dispatchSync(name, args);
+    return global.dispatch(name, args);
   };
 };
 
@@ -139,7 +115,7 @@ global.defineBlocking = global.define;
 global.defineAsync = name => {
   global[name] = (...args) => {
     const callback = args.pop();
-    return global.dispatchAsync(name, args, callback);
+    return global.dispatch(name, args, callback);
   };
 };
 //# sourceMappingURL=runtime.js.map

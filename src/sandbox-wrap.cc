@@ -99,8 +99,8 @@ void SandboxWrap::Execute(const char *code) {
   Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
 
   Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(global, "_dispatchSync", DispatchSync);
-  Nan::SetMethod(global, "_dispatchAsync", DispatchAsync);
+
+  Nan::SetMethod(global, "_dispatch", Dispatch);
   Nan::SetMethod(global, "_debug", DebugLog);
 
   result_= "";
@@ -163,28 +163,25 @@ NAN_METHOD(SandboxWrap::Callback) {
   sandbox->Callback(Nan::To<uint32_t>(info[0]).FromJust(), *args);
 }
 
-NAN_METHOD(SandboxWrap::DispatchSync) {
+NAN_METHOD(SandboxWrap::Dispatch) {
   NODE_ARG_STRING(0, "parameters");
+  NODE_ARG_FUNCTION_OPTIONAL(1, "callback");
 
   Nan::Utf8String arguments(info[0]);
 
   SandboxWrap* sandbox = GetSandboxFromContext();
 
-  std::string result = sandbox->DispatchSync(AsyncSandboxOperationBaton::nextID(), *arguments);
+  std::string result;
 
-  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
-}
+  if (info[1]->IsNull()) {
+    result = sandbox->Dispatch(*arguments, nullptr);
+  }
+  else {
+    Local<Function> callback = info[1].As<Function>();
 
-NAN_METHOD(SandboxWrap::DispatchAsync) {
-  NODE_ARG_STRING(0, "parameters");
-  NODE_ARG_FUNCTION(1, "callback");
-
-  Nan::Utf8String arguments(info[0]);
-
-  SandboxWrap* sandbox = GetSandboxFromContext();
-
-  std::string result = sandbox->DispatchAsync(*arguments, info[1].As<Function>());
-
+    result = sandbox->Dispatch(*arguments, &callback);
+  }
+  
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
@@ -275,7 +272,25 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
   return sandbox;
 }
 
-std::string SandboxWrap::DispatchSync(int id, const char *arguments) {
+// make a single interface with (const char *arguments, Local<Function> callback)
+// always dispatch batons the same way, no different with sync or async, just the presence of the callback
+std::string SandboxWrap::Dispatch(const char *arguments, Local<Function> *callback) {
+  int id;
+  
+  if (callback) {
+    auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
+    auto baton = std::make_shared<AsyncSandboxOperationBaton>(this, cb);
+
+    id = baton->id;
+
+    pendingOperations_[baton->id] = baton;
+
+    baton->arguments = arguments;
+  }
+  else {
+    id = AsyncSandboxOperationBaton::nextID();
+  }
+
   bytesRead_ = -1;
   bytesExpected_ = -1;
   buffers_.clear();
@@ -286,24 +301,7 @@ std::string SandboxWrap::DispatchSync(int id, const char *arguments) {
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
-  // std::cout << "===== " << id << std::endl;
-  // Debug(dispatchResult_.c_str());
-
   return dispatchResult_;
-}
-
-// make a single interface with (const char *arguments, Local<Function> callback)
-// always dispatch batons the same way, no different with sync or async, just the presence of the callback
-std::string SandboxWrap::DispatchAsync(const char *arguments, Local<Function> callback) {
-  auto cb = std::make_shared<Nan::Persistent<Function>>(callback);
-
-  auto baton = std::make_shared<AsyncSandboxOperationBaton>(this, cb);
-
-  pendingOperations_[baton->id] = baton;
-
-  baton->arguments = arguments;
-
-  return DispatchSync(baton->id, arguments);
 }
 
 void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {
