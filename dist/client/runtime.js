@@ -4,7 +4,6 @@ global._try = func => {
   } catch (ex) {
     global.setResult({
       error: {
-        test: 1,
         name: ex.name,
         message: ex.message,
         stack: ex.stack
@@ -19,12 +18,8 @@ global._execute = () => {
   });
 };
 
-global._callbackID = 0;
-
 global.dispatchSync = (name, args) => {
-  const id = global._callbackID++;
-  const parameters = [id, JSON.stringify({
-    id,
+  const parameters = [JSON.stringify({
     name,
     args: args || []
   })];
@@ -56,11 +51,8 @@ global.dispatchAsync = (name, args, callback) => {
     callback = () => {};
   }
 
-  const id = global._callbackID++;
-  const parameters = [id, JSON.stringify({
-    id,
+  const parameters = [JSON.stringify({
     name,
-    async: true,
     args: args || []
   })];
 
@@ -116,7 +108,7 @@ global.httpRequestOld = (options, callback) => {
 };
 
 global.setResult = result => {
-  return dispatchSync('setResult', result != null ? [result] : null); // return global._setResult(result != null ? JSON.stringify(result) : null);
+  return dispatchSync('setResult', result != null ? [result] : null);
 };
 
 global.setTimeout = (callback, timeout) => {

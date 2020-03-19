@@ -15,6 +15,8 @@ var _uuid = require("uuid");
 
 var _request = _interopRequireDefault(require("request"));
 
+var _wtfnode = _interopRequireDefault(require("wtfnode"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -26,6 +28,14 @@ class TimeoutError extends Error {
 
 }
 
+function tryParseJSON(value) {
+  try {
+    return JSON.parse(value);
+  } catch (ex) {
+    return null;
+  }
+}
+
 class Socket {
   constructor(socket, sandbox) {
     _defineProperty(this, "handleClose", () => {
@@ -33,31 +43,41 @@ class Socket {
     });
 
     _defineProperty(this, "handleData", data => {
-      // console.log('socket data', data.toString());
-      const message = JSON.parse(data);
+      // console.log('socket data1', data);
+      const id = data.readInt32BE();
+      const json = data.toString('utf8', 4);
+      const message = tryParseJSON(json);
 
       const callback = (...args) => {
-        this.sandbox.worker.send({
-          type: 'callback',
-          id: message.id,
-          args
-        });
+        // make sure the current worker is the worker we started with. The worker might've
+        // been replaced by the time this is invoked.
+        if (this.worker === this.sandbox.worker) {
+          this.sandbox.worker.send({
+            type: 'callback',
+            id,
+            args
+          });
+        }
       };
 
       const respond = result => {
         const json = JSON.stringify({
-          id: message.id,
+          id,
           result
         });
         const length = Buffer.byteLength(json, 'utf8');
         const buffer = Buffer.alloc(length + 4);
-        buffer.writeInt32LE(length);
+        buffer.writeInt32BE(length);
         buffer.write(json, 4); // console.log('writing json', json);
 
         this.socket.write(buffer);
       };
 
       try {
+        if (message == null) {
+          throw new Error('invalid dispatch');
+        }
+
         this.sandbox.dispatch(message, respond, callback);
       } catch (ex) {
         return respond({
@@ -88,6 +108,7 @@ class Socket {
     });
 
     this.sandbox = sandbox;
+    this.worker = sandbox.worker;
     this.socket = socket;
     this.socket.on('close', this.handleClose);
     this.socket.on('data', this.handleData);
@@ -95,6 +116,13 @@ class Socket {
     this.socket.on('drain', this.handleDrain);
     this.socket.on('timeout', this.handleTimeout);
     this.socket.on('end', this.handleEnd);
+  }
+
+  shutdown() {
+    if (this.socket) {
+      this.socket.end();
+      this.socket.unref();
+    }
   }
 
 }
@@ -130,12 +158,13 @@ class Sandbox {
   }
 
   forkWorker() {
+    this.clearWorkerTimeout();
+
     if (this.worker) {
-      this.worker.kill();
       this.worker = null;
     }
 
-    this.worker = (0, _child_process.fork)(_path.default.join(__dirname, 'worker'), [this.socketName]);
+    this.worker = (0, _child_process.fork)(_path.default.join(__dirname, '..', 'client', 'worker'), [this.socketName]);
   }
 
   get socketName() {
@@ -193,7 +222,8 @@ class Sandbox {
     });
 
     if (item.timeout > 0) {
-      worker.executionTimeout = setTimeout(() => {
+      this.clearWorkerTimeout();
+      this.executionTimeout = setTimeout(() => {
         worker.kill();
         this.forkWorker();
         item.callback({
@@ -210,12 +240,27 @@ class Sandbox {
     });
   }
 
+  clearWorkerTimeout() {
+    if (this.worker) {
+      clearTimeout(this.executionTimeout);
+      this.executionTimeout = null;
+    }
+  }
+
   shutdown() {
+    if (this.socket) {
+      this.socket.shutdown();
+    }
+
+    this.clearWorkerTimeout();
     this.worker.send({
       type: 'exit'
     });
+    this.worker.kill();
     this.server.close(() => {
       console.log('server shutdown');
+
+      _wtfnode.default.dump();
     });
   }
 
@@ -250,27 +295,6 @@ class Sandbox {
         {
           throw new Error(`${name} is not a valid method`);
         }
-    }
-
-    if (name === 'setResult') {
-      return respond({
-        value: this.setResult(...args)
-      });
-    }
-
-    if (name === 'test') {
-      return respond({
-        value: args
-      });
-    } else if (name === 'testAsync') {
-      const timerID = setTimeout(() => {
-        callback(null, 7171717);
-      });
-      return respond({
-        value: +timerID
-      });
-    } else {
-      throw new Error(`${name} is not a valid method`);
     }
   }
 

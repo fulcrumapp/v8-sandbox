@@ -1,4 +1,4 @@
-import Sandbox from '../dist/sandbox';
+import Sandbox from '../dist/server/sandbox';
 import fs from 'fs';
 import path from 'path';
 
