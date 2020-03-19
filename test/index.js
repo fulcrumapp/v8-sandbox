@@ -498,120 +498,126 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
-//   it('should handle errors when crossing between nodejs and sandbox', async () => {
-//     const template = '';
+  it('should handle errors when crossing between nodejs and sandbox', async () => {
+    const template = '';
 
-//     const sandbox = new Sandbox({template});
+    const sandbox = new Sandbox({template});
 
-//     // must use the raw _setTimeout which doesn't wrap in try/catch. Assume everything in the sandbox
-//     // can be overwritten or called manually. This test exercises the TryCatch in OnTimer from C++.
-//     const code = `_setTimeout(() => { throw new Error('hi'); }, 1);`;
+    // must use the raw _setTimeout which doesn't wrap in try/catch. Assume everything in the sandbox
+    // can be overwritten or called manually. This test exercises the TryCatch in OnTimer from C++.
 
-//     const {error} = await sandbox.execute({code, timeout: 3000});
+    const code = `
+      const invocation = JSON.stringify({ name: 'setTimeout', args: [ 1 ] });
+      const callback = () => { throw new Error('hi'); };
 
-//     assert.equal(error.message, 'Uncaught Error: hi');
+      _dispatch(invocation, callback);
+    `;
 
-//     sandbox.shutdown();
-//   });
+    const {error} = await sandbox.execute({code, timeout: 3000});
 
-//   it('should allow crossing between nodejs and sandbox with custom sync functions', async () => {
-//     const sandbox = new Sandbox({require: REQUIRE});
+    assert.equal(error.message, 'Uncaught Error: hi');
 
-//     const code = `
-// setTimeout(() => {
-//   setResult({value: addNumbers(1, 2)});
-// }, 1);
-// `;
+    sandbox.shutdown();
+  });
 
-//     for (let count = 0; count < 20; ++count) {
-//       const {value} = await sandbox.execute({code, timeout: 3000});
+  it('should allow crossing between nodejs and sandbox with custom sync functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
 
-//       assert.equal(value, 3);
-//     }
+    const code = `
+setTimeout(() => {
+  setResult({value: addNumbers(1, 2)});
+}, 1);
+`;
 
-//     sandbox.shutdown();
-//   });
+    for (let count = 0; count < 20; ++count) {
+      const {value} = await sandbox.execute({code, timeout: 3000});
 
-//   it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
-//     const sandbox = new Sandbox({require: REQUIRE});
+      assert.equal(value, 3);
+    }
 
-//     const code = `
-// setTimeout(() => {
-//   setResult({value: addNumbersBlocking(1, 2)});
-// }, 1);
-// `;
+    sandbox.shutdown();
+  });
 
-//     for (let count = 0; count < 20; ++count) {
-//       const {value} = await sandbox.execute({code, timeout: 3000});
+  it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
 
-//       assert.equal(value, 3);
-//     }
+    const code = `
+setTimeout(() => {
+  setResult({value: addNumbersBlocking(1, 2)});
+}, 1);
+`;
 
-//     sandbox.shutdown();
-//   });
+    for (let count = 0; count < 20; ++count) {
+      const { value, error } = await sandbox.execute({code, timeout: 3000});
 
-//   it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
-//     const sandbox = new Sandbox({require: REQUIRE});
+      assert.equal(value, 3);
+    }
 
-//     const code = `
-// const randomTimeout = () => Math.floor(Math.random() * 5) + 1;
+    sandbox.shutdown();
+  });
 
-// for (let i = 0; i < 5000; ++i) {
-//   setTimeout(() => {
-//     setResult({value: addNumbers(1, 2)});
-//   }, randomTimeout());
-// }
-// `;
+  it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
 
-//     const {value} = await sandbox.execute({code, timeout: 3000});
+    const code = `
+const randomTimeout = () => Math.floor(Math.random() * 5) + 1;
 
-//     assert.equal(value, 3);
+for (let i = 0; i < 5000; ++i) {
+  setTimeout(() => {
+    setResult({value: addNumbers(1, 2)});
+  }, randomTimeout());
+}
+`;
 
-//     sandbox.shutdown();
-//   });
+    const {value} = await sandbox.execute({code, timeout: 3000});
 
-//   it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
-//     const sandbox = new Sandbox({require: REQUIRE});
+    assert.equal(value, 3);
 
-//     const code = `
-// setTimeout(() => {
-//   addNumbersAsync(1, 2, (err, value) => {
-//     setResult({value});
-//   });
-// }, 1);
-// `;
+    sandbox.shutdown();
+  });
 
-//     for (let count = 0; count < 20; ++count) {
-//       const {value} = await sandbox.execute({code, timeout: 3000});
+  it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
+    const sandbox = new Sandbox({require: REQUIRE});
 
-//       assert.equal(value, 3);
-//     }
+    const code = `
+setTimeout(() => {
+  addNumbersAsync(1, 2, (err, value) => {
+    setResult({value});
+  });
+}, 1);
+`;
 
-//     sandbox.shutdown();
-//   });
+    for (let count = 0; count < 20; ++count) {
+      const {value} = await sandbox.execute({code, timeout: 3000});
 
-//   it('should handle errors when crossing between nodejs and sandbox with custom functions', async () => {
-//     const template = '';
+      assert.equal(value, 3);
+    }
 
-//     const sandbox = new Sandbox({template, require: REQUIRE});
+    sandbox.shutdown();
+  });
 
-//     // hack the _try method to directly invoke the function. This would only be possible if someone stomped
-//     // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
-//     // test exercises the TryCatch on the OnEndNodeInvocation from C++
-//     const code = `
-// global._try = (fn) => fn();
+  it('should handle errors when crossing between nodejs and sandbox with custom functions', async () => {
+    const template = '';
 
-// setTimeout(() => {
-//   addNumbersAsync(1, 2, (err, value) => {
-//     throw new Error('uh oh: ' + value);
-//   });
-// }, 20);
-// `;
+    const sandbox = new Sandbox({template, require: REQUIRE});
 
-//     const {error} = await sandbox.execute({code, timeout: 3000});
+    // hack the _try method to directly invoke the function. This would only be possible if someone stomped
+    // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
+    // test exercises the TryCatch on the OnEndNodeInvocation from C++
+    const code = `
+global._try = (fn) => fn();
 
-//     assert.equal(error.message, 'Uncaught Error: uh oh: 3');
+setTimeout(() => {
+  addNumbersAsync(1, 2, (err, value) => {
+    throw new Error('uh oh: ' + value);
+  });
+}, 20);
+`;
 
-//     sandbox.shutdown();
-//   });
+    const {error} = await sandbox.execute({code, timeout: 3000});
+
+    assert.equal(error.message, 'Uncaught Error: uh oh: 3');
+
+    sandbox.shutdown();
+  });
 });

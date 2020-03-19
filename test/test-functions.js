@@ -3,24 +3,26 @@
 const fs = require('fs');
 
 // Example of a synchronous function
-define('addNumbers', (value1, value2) => {
-  return value1 + value2;
+define('addNumbers', ([ value1, value2 ], { respond }) => {
+  respond(value1 + value2);
 });
 
 // Example of a blocking function. It's a synchronous function for the sandbox, but asynchronous to the host
-defineBlocking('addNumbersBlocking', (value1, value2, callback) => {
+define('addNumbersBlocking', ([ value1, value2 ], { respond }) => {
   setTimeout(() => {
-    callback(null, value1 + value2);
+    respond(value1 + value2);
   }, 1);
 });
 
 // Example of an asynchronous function
-defineAsync('addNumbersAsync', (value1, value2, callback) => {
+defineAsync('addNumbersAsync', ([ value1, value2 ], { respond, callback }) => {
   setTimeout(() => {
     callback(null, value1 + value2);
   }, 20);
+
+  respond();
 });
 
-defineAsync('errorAsync', (callback) => {
+defineAsync('errorAsync', ({ callback }) => {
   throw new Error('hi');
 });

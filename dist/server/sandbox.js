@@ -69,6 +69,7 @@ class Sandbox {
 
     this.host = new _host.default(this.socketName);
     global.define = this.define.bind(this);
+    global.defineAsync = this.defineAsync.bind(this);
     this.syncFunctions = {};
     this.asyncFunctions = {};
 
@@ -206,8 +207,16 @@ class Sandbox {
   dispatch({
     name,
     args
-  }, respond, callback) {
-    const params = [args, respond, callback];
+  }, {
+    fail,
+    respond,
+    callback
+  }) {
+    const params = [args, {
+      respond,
+      fail,
+      callback
+    }];
 
     switch (name) {
       case 'setResult':
@@ -253,23 +262,28 @@ class Sandbox {
     }
   }
 
-  setResult([result], respond, callback) {
+  setResult([result], {
+    respond
+  }) {
     this.finish(result);
     respond();
     this.next();
   }
 
-  setTimeout([timeout], respond, callback) {
+  setTimeout([timeout], {
+    respond,
+    callback
+  }) {
     const timer = new _timer.default();
     timer.start(timeout || 0, callback);
     const id = +timer.id;
     this.timers[id] = timer;
-    respond({
-      value: id
-    });
+    respond(id);
   }
 
-  clearTimeout(timerID, respond, callback) {
+  clearTimeout(timerID, {
+    respond
+  }) {
     const timer = this.timers[+timerID];
 
     if (timer) {
@@ -280,7 +294,10 @@ class Sandbox {
     respond();
   }
 
-  httpRequest([options], respond, callback) {
+  httpRequest([options], {
+    respond,
+    callback
+  }) {
     const {
       sync
     } = options || {};
@@ -290,13 +307,7 @@ class Sandbox {
       }
 
       if (sync) {
-        respond({
-          value: {
-            err,
-            response,
-            body
-          }
-        });
+        respond(err, response, body);
       } else {
         callback(err, response, body);
       }
@@ -307,7 +318,10 @@ class Sandbox {
     }
   }
 
-  log([args], respond, callback) {
+  log([args], {
+    respond,
+    callback
+  }) {
     this.write({
       type: 'log',
       args
@@ -316,7 +330,10 @@ class Sandbox {
     respond();
   }
 
-  error([args], respond, callback) {
+  error([args], {
+    respond,
+    callback
+  }) {
     this.write({
       type: 'error',
       args

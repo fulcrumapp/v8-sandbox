@@ -34,7 +34,9 @@ global.dispatch = (name, args, callback) => {
 
   const wrappedCallback = (...args) => {
     global._try(() => {
-      callback.apply(null, JSON.parse(args));
+      if (callback) {
+        callback.apply(null, JSON.parse(args));
+      }
     });
   };
 

@@ -36,11 +36,11 @@ class Socket extends _events.default {
         }
       };
 
-      const respond = result => {
+      const write = result => {
         const json = JSON.stringify({
           id,
           result: result || {
-            value: null
+            value: undefined
           }
         });
         const length = Buffer.byteLength(json, 'utf8');
@@ -50,20 +50,34 @@ class Socket extends _events.default {
         this.socket.write(buffer);
       };
 
+      const respond = value => {
+        write({
+          value
+        });
+      };
+
+      const fail = error => {
+        write({
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          }
+        });
+      };
+
       try {
         if (message == null) {
           throw new Error('invalid dispatch');
         }
 
-        this.sandbox.dispatch(message, respond, callback);
-      } catch (ex) {
-        return respond({
-          error: {
-            name: ex.name,
-            message: ex.message,
-            stack: ex.stack
-          }
+        this.sandbox.dispatch(message, {
+          fail,
+          respond,
+          callback
         });
+      } catch (ex) {
+        fail(ex);
       }
     });
 

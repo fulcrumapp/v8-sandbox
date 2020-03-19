@@ -236,11 +236,14 @@ void SandboxWrap::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &cont
     return;
   }
 
+  auto invocation = Nan::New<Object>();
   auto result = Nan::New<Object>();
   auto error = Nan::New<Object>();
+  auto arguments = Nan::New<Array>();
 
   Nan::Utf8String message(tryCatch.Message()->Get());
   Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
+
   int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
 
   Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
@@ -249,11 +252,18 @@ void SandboxWrap::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &cont
   Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
 
-  auto json = JSON::Stringify(context, result).ToLocalChecked();
+  Nan::Set(arguments, 0, result);
 
-  result_ = *Nan::Utf8String(json);
+  Nan::Set(invocation, Nan::New("name").ToLocalChecked(), Nan::New("setResult").ToLocalChecked());
+  Nan::Set(invocation, Nan::New("args").ToLocalChecked(), arguments);
 
-  Debug(result_.c_str());
+  auto json = JSON::Stringify(context, invocation).ToLocalChecked();
+
+  std::string args = *Nan::Utf8String(json);
+
+  // result_ = *Nan::Utf8String(json);
+
+  Dispatch(args.c_str(), nullptr);
 }
 
 SandboxWrap *SandboxWrap::GetSandboxFromContext() {
