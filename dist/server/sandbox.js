@@ -9,17 +9,15 @@ var _path = _interopRequireDefault(require("path"));
 
 var _net = _interopRequireDefault(require("net"));
 
-var _uuid = require("uuid");
-
 var _request = _interopRequireDefault(require("request"));
-
-var _wtfnode = _interopRequireDefault(require("wtfnode"));
 
 var _socket = _interopRequireDefault(require("./socket"));
 
 var _host = _interopRequireDefault(require("./host"));
 
 var _lodash = require("lodash");
+
+var _uuid = require("uuid");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -34,29 +32,19 @@ class TimeoutError extends Error {
 
 class Sandbox {
   constructor() {
-    _defineProperty(this, "handleClose", () => {
-      console.log('server closed');
-    });
-
     _defineProperty(this, "handleConnection", socket => {
       // console.log('server connection');
       this.socket = new _socket.default(socket, this);
     });
 
     _defineProperty(this, "handleError", error => {
-      console.log('server error', error);
-    });
-
-    _defineProperty(this, "handleListening", () => {
-      console.log('server listening', this.socketName);
+      console.error('server error', error);
     });
 
     this.id = (0, _uuid.v4)();
     this.server = _net.default.createServer();
-    this.server.on('close', this.handleClose);
     this.server.on('connection', this.handleConnection);
     this.server.on('error', this.handleError);
-    this.server.on('listening', this.handleListening);
     this.server.listen(this.socketName);
     this.queue = [];
     this.setup();
