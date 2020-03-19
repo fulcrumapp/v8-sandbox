@@ -66,17 +66,19 @@ class Sandbox {
     code,
     context,
     timeout
-  }, callback) {
-    this.queue.push({
-      code,
-      context: context || {},
-      timeout,
-      callback: (0, _lodash.once)(callback)
-    });
+  }) {
+    return new Promise(resolve => {
+      this.queue.push({
+        code,
+        context: context || {},
+        timeout,
+        callback: (0, _lodash.once)(resolve)
+      });
 
-    if (!this.item) {
-      this.next();
-    }
+      if (!this.item) {
+        this.next();
+      }
+    });
   }
 
   next() {

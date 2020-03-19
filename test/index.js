@@ -7,12 +7,7 @@ import assert from 'assert';
 const sandbox = new Sandbox();
 
 const runWithTimeout = (code, timeout) => {
-  return new Promise((resolve, reject) => {
-    sandbox.execute({code, timeout}, (result) => {
-      // console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%', result);
-      resolve(result);
-    });
-  });
+  return sandbox.execute({code, timeout});
 };
 
 const run = (code) => {
