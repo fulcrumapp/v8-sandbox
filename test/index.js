@@ -190,13 +190,13 @@ setResult({value: 1});
     assert.ok(error && error.stack.indexOf('SyntaxError') >= 0);
   });
 
-  // it('should capture logs', async () => {
-  //   const js = `console.log('hi'); console.error('there'); console.log('yo')`;
+  it('should capture logs', async () => {
+    const js = `console.log('hi'); console.error('there'); console.log('yo'); setResult();`;
 
-  //   const {output} = await runWithTimeout(js, 30);
+    const { output } = await runWithTimeout(js, 30);
 
-  //   assert.deepStrictEqual(output.map(o => o.message), ['hi', 'there', 'yo']);
-  // });
+    assert.deepStrictEqual(output.map(o => o.message), ['hi', 'there', 'yo']);
+  });
 
   it('should run simple script', async () => {
     const js = `setResult({value: 1337});`;
@@ -368,6 +368,7 @@ setTimeout(() => {
         invoke(() => _setResult(7)),
         invoke(() => _dispatchSync()),
         invoke(() => _dispatchSync(null)),
+        invoke(() => _dispatchSync('setResult', null)),
         invoke(() => _dispatchSync('test')),
         invoke(() => _dispatchSync(() => {}, () => {})),
         invoke(() => _dispatchSync(new Promise(() => {}))),
@@ -383,7 +384,7 @@ setTimeout(() => {
 
     const {value, error} = await run(js);
 
-    assert.equal(value.length, 19);
+    assert.equal(value.length, 20);
   });
 
   it('should handle stress', async () => {

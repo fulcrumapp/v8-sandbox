@@ -94,7 +94,7 @@ class Sandbox {
     const item = this.item = this.queue.pop();
     this.host.removeAllListeners();
     this.host.on('error', error => {
-      console.error('worker:error', error);
+      console.error('worker error', error);
       this.finish({
         error: new Error('worker error')
       });
@@ -132,7 +132,7 @@ class Sandbox {
     name,
     args
   }, respond, callback) {
-    const params = [...args, respond, callback];
+    const params = [args, respond, callback];
 
     switch (name) {
       case 'setResult':
@@ -155,6 +155,16 @@ class Sandbox {
           return this.clearTimeout(...params);
         }
 
+      case 'log':
+        {
+          return this.log(...params);
+        }
+
+      case 'error':
+        {
+          return this.error(...params);
+        }
+
       default:
         {
           throw new Error(`${name} is not a valid method`);
@@ -162,13 +172,13 @@ class Sandbox {
     }
   }
 
-  setResult(result, respond, callback) {
+  setResult([result], respond, callback) {
     this.finish(result);
     respond();
     this.next();
   }
 
-  setTimeout(timeout, respond, callback) {
+  setTimeout([timeout], respond, callback) {
     const timerID = setTimeout(callback, timeout);
     respond({
       value: +timerID
@@ -180,10 +190,10 @@ class Sandbox {
     respond();
   }
 
-  httpRequest(options, respond, callback) {
+  httpRequest([options], respond, callback) {
     const {
       sync
-    } = options;
+    } = options || {};
     (0, _request.default)(options, (err, response, body) => {
       if (response && Buffer.isBuffer(response.body)) {
         response.body = body = response.body.toString('base64');
@@ -207,7 +217,7 @@ class Sandbox {
     }
   }
 
-  log(args, respond, callback) {
+  log([args], respond, callback) {
     this.write({
       type: 'log',
       args
@@ -216,7 +226,7 @@ class Sandbox {
     respond();
   }
 
-  error(args, respond, callback) {
+  error([args], respond, callback) {
     this.write({
       type: 'error',
       args
@@ -229,7 +239,7 @@ class Sandbox {
     type,
     args
   }) {
-    this.output.push({
+    this.item.output.push({
       type,
       time: new Date(),
       message: _util.default.format(...args)
