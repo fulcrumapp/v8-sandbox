@@ -28,7 +28,7 @@ describe('sandbox', () => {
     sandbox.shutdown();
   });
 
-  it('should execute simple httpRequest', async () => {
+  it('HTTP should execute simple httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   setResult({value: body});
@@ -40,7 +40,7 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     assert.equal(value, 'hi there');
   });
 
-  it('should handle errors from httpRequest', async () => {
+  it('HTTP should handle errors from httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   throw new Error('yoyo');

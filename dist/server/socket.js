@@ -5,6 +5,10 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
+var _events = _interopRequireDefault(require("events"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 function tryParseJSON(value) {
@@ -15,27 +19,20 @@ function tryParseJSON(value) {
   }
 }
 
-class Socket {
+class Socket extends _events.default {
   constructor(socket, sandbox) {
-    _defineProperty(this, "handleClose", () => {
-      console.log('socket closed');
-    });
+    super();
 
     _defineProperty(this, "handleData", data => {
-      // console.log('socket data1', data);
       const id = data.readInt32BE();
       const json = data.toString('utf8', 4);
       const message = tryParseJSON(json);
 
       const callback = (...args) => {
-        // make sure the current worker is the worker we started with. The worker might've
+        // make sure the current host is the host we started with. The host might've
         // been replaced by the time this is invoked.
-        if (this.worker === this.sandbox.worker) {
-          this.sandbox.worker.send({
-            type: 'callback',
-            id,
-            args
-          });
+        if (this.worker === this.sandbox.host.worker) {
+          this.sandbox.host.callback(id, args);
         }
       };
 
@@ -47,8 +44,7 @@ class Socket {
         const length = Buffer.byteLength(json, 'utf8');
         const buffer = Buffer.alloc(length + 4);
         buffer.writeInt32BE(length);
-        buffer.write(json, 4); // console.log('writing json', json);
-
+        buffer.write(json, 4);
         this.socket.write(buffer);
       };
 
@@ -70,31 +66,19 @@ class Socket {
     });
 
     _defineProperty(this, "handleError", error => {
-      console.log('socket error', error);
-    });
-
-    _defineProperty(this, "handleTimeout", () => {
-      console.log('socket timeout');
+      console.error('socket error', error);
     });
 
     _defineProperty(this, "handleDrain", () => {
-      console.log('socket drain');
       this.socket.resume();
     });
 
-    _defineProperty(this, "handleEnd", () => {
-      console.log('socket end');
-    });
-
     this.sandbox = sandbox;
-    this.worker = sandbox.worker;
+    this.worker = sandbox.host.worker;
     this.socket = socket;
-    this.socket.on('close', this.handleClose);
     this.socket.on('data', this.handleData);
     this.socket.on('error', this.handleError);
     this.socket.on('drain', this.handleDrain);
-    this.socket.on('timeout', this.handleTimeout);
-    this.socket.on('end', this.handleEnd);
   }
 
   shutdown() {
