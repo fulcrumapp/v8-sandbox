@@ -35,8 +35,6 @@ private:
 
   static NAN_METHOD(Dispatch);
 
-  static NAN_METHOD(DebugLog);
-
   void Initialize();
 
   void Dispose();

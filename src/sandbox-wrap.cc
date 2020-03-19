@@ -110,7 +110,6 @@ void SandboxWrap::Initialize() {
   Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
   Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
   Nan::SetMethod(global, "_dispatch", Dispatch);
-  Nan::SetMethod(global, "_debug", DebugLog);
 }
 
 void SandboxWrap::Execute(const char *code) {  
@@ -190,16 +189,6 @@ NAN_METHOD(SandboxWrap::Dispatch) {
   }
   
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
-}
-
-NAN_METHOD(SandboxWrap::DebugLog) {
-  NODE_ARG_STRING(0, "message");
-
-  Nan::Utf8String message(info[0]);
-
-  Debug(*message);
-
-  // info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
 }
 
 NAN_METHOD(SandboxWrap::Connect) {
