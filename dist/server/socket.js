@@ -39,7 +39,9 @@ class Socket extends _events.default {
       const respond = result => {
         const json = JSON.stringify({
           id,
-          result
+          result: result || {
+            value: null
+          }
         });
         const length = Buffer.byteLength(json, 'utf8');
         const buffer = Buffer.alloc(length + 4);

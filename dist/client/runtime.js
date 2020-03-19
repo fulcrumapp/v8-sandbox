@@ -121,10 +121,10 @@ global.clearTimeout = id => {
 
 global.console = {
   log: (...args) => {
-    global._log(JSON.stringify(args));
+    return global.dispatchAsync('log', args);
   },
   error: (...args) => {
-    global._error(JSON.stringify(args));
+    return global.dispatchAsync('error', args);
   }
 };
 

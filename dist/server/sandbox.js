@@ -19,6 +19,8 @@ var _lodash = require("lodash");
 
 var _uuid = require("uuid");
 
+var _util = _interopRequireDefault(require("util"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -71,6 +73,7 @@ class Sandbox {
       this.queue.push({
         code,
         context: context || {},
+        output: [],
         timeout,
         callback: (0, _lodash.once)(resolve)
       });
@@ -92,13 +95,13 @@ class Sandbox {
     this.host.removeAllListeners();
     this.host.on('error', error => {
       console.error('worker:error', error);
-      item.callback({
+      this.finish({
         error: new Error('worker error')
       });
       this.next();
     });
     this.host.on('timeout', () => {
-      item.callback({
+      this.finish({
         error: new TimeoutError('timeout')
       });
       this.next();
@@ -114,6 +117,15 @@ class Sandbox {
     }
 
     this.server.close(callback);
+  }
+
+  finish(result) {
+    if (this.item) {
+      this.item.callback({ ...result,
+        output: this.item.output
+      });
+      this.item = null;
+    }
   }
 
   dispatch({
@@ -151,10 +163,8 @@ class Sandbox {
   }
 
   setResult(result, respond, callback) {
-    this.item.callback(result);
-    respond({
-      value: null
-    });
+    this.finish(result);
+    respond();
     this.next();
   }
 
@@ -167,9 +177,7 @@ class Sandbox {
 
   clearTimeout(timerID, respond, callback) {
     clearTimeout(timerID);
-    respond({
-      value: null
-    });
+    respond();
   }
 
   httpRequest(options, respond, callback) {
@@ -195,10 +203,37 @@ class Sandbox {
     });
 
     if (!sync) {
-      respond({
-        value: null
-      });
+      respond();
     }
+  }
+
+  log(args, respond, callback) {
+    this.write({
+      type: 'log',
+      args
+    });
+    console.log(...args);
+    respond();
+  }
+
+  error(args, respond, callback) {
+    this.write({
+      type: 'error',
+      args
+    });
+    console.error(...args);
+    respond();
+  }
+
+  write({
+    type,
+    args
+  }) {
+    this.output.push({
+      type,
+      time: new Date(),
+      message: _util.default.format(...args)
+    });
   }
 
 }
