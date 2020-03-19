@@ -82,8 +82,6 @@ global.define = name => {
   };
 };
 
-global.defineBlocking = global.define;
-
 global.defineAsync = name => {
   global[name] = (...args) => {
     const callback = args.pop();

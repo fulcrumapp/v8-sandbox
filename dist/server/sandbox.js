@@ -34,10 +34,15 @@ class TimeoutError extends Error {
 
 }
 
+const SYNC_FUNCTIONS = {};
+const ASYNC_FUNCTIONS = {};
+
 class Sandbox {
-  constructor() {
+  constructor({
+    template,
+    require
+  } = {}) {
     _defineProperty(this, "handleConnection", socket => {
-      // console.log('server connection');
       this.socket = new _socket.default(socket, this);
     });
 
@@ -46,6 +51,8 @@ class Sandbox {
     });
 
     this.id = (0, _uuid.v4)();
+    this.template = template || '';
+    this.require = require;
     this.server = _net.default.createServer();
     this.server.on('connection', this.handleConnection);
     this.server.on('error', this.handleError);
@@ -61,6 +68,28 @@ class Sandbox {
     }
 
     this.host = new _host.default(this.socketName);
+    global.define = this.define.bind(this);
+    this.syncFunctions = {};
+    this.asyncFunctions = {};
+
+    if (this.require) {
+      this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
+      this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
+
+      require(this.require);
+    }
+  }
+
+  define(name, fn) {
+    this.syncFunctions[name] = fn;
+  }
+
+  defineAsync(name, fn) {
+    this.asyncFunctions[name] = fn;
+  }
+
+  defines() {
+    return [...Object.entries(this.syncFunctions).map(([name]) => `define('${name}');\n`), ...Object.entries(this.asyncFunctions).map(([name]) => `defineAsync('${name}');\n`)];
   }
 
   get socketName() {
@@ -68,16 +97,22 @@ class Sandbox {
   }
 
   initialize({
-    template,
     timeout
   }) {
+    if (this.host.worker.initialized) {
+      return {};
+    }
+
     return new Promise(resolve => {
       this.queue.push({
         type: 'initialize',
-        template,
+        template: [this.defines().join('\n'), this.template].join('\n'),
         output: [],
         timeout,
-        callback: (0, _lodash.once)(resolve)
+        callback: (0, _lodash.once)(result => {
+          this.host.worker.initialized = true;
+          resolve(result);
+        })
       });
 
       if (!this.item) {
@@ -86,11 +121,19 @@ class Sandbox {
     });
   }
 
-  execute({
+  async execute({
     code,
     context,
     timeout
   }) {
+    const result = await this.initialize({
+      timeout
+    });
+
+    if (result.error) {
+      return result;
+    }
+
     return new Promise(resolve => {
       this.queue.push({
         type: 'execute',
@@ -199,7 +242,13 @@ class Sandbox {
 
       default:
         {
-          throw new Error(`${name} is not a valid method`);
+          const fn = this.syncFunctions[name] || this.asyncFunctions[name];
+
+          if (fn) {
+            fn(...params);
+          } else {
+            throw new Error(`${name} is not a valid method`);
+          }
         }
     }
   }

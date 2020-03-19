@@ -54,7 +54,7 @@ class Worker {
   }) {
     this.reset(true);
     this.connect();
-    const code = [RUNTIME, template, 'setResult()'].join('\n');
+    const code = [RUNTIME, wrapCode(template), 'setResult()'].join('\n');
 
     this._execute(code);
   }

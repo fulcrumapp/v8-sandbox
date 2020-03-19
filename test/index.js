@@ -464,39 +464,39 @@ setResult({value: ${i}});
     executeNext(0);
   });
 
-//   it('should handle template scripts', async () => {
-//     const template = `
-// global.testValue = 1;
-// `;
+  it('should handle template scripts', async () => {
+    const template = `
+global.testValue = 1;
+`;
 
-//     const sandbox = new Sandbox({template});
+    const sandbox = new Sandbox({ template });
 
-//     const code = `
-// setTimeout(() => {
-//   setResult({value: ++global.testValue});
-// }, 1);
-// `;
+    const code = `
+setTimeout(() => {
+  setResult({value: ++global.testValue});
+}, 1);
+`;
 
-//     const {value} = await sandbox.execute({code, timeout: 3000});
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
 
-//     assert.equal(value, 2);
+    assert.equal(value, 2);
 
-//     sandbox.shutdown();
-//   });
+    sandbox.shutdown();
+  });
 
-  // it('should handle syntax errors in template scripts', async () => {
-  //   const template = `{`;
+  it('should handle syntax errors in template scripts', async () => {
+    const template = `{`;
 
-  //   const sandbox = new Sandbox({template});
+    const sandbox = new Sandbox({template});
 
-  //   const code = `setResult({value: 1});`;
+    const code = `setResult({value: 1});`;
 
-  //   const {error} = await sandbox.execute({code, timeout: 3000});
+    const { error } = await sandbox.execute({code, timeout: 3000});
 
-  //   assert.equal(error.message, 'error initializing sandbox. Uncaught SyntaxError: Unexpected end of input');
+    assert.equal(error.message, 'Unexpected end of input');
 
-  //   sandbox.shutdown();
-  // });
+    sandbox.shutdown();
+  });
 
 //   it('should handle errors when crossing between nodejs and sandbox', async () => {
 //     const template = '';
