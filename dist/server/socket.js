@@ -29,9 +29,7 @@ class Socket extends _events.default {
       const message = tryParseJSON(json);
 
       const callback = (...args) => {
-        // make sure the current host is the host we started with. The host might've
-        // been replaced by the time this is invoked.
-        if (this.worker === this.sandbox.host.worker) {
+        if (this.isConnected) {
           this.sandbox.host.callback(id, args);
         }
       };
@@ -47,7 +45,10 @@ class Socket extends _events.default {
         const buffer = Buffer.alloc(length + 4);
         buffer.writeInt32BE(length);
         buffer.write(json, 4);
-        this.socket.write(buffer);
+
+        if (this.isConnected) {
+          this.socket.write(buffer);
+        }
       };
 
       const respond = value => {
@@ -89,19 +90,36 @@ class Socket extends _events.default {
       this.socket.resume();
     });
 
+    _defineProperty(this, "handleClose", () => {
+      this.closed = true;
+    });
+
+    _defineProperty(this, "handleEnd", () => {
+      this.closed = true;
+    });
+
     this.sandbox = sandbox;
     this.worker = sandbox.host.worker;
     this.socket = socket;
     this.socket.on('data', this.handleData);
+    this.socket.on('end', this.handleEnd);
+    this.socket.on('close', this.handleClose);
     this.socket.on('error', this.handleError);
     this.socket.on('drain', this.handleDrain);
   }
 
   shutdown() {
     if (this.socket) {
+      this.closed = true;
       this.socket.end();
       this.socket.unref();
     }
+  }
+
+  get isConnected() {
+    // make sure the current host is the host we started with. The host might've
+    // been replaced by the time this is invoked.
+    return !this.closed && this.worker === this.sandbox.host.worker;
   }
 
 }

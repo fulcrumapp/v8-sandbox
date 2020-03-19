@@ -556,7 +556,9 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
-  it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
+  it('should allow random crossing between nodejs and sandbox with custom sync functions', async function() {
+    this.timeout(10000);
+
     const sandbox = new Sandbox({require: REQUIRE});
 
     const code = `
@@ -569,7 +571,7 @@ for (let i = 0; i < 5000; ++i) {
 }
 `;
 
-    const {value} = await sandbox.execute({code, timeout: 3000});
+    const {value} = await sandbox.execute({code, timeout: 10000});
 
     assert.equal(value, 3);
 
