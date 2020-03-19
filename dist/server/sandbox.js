@@ -9,17 +9,19 @@ var _path = _interopRequireDefault(require("path"));
 
 var _net = _interopRequireDefault(require("net"));
 
+var _util = _interopRequireDefault(require("util"));
+
 var _request = _interopRequireDefault(require("request"));
-
-var _socket = _interopRequireDefault(require("./socket"));
-
-var _host = _interopRequireDefault(require("./host"));
 
 var _lodash = require("lodash");
 
 var _uuid = require("uuid");
 
-var _util = _interopRequireDefault(require("util"));
+var _socket = _interopRequireDefault(require("./socket"));
+
+var _host = _interopRequireDefault(require("./host"));
+
+var _timer = _interopRequireDefault(require("./timer"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -49,6 +51,7 @@ class Sandbox {
     this.server.on('error', this.handleError);
     this.server.listen(this.socketName);
     this.queue = [];
+    this.timers = {};
     this.setup();
   }
 
@@ -64,6 +67,25 @@ class Sandbox {
     return process.platform === 'win32' ? _path.default.join('\\\\?\\pipe', process.cwd(), this.id) : `/tmp/${this.id}`;
   }
 
+  initialize({
+    template,
+    timeout
+  }) {
+    return new Promise(resolve => {
+      this.queue.push({
+        type: 'initialize',
+        template,
+        output: [],
+        timeout,
+        callback: (0, _lodash.once)(resolve)
+      });
+
+      if (!this.item) {
+        this.next();
+      }
+    });
+  }
+
   execute({
     code,
     context,
@@ -71,6 +93,7 @@ class Sandbox {
   }) {
     return new Promise(resolve => {
       this.queue.push({
+        type: 'execute',
         code,
         context: context || {},
         output: [],
@@ -106,7 +129,7 @@ class Sandbox {
       });
       this.next();
     });
-    this.host.execute(item);
+    this.host.process(item);
   }
 
   shutdown(callback) {
@@ -125,6 +148,15 @@ class Sandbox {
         output: this.item.output
       });
       this.item = null;
+    }
+
+    this.clearTimers();
+  }
+
+  clearTimers() {
+    for (const [id, timer] of Object.entries(this.timers)) {
+      timer.clear();
+      delete this.timers[id];
     }
   }
 
@@ -179,14 +211,23 @@ class Sandbox {
   }
 
   setTimeout([timeout], respond, callback) {
-    const timerID = setTimeout(callback, timeout);
+    const timer = new _timer.default();
+    timer.start(timeout || 0, callback);
+    const id = +timer.id;
+    this.timers[id] = timer;
     respond({
-      value: +timerID
+      value: id
     });
   }
 
   clearTimeout(timerID, respond, callback) {
-    clearTimeout(timerID);
+    const timer = this.timers[+timerID];
+
+    if (timer) {
+      timer.clear();
+      delete this.timers[+timerID];
+    }
+
     respond();
   }
 

@@ -6,7 +6,9 @@ import assert from 'assert';
 
 const sandbox = new Sandbox();
 
-const runWithTimeout = (code, timeout) => {
+const runWithTimeout = async (code, timeout) => {
+  await sandbox.initialize({ template: '', timeout });
+
   return sandbox.execute({code, timeout});
 };
 

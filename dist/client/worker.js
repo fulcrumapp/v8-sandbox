@@ -18,34 +18,58 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString(); // const LINECOUNT = RUNTIME.split('\n').length;
 
 
+const wrapCode = code => {
+  return `
+    global._code = ${JSON.stringify(code)};
+    global._execute();
+  `;
+};
+
 class Worker {
   constructor() {
     _defineProperty(this, "handleMessage", message => {
-      if (message.type === 'execute') {
-        this.execute(message);
-      } else if (message.type === 'callback') {
-        this.callback(message.id, JSON.stringify(message.args));
-      } else if (message.type === 'exit') {
-        this.disconnect();
-        process.off('message', worker.handleMessage);
+      switch (message.type) {
+        case 'initialize':
+          return this.initialize(message);
+
+        case 'execute':
+          return this.execute(message);
+
+        case 'callback':
+          return this.callback(message);
+
+        case 'exit':
+          return this.exit(message);
+
+        default:
+          throw new Error('invalid message');
       }
     });
 
     this.native = new NativeSandbox(process.argv[2]);
   }
 
-  execute({
-    code,
+  initialize({
     template
+  }) {
+    this.reset(true);
+    this.connect();
+    const code = [RUNTIME, template, 'setResult()'].join('\n');
+
+    this._execute(code);
+  }
+
+  execute({
+    code
   }) {
     this.reset();
     this.connect();
-    const wrappedCode = `
-      global._code = ${JSON.stringify(code)};
-      global._execute();
-    `;
-    code = [RUNTIME, wrappedCode].join('\n');
-    this.native.execute(code, result => {
+
+    this._execute(wrapCode(code));
+  }
+
+  _execute(code) {
+    return this.native.execute(code, result => {
       process.send({
         type: 'result',
         result
@@ -53,8 +77,8 @@ class Worker {
     });
   }
 
-  reset() {
-    if (!this.native.initialized) {
+  reset(force) {
+    if (force || !this.native.initialized) {
       this.native.initialize();
       this.native.initialized = true;
     }
@@ -78,8 +102,16 @@ class Worker {
     this.connected = false;
   }
 
-  callback(id, message) {
-    this.native.callback(id, message);
+  callback({
+    id,
+    args
+  }) {
+    this.native.callback(id, JSON.stringify(args));
+  }
+
+  exit(message) {
+    this.disconnect();
+    process.off('message', this.handleMessage);
   }
 
 }

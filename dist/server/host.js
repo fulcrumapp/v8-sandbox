@@ -11,12 +11,24 @@ var _child_process = require("child_process");
 
 var _events = _interopRequireDefault(require("events"));
 
+var _timer = _interopRequireDefault(require("./timer"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 class Host extends _events.default {
   constructor(socketName) {
     super();
+
+    _defineProperty(this, "handleTimeout", () => {
+      this.fork();
+      this.emit('timeout');
+    });
+
     this.socketName = socketName;
+    this.initializeTimeout = new _timer.default();
+    this.executeTimeout = new _timer.default();
     this.fork();
   }
 
@@ -33,7 +45,8 @@ class Host extends _events.default {
   }
 
   kill() {
-    this.clearTimeout();
+    this.initializeTimeout.clear();
+    this.executeTimeout.clear();
 
     if (this.worker) {
       this.worker.removeAllListeners();
@@ -42,11 +55,28 @@ class Host extends _events.default {
     }
   }
 
-  clearTimeout() {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
+  process(item) {
+    switch (item.type) {
+      case 'initialize':
+        return this.initialize(item);
+
+      case 'execute':
+        return this.execute(item);
+
+      default:
+        throw new Error('invalid item');
     }
+  }
+
+  initialize({
+    template,
+    timeout
+  }) {
+    this.initializeTimeout.start(timeout, this.handleTimeout);
+    this.worker.send({
+      type: 'initialize',
+      template: template || ''
+    });
   }
 
   execute({
@@ -54,14 +84,7 @@ class Host extends _events.default {
     context,
     timeout
   }) {
-    if (timeout > 0) {
-      this.clearTimeout();
-      this.timer = setTimeout(() => {
-        this.fork();
-        this.emit('timeout');
-      }, timeout);
-    }
-
+    this.executeTimeout.start(timeout, this.handleTimeout);
     this.worker.send({
       type: 'execute',
       code,
