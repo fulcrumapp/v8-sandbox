@@ -125,6 +125,8 @@ void SandboxWrap::Execute(const char *code) {
 }
 
 void SandboxWrap::Callback(int id, const char *args) {
+  assert(id > 0);
+  
   auto baton = pendingOperations_[id];
 
   assert(baton);
@@ -275,7 +277,7 @@ SandboxWrap *SandboxWrap::GetSandboxFromContext() {
 // make a single interface with (const char *arguments, Local<Function> callback)
 // always dispatch batons the same way, no different with sync or async, just the presence of the callback
 std::string SandboxWrap::Dispatch(const char *arguments, Local<Function> *callback) {
-  int id;
+  int id = 0;
   
   if (callback) {
     auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
@@ -286,9 +288,6 @@ std::string SandboxWrap::Dispatch(const char *arguments, Local<Function> *callba
     pendingOperations_[baton->id] = baton;
 
     baton->arguments = arguments;
-  }
-  else {
-    id = AsyncSandboxOperationBaton::nextID();
   }
 
   bytesRead_ = -1;
