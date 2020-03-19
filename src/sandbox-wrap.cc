@@ -99,7 +99,6 @@ void SandboxWrap::Execute(const char *code) {
   Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
 
   Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(global, "_setResult", SetResult);
   Nan::SetMethod(global, "_dispatchSync", DispatchSync);
   Nan::SetMethod(global, "_dispatchAsync", DispatchAsync);
   Nan::SetMethod(global, "_debug", DebugLog);
@@ -152,17 +151,6 @@ void SandboxWrap::Callback(int id, const char *args) {
 
   pendingOperations_.erase(id);
 }
-
-NAN_METHOD(SandboxWrap::SetResult) {
-  NODE_ARG_STRING(0, "result");
-
-  Nan::Utf8String value(info[0]);
-
-  SandboxWrap* sandbox = GetSandboxFromContext();
-
-  sandbox->result_ = *value;
-}
-
 
 NAN_METHOD(SandboxWrap::Callback) {
   NODE_ARG_INTEGER(0, "id");

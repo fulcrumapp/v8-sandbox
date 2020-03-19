@@ -364,8 +364,6 @@ setTimeout(() => {
         invoke(() => _setTimeout(7, 7)),
         invoke(() => _clearTimeout()),
         invoke(() => _clearTimeout(null)),
-        invoke(() => _setResult(null)),
-        invoke(() => _setResult(7)),
         invoke(() => _dispatchSync()),
         invoke(() => _dispatchSync(null)),
         invoke(() => _dispatchSync('setResult', null)),
@@ -384,7 +382,7 @@ setTimeout(() => {
 
     const {value, error} = await run(js);
 
-    assert.equal(value.length, 20);
+    assert.equal(value.length, 18);
   });
 
   it('should handle stress', async () => {

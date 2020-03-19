@@ -30,8 +30,6 @@ private:
 
   static NAN_METHOD(Execute);
 
-  static NAN_METHOD(SetResult);
-
   static NAN_METHOD(Callback);
 
   static NAN_METHOD(DispatchSync);
