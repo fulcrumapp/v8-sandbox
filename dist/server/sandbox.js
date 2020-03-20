@@ -17,8 +17,6 @@ var _request = _interopRequireDefault(require("request"));
 
 var _lodash = require("lodash");
 
-var _uuid = require("uuid");
-
 var _socket = _interopRequireDefault(require("./socket"));
 
 var _host = _interopRequireDefault(require("./host"));
@@ -42,8 +40,7 @@ const ASYNC_FUNCTIONS = {};
 class Sandbox {
   constructor({
     template,
-    require,
-    id
+    require
   } = {}) {
     _defineProperty(this, "handleConnection", socket => {
       this.socket = new _socket.default(socket, this);
@@ -53,7 +50,7 @@ class Sandbox {
       console.error('server error', error);
     });
 
-    this.id = id || `v8-sandbox-socket-${(0, _uuid.v4)()}`;
+    this.id = `v8-sandbox-socket-${process.pid}`;
     this.template = template || '';
     this.require = require;
     this.server = _net.default.createServer();

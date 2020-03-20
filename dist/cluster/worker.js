@@ -39,9 +39,7 @@ class Worker {
 
   create() {
     if (!globalSandbox) {
-      const id = `v8-sandbox-socket-${process.argv[2]}`;
       globalSandbox = new _sandbox.default({
-        id,
         require: this.require,
         template: this.template
       });
@@ -118,7 +116,6 @@ process.on('message', message => {
 });
 process.on('SIGTERM', function () {
   if (globalSandbox) {
-    console.log('sigterm', process.pid);
     globalSandbox.shutdown();
     process.exit();
   }
