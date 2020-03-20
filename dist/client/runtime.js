@@ -1,3 +1,5 @@
+"use strict";
+
 global._try = func => {
   try {
     func();
