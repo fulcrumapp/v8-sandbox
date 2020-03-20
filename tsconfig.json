@@ -1,0 +1,13 @@
+// See: https://github.com/parcel-bundler/parcel/blob/master/packages/core/parcel-bundler/src/assets/TypeScriptAsset.js#L14
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "esModuleInterop": true,
+    "module": "commonjs",
+    "lib": [
+      "es2015",
+      "dom"
+    ],
+    "target": "es6"
+  }
+}
