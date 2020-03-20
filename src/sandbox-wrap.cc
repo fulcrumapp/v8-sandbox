@@ -261,6 +261,7 @@ void SandboxWrap::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &cont
 
   std::string args = *Nan::Utf8String(json);
 
+  // std::cout << getpid() << " MaybeHandleError: " << args << std::endl;
   // result_ = *Nan::Utf8String(json);
 
   Dispatch(args.c_str(), nullptr);
@@ -311,6 +312,10 @@ void SandboxWrap::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buf
 }
 
 void SandboxWrap::OnConnected(uv_connect_t *request, int status) {
+  if (status != 0) {
+    std::cout << getpid() << " OnConnected failed, status: " << status << " : " << uv_strerror(status) << std::endl;
+  }
+
   assert(status == 0);
 }
 
@@ -380,12 +385,18 @@ void SandboxWrap::WriteData(uv_stream_t *pipe, int id, std::string &message) {
 
   write->data = data;
 
+  // std::cout << getpid() << " WriteData: " << message << std::endl;
+
   uv_write(write, pipe, buffers, 1, OnWriteComplete);
 
   uv_read_start((uv_stream_t *)pipe, AllocateBuffer, OnRead);
 }
 
 void SandboxWrap::OnWriteComplete(uv_write_t *request, int status) {
+  if (status != 0) {
+    std::cout << getpid() << " OnWriteComplete failed, status: " << status << " : " << uv_strerror(status) << " : " << (char *)request->data << std::endl;
+  }
+
   assert(status == 0);
 
   free(request->data);

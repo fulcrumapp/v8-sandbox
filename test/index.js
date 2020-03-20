@@ -1,15 +1,17 @@
-import Sandbox from '../dist/server/sandbox';
+// import Sandbox from '../dist/server/sandbox';
+import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
+import wtf from 'wtfnode';
 
 import assert from 'assert';
 
 const sandbox = new Sandbox();
 
 const runWithTimeout = async (code, timeout) => {
-  await sandbox.initialize({ template: '', timeout });
+  // await sandbox.initialize({ template: '', timeout });
 
-  return sandbox.execute({code, timeout});
+  return sandbox.execute({ code, timeout });
 };
 
 const run = (code) => {
@@ -23,6 +25,7 @@ const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f6
 describe('sandbox', () => {
   after(() => {
     sandbox.shutdown();
+    // wtf.dump();
   });
 
   it('HTTP should execute simple httpRequest', async () => {

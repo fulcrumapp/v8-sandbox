@@ -4,6 +4,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = void 0;
+let nextID = 0;
+const TIMERS = {};
 
 class Timer {
   constructor() {
@@ -12,14 +14,17 @@ class Timer {
 
   clear() {
     if (this.id) {
-      clearTimeout(this.id);
+      clearTimeout(TIMERS[this.id]);
+      delete TIMERS[this.id];
       this.id = null;
     }
   }
 
   start(timeout, callback) {
     this.clear();
-    this.id = setTimeout(() => {
+    this.id = ++nextID;
+    TIMERS[this.id] = setTimeout(() => {
+      delete TIMERS[this.id];
       this.id = null;
       callback();
     }, timeout == null ? 1e8 : timeout);

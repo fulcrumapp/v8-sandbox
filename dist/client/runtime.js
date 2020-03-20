@@ -35,6 +35,7 @@ global.dispatch = (name, args, callback) => {
   const wrappedCallback = (...args) => {
     global._try(() => {
       if (callback) {
+        // console.log('CALLBACK', args);
         callback.apply(null, JSON.parse(args));
       }
     });
@@ -42,7 +43,8 @@ global.dispatch = (name, args, callback) => {
 
   parameters.push(wrappedCallback);
 
-  const json = global._dispatch.apply(global, parameters);
+  const json = global._dispatch.apply(global, parameters); // console.log('PARZIN', name, json);
+
 
   const result = json != null ? JSON.parse(json).result : null;
 

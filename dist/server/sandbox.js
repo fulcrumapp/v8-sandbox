@@ -5,6 +5,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
+var _fs = _interopRequireDefault(require("fs"));
+
 var _path = _interopRequireDefault(require("path"));
 
 var _net = _interopRequireDefault(require("net"));
@@ -14,8 +16,6 @@ var _util = _interopRequireDefault(require("util"));
 var _request = _interopRequireDefault(require("request"));
 
 var _lodash = require("lodash");
-
-var _uuid = require("uuid");
 
 var _socket = _interopRequireDefault(require("./socket"));
 
@@ -40,7 +40,8 @@ const ASYNC_FUNCTIONS = {};
 class Sandbox {
   constructor({
     template,
-    require
+    require,
+    id
   } = {}) {
     _defineProperty(this, "handleConnection", socket => {
       this.socket = new _socket.default(socket, this);
@@ -50,12 +51,13 @@ class Sandbox {
       console.error('server error', error);
     });
 
-    this.id = (0, _uuid.v4)();
+    this.id = id || 'v8-sandbox-socket';
     this.template = template || '';
     this.require = require;
     this.server = _net.default.createServer();
     this.server.on('connection', this.handleConnection);
     this.server.on('error', this.handleError);
+    this.cleanupSocket();
     this.server.listen(this.socketName);
     this.queue = [];
     this.timers = {};
@@ -99,7 +101,7 @@ class Sandbox {
 
   initialize({
     timeout
-  }) {
+  } = {}) {
     if (this.host.worker.initialized) {
       return {};
     }
@@ -176,14 +178,27 @@ class Sandbox {
     this.host.process(item);
   }
 
+  cleanupSocket() {
+    try {
+      _fs.default.unlinkSync(this.socketName);
+    } catch (ex) {}
+  }
+
   shutdown(callback) {
+    this.clearTimers();
     this.host.kill();
 
     if (this.socket) {
       this.socket.shutdown();
     }
 
-    this.server.close(callback);
+    this.server.close(() => {
+      this.cleanupSocket();
+
+      if (callback) {
+        callback();
+      }
+    });
   }
 
   finish(result) {
@@ -276,12 +291,12 @@ class Sandbox {
   }) {
     const timer = new _timer.default();
     timer.start(timeout || 0, callback);
-    const id = +timer.id;
+    const id = timer.id;
     this.timers[id] = timer;
     respond(id);
   }
 
-  clearTimeout(timerID, {
+  clearTimeout([timerID], {
     respond
   }) {
     const timer = this.timers[+timerID];
