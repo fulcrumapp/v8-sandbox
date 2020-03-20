@@ -1,5 +1,5 @@
-// import Sandbox from '../dist/server/sandbox';
-import Sandbox from '../dist/cluster/cluster';
+import Sandbox from '../dist/server/sandbox';
+// import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
 import wtf from 'wtfnode';

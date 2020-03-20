@@ -17,6 +17,8 @@ var _request = _interopRequireDefault(require("request"));
 
 var _lodash = require("lodash");
 
+var _uuid = require("uuid");
+
 var _socket = _interopRequireDefault(require("./socket"));
 
 var _host = _interopRequireDefault(require("./host"));
@@ -51,7 +53,7 @@ class Sandbox {
       console.error('server error', error);
     });
 
-    this.id = id || 'v8-sandbox-socket';
+    this.id = id || `v8-sandbox-socket-${(0, _uuid.v4)()}`;
     this.template = template || '';
     this.require = require;
     this.server = _net.default.createServer();
