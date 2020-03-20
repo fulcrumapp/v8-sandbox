@@ -24,7 +24,6 @@ const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f6
 
 describe('sandbox', () => {
   after(() => {
-    console.log('shutting down');
     sandbox.shutdown();
     // wtf.dump();
   });
