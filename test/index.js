@@ -1,5 +1,5 @@
-import Sandbox from '../dist/server/sandbox';
-// import Sandbox from '../dist/cluster/cluster';
+// import Sandbox from '../dist/server/sandbox';
+import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
 import wtf from 'wtfnode';
@@ -24,6 +24,7 @@ const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f6
 
 describe('sandbox', () => {
   after(() => {
+    console.log('shutting down');
     sandbox.shutdown();
     // wtf.dump();
   });

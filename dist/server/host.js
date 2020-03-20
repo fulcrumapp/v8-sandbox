@@ -35,6 +35,7 @@ class Host extends _events.default {
   fork() {
     this.kill();
     this.worker = (0, _child_process.fork)(_path.default.join(__dirname, '..', 'client', 'worker'), [this.socketName]);
+    console.log('forkworker', this.worker.pid);
     this.worker.on('error', error => {
       this.fork();
       this.emit('error', error);
@@ -49,6 +50,7 @@ class Host extends _events.default {
     this.executeTimeout.clear();
 
     if (this.worker) {
+      console.log('killworker', this.worker.pid);
       this.worker.removeAllListeners();
       this.worker.kill();
       this.worker = null;
