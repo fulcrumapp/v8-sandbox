@@ -14,8 +14,8 @@ It's intentionally not possible to expose any nodejs objects or functions direct
 * Asynchronous function support (e.g. `setTimeout` and `httpRequest`). The built-in `setResult` function defines the final result of the sandbox execution
 * Optional worker cluster for parallel execution of multiple scripts
 * Timeout support
-* Expose nodejs functionality selectively using `require` parameter `new Sandbox({require: 'path-to-file.js'})`. This file will be required by the workers and define both synchronous and asynchronous functions that can be called from the sandbox. See `example.js` and `example-functions.js` for a sample of how to expose native functions to the sandbox.
-* Support for a `template` script that gets executed upon initialization of each sandbox instance. This is useful if you have large libraries or setup code before calling the user code. When using this library in a web app, this feature can massively improve performance since a worker will be "pre-warmed" with your setup code by the time you execute the actual user code.
+* Expose nodejs functionality selectively using `require` parameter `new Sandbox({ require: 'path-to-file.js' })`. This file will be required by the workers and define both synchronous and asynchronous functions that can be called from the sandbox. See `example.js` and `example-functions.js` for a sample of how to expose native functions to the sandbox. Note that the native functions cannot be directly exposed, all input and output from the native functions is serialized with JSON between native <--> sandbox.
+* Support for a `template` script that gets executed upon initialization of each sandbox instance. This is useful if you have large libraries or setup code before calling the user code. When using this library in a web app, this feature can massively improve performance since a worker will be "pre-warmed" with your setup code by the time you execute the actual user code. For example, if you want to provide some helper functions to all code that's executed in the sandbox. This is mostly intended for use with the cluster feature since the template code is executed on initialization. In a server environment, when the time comes to execute user code in a request, the cluster worker will already be pre-warmed with the template code and only need to execute the user code.
 
 ## Installation
 
@@ -24,6 +24,24 @@ npm install v8-sandbox
 ```
 
 ## API
+
+```js
+import Sandbox from 'v8-sandbox';
+
+const sandbox = new Sandbox();
+
+const code = '1 + 2';
+
+(async () => {
+  const { error, value } = await sandbox.execute({ code, timeout: 3000 });
+
+  sandbox.shutdown();
+
+  console.log(value);
+  //=> 3
+})();
+```
+
 
 ```js
 import Sandbox from 'v8-sandbox';
@@ -40,7 +58,7 @@ setTimeout(() => {
 `;
 
 (async () => {
-  const {error, value} = await sandbox.execute({code, timeout: 3000});
+  const { error, value } = await sandbox.execute({ code, timeout: 3000 });
 
   sandbox.shutdown();
 
@@ -57,7 +75,7 @@ const sandbox = new Sandbox();
 const code = 'while (true) {}';
 
 (async () => {
-  const {error, value} = await sandbox.execute({code, timeout: 3000});
+  const { error, value } = await sandbox.execute({ code, timeout: 3000 });
 
   console.log(error.isTimeout);
   //=> true
