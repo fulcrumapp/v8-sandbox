@@ -20,10 +20,6 @@ global._execute = () => {
   });
 };
 
-global.debug = (...args) => {
-  console.log(JSON.stringify(args));
-};
-
 global.dispatch = (name, args, callback) => {
   if (typeof callback !== 'function') {
     callback = null;
@@ -37,7 +33,6 @@ global.dispatch = (name, args, callback) => {
   const wrappedCallback = (...args) => {
     global._try(() => {
       if (callback) {
-        // console.log('CALLBACK', args);
         callback.apply(null, JSON.parse(args));
       }
     });
@@ -45,8 +40,7 @@ global.dispatch = (name, args, callback) => {
 
   parameters.push(wrappedCallback);
 
-  const json = global._dispatch.apply(global, parameters); // console.log('PARZIN', name, json);
-
+  const json = global._dispatch.apply(global, parameters);
 
   const result = json != null ? JSON.parse(json).result : null;
 
@@ -58,7 +52,7 @@ global.dispatch = (name, args, callback) => {
 };
 
 global.httpRequest = (options, callback) => {
-  return global.dispatch('httpRequest', [options], callback);
+  return dispatch('httpRequest', [options], callback);
 };
 
 global.setResult = result => {
@@ -66,32 +60,32 @@ global.setResult = result => {
 };
 
 global.setTimeout = (callback, timeout) => {
-  return global.dispatch('setTimeout', [timeout], callback);
+  return dispatch('setTimeout', [timeout], callback);
 };
 
 global.clearTimeout = id => {
-  return global.dispatch('clearTimeout', [id]);
+  return dispatch('clearTimeout', [id]);
 };
 
 global.console = {
   log: (...args) => {
-    return global.dispatch('log', [args]);
+    return dispatch('log', [args]);
   },
   error: (...args) => {
-    return global.dispatch('error', [args]);
+    return dispatch('error', [args]);
   }
 };
 
 global.define = name => {
   global[name] = (...args) => {
-    return global.dispatch(name, args);
+    return dispatch(name, args);
   };
 };
 
 global.defineAsync = name => {
   global[name] = (...args) => {
     const callback = args.pop();
-    return global.dispatch(name, args, callback);
+    return dispatch(name, args, callback);
   };
 };
 //# sourceMappingURL=runtime.js.map
