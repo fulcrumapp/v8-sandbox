@@ -4,11 +4,16 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = void 0;
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 let nextID = 0;
 const TIMERS = {};
 
 class Timer {
   constructor() {
+    _defineProperty(this, "id", void 0);
+
     this.id = null;
   }
 

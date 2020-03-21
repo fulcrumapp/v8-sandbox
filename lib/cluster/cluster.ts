@@ -1,4 +1,4 @@
-import { fork } from 'child_process';
+import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
 import os from 'os';
@@ -17,12 +17,32 @@ function remove(array, object) {
   }
 }
 
+interface Item {
+  code: string;
+  timeout: number;
+  context: any;
+}
+
 export default class Cluster {
-  constructor({ workers, require, template } = {}) {
+  _workerCount: number;
+
+  _require: string;
+
+  _template: string;
+
+  _inactiveWorkers: ChildProcess[];
+
+  _activeWorkers: ChildProcess[];
+
+  _queue: async.AsyncQueue<Item>;
+
+  constructor(
+    { workers, require, template } =
+    { workers: null, require: null, template: null }
+  ) {
     this._workerCount = workers || Math.max(os.cpus().length, 4);
     this._require = require;
     this._template = template;
-    this._workers = {};
     this.start();
   }
 
@@ -48,7 +68,6 @@ export default class Cluster {
 
     this._inactiveWorkers = [];
     this._activeWorkers = [];
-    this._workers = {};
 
     if (this._queue) {
       this._queue.kill();
@@ -62,31 +81,21 @@ export default class Cluster {
   };
 
   ensureWorkers() {
-    for (let number = 0; number < this._workerCount; ++number) {
-      const worker = this._workers[number];
+    const total = this._inactiveWorkers.length + this._activeWorkers.length;
 
-      if (!worker) {
-        const newWorker = this.forkWorker(number);
+    for (let i = 0; i < this._workerCount - total; ++i) {
+      const worker = this.forkWorker();
 
-        // console.log('forking', number, newWorker.pid);
+      worker.send({ initialize: true,
+                    require: this._require,
+                    template: this._template });
 
-        newWorker.send({ initialize: true,
-                         require: this._require,
-                         template: this._template });
-
-        this._workers[number] = newWorker;
-
-        this._inactiveWorkers.push(newWorker);
-      }
+      this._inactiveWorkers.push(worker);
     }
   }
 
-  forkWorker(number) {
-    const worker = fork(path.join(__dirname, 'worker'), [ number ]);
-
-    worker.number = number;
-
-    return worker;
+  forkWorker() {
+    return fork(path.join(__dirname, 'worker'));
   }
 
   popWorker(callback) {
@@ -105,9 +114,7 @@ export default class Cluster {
     this._activeWorkers.push(worker);
 
     if (this._activeWorkers.length + this._inactiveWorkers.length !== this._workerCount) {
-      throw new Error('invalid worker count',
-                      'active:', this._activeWorkers.length,
-                      'inactive:', this._inactiveWorkers.length);
+      throw new Error('invalid worker count');
     }
 
     callback(worker);
@@ -125,14 +132,13 @@ export default class Cluster {
   }
 
   removeWorker(worker) {
-    // console.log('removing worker', worker.number, worker.pid);
     this.clearWorkerTimeout(worker);
+
     worker.kill();
     worker.removeAllListeners();
+
     remove(this._activeWorkers, worker);
     remove(this._inactiveWorkers, worker);
-
-    delete this._workers[worker.number];
 
     this.ensureWorkers();
   }

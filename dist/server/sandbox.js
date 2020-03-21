@@ -41,7 +41,32 @@ class Sandbox {
   constructor({
     template,
     require
-  } = {}) {
+  } = {
+    template: null,
+    require: null
+  }) {
+    _defineProperty(this, "id", void 0);
+
+    _defineProperty(this, "template", void 0);
+
+    _defineProperty(this, "require", void 0);
+
+    _defineProperty(this, "server", void 0);
+
+    _defineProperty(this, "socket", void 0);
+
+    _defineProperty(this, "host", void 0);
+
+    _defineProperty(this, "queue", void 0);
+
+    _defineProperty(this, "timers", void 0);
+
+    _defineProperty(this, "syncFunctions", void 0);
+
+    _defineProperty(this, "asyncFunctions", void 0);
+
+    _defineProperty(this, "item", void 0);
+
     _defineProperty(this, "handleConnection", socket => {
       this.socket = new _socket.default(socket, this);
     });
@@ -76,7 +101,7 @@ class Sandbox {
 
     if (this.require) {
       this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
-      this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
+      this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {}; // eslint-disable-next-line global-require
 
       require(this.require);
     }
@@ -100,7 +125,9 @@ class Sandbox {
 
   initialize({
     timeout
-  } = {}) {
+  } = {
+    timeout: null
+  }) {
     if (this.host.worker.initialized) {
       return {};
     }
@@ -180,7 +207,8 @@ class Sandbox {
   cleanupSocket() {
     try {
       _fs.default.unlinkSync(this.socketName);
-    } catch (ex) {}
+    } catch (ex) {// silent
+    }
   }
 
   shutdown(callback) {

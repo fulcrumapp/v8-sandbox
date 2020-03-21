@@ -1,4 +1,7 @@
 import EventEmitter from 'events';
+import Sandbox from './sandbox';
+import Worker from '../client/worker';
+import net from 'net';
 
 function tryParseJSON(value) {
   try {
@@ -9,6 +12,14 @@ function tryParseJSON(value) {
 }
 
 export default class Socket extends EventEmitter {
+  sandbox: Sandbox;
+
+  worker: Worker;
+
+  socket: net.Socket;
+
+  closed: boolean;
+
   constructor(socket, sandbox) {
     super();
 
@@ -49,12 +60,12 @@ export default class Socket extends EventEmitter {
     };
 
     const write = (result) => {
-      const json = JSON.stringify({ id, result: result || { value: undefined } });
-      const length = Buffer.byteLength(json, 'utf8');
+      const string = JSON.stringify({ id, result: result || { value: undefined } });
+      const length = Buffer.byteLength(string, 'utf8');
       const buffer = Buffer.alloc(length + 4);
 
       buffer.writeInt32BE(length);
-      buffer.write(json, 4);
+      buffer.write(string, 4);
 
       if (this.isConnected) {
         this.socket.write(buffer);

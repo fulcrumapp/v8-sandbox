@@ -7,6 +7,7 @@ import { once } from 'lodash';
 import Socket from './socket';
 import Host from './host';
 import Timer from './timer';
+import { HeapCodeStatistics } from 'v8';
 
 class TimeoutError extends Error {
   get isTimeout() {
@@ -14,12 +15,71 @@ class TimeoutError extends Error {
   }
 }
 
+interface Log {
+  type: string;
+  time: Date;
+  message: string;
+}
+
+export interface Result {
+  value: any;
+  error?: {
+    name: string;
+    message: string;
+    stack: string;
+  };
+  output?: Log[];
+}
+
 const SYNC_FUNCTIONS = {};
 
 const ASYNC_FUNCTIONS = {};
 
+interface Timers {
+  [key: string]: Timer;
+}
+
+interface Functions {
+  [key: string]: Function;
+}
+
+interface Item {
+  type: 'initialize' | 'execute';
+  template?: string;
+  code?: string;
+  context?: any;
+  output: Log[];
+  timeout: number;
+  callback: Function;
+}
+
 export default class Sandbox {
-  constructor({ template, require } = {}) {
+  id: string;
+
+  template: string;
+
+  require: string;
+
+  server: net.Server;
+
+  socket: Socket;
+
+  host: Host;
+
+  queue: Item[];
+
+  timers: Timers;
+
+  syncFunctions: Functions;
+
+  asyncFunctions: Functions;
+
+  item: Item;
+
+  constructor(
+    { template, require } =
+    { template: null, require: null }
+  ) {
     this.id = `v8-sandbox-socket-${ process.pid }`;
     this.template = template || '';
     this.require = require;
@@ -57,6 +117,7 @@ export default class Sandbox {
       this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
       this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
 
+      // eslint-disable-next-line global-require
       require(this.require);
     }
   }
@@ -89,7 +150,7 @@ export default class Sandbox {
     console.error('server error', error);
   };
 
-  initialize({ timeout } = {}) {
+  initialize({ timeout } = { timeout: null }): Promise<Result> {
     if (this.host.worker.initialized) {
       return {};
     }
@@ -100,7 +161,7 @@ export default class Sandbox {
         template: [ this.defines().join('\n'), this.template ].join('\n'),
         output: [],
         timeout,
-        callback: once((result) => {
+        callback: once((result: Result) => {
           this.host.worker.initialized = true;
 
           resolve(result);
@@ -168,6 +229,7 @@ export default class Sandbox {
     try {
       fs.unlinkSync(this.socketName);
     } catch (ex) {
+      // silent
     }
   }
 

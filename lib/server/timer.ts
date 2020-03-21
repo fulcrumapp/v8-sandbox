@@ -3,6 +3,8 @@ let nextID = 0;
 const TIMERS = {};
 
 export default class Timer {
+  id: number;
+
   constructor() {
     this.id = null;
   }

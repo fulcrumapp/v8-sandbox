@@ -23,6 +23,14 @@ class Socket extends _events.default {
   constructor(socket, sandbox) {
     super();
 
+    _defineProperty(this, "sandbox", void 0);
+
+    _defineProperty(this, "worker", void 0);
+
+    _defineProperty(this, "socket", void 0);
+
+    _defineProperty(this, "closed", void 0);
+
     _defineProperty(this, "handleData", data => {
       const id = data.readInt32BE();
       const json = data.toString('utf8', 4);
@@ -35,16 +43,16 @@ class Socket extends _events.default {
       };
 
       const write = result => {
-        const json = JSON.stringify({
+        const string = JSON.stringify({
           id,
           result: result || {
             value: undefined
           }
         });
-        const length = Buffer.byteLength(json, 'utf8');
+        const length = Buffer.byteLength(string, 'utf8');
         const buffer = Buffer.alloc(length + 4);
         buffer.writeInt32BE(length);
-        buffer.write(json, 4);
+        buffer.write(string, 4);
 
         if (this.isConnected) {
           this.socket.write(buffer);

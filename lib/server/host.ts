@@ -1,9 +1,17 @@
 import path from 'path';
-import { fork } from 'child_process';
+import { fork, ChildProcess } from 'child_process';
 import EventEmitter from 'events';
 import Timer from './timer';
 
 export default class Host extends EventEmitter {
+  socketName: string;
+
+  initializeTimeout: Timer;
+
+  executeTimeout: Timer;
+
+  worker: ChildProcess;
+
   constructor(socketName) {
     super();
 

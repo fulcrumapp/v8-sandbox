@@ -21,6 +21,14 @@ class Host extends _events.default {
   constructor(socketName) {
     super();
 
+    _defineProperty(this, "socketName", void 0);
+
+    _defineProperty(this, "initializeTimeout", void 0);
+
+    _defineProperty(this, "executeTimeout", void 0);
+
+    _defineProperty(this, "worker", void 0);
+
     _defineProperty(this, "handleTimeout", () => {
       this.fork();
       this.emit('timeout');
