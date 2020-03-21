@@ -3,7 +3,7 @@
 using v8::FunctionTemplate;
 
 NAN_MODULE_INIT(Init) {
-  SandboxWrap::Init(target);
+  Sandbox::Init(target);
 }
 
 NODE_MODULE(sandbox, Init)

@@ -4,7 +4,7 @@
       "target_name": "sandbox",
       "sources": [ "src/addon.cc",
                    "src/baton.cc",
-                   "src/sandbox-wrap.cc" ],
+                   "src/sandbox.cc" ],
       "include_dirs": [
         "<!(node -e \"require('nan')\")"
 			],

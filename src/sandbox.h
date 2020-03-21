@@ -8,18 +8,18 @@
 
 using namespace v8;
 
-class SandboxWrap;
+class Sandbox;
 
-typedef Baton<SandboxWrap> AsyncOperationBaton;
+typedef Baton<Sandbox> AsyncOperationBaton;
 
-class SandboxWrap : public Nan::ObjectWrap {
+class Sandbox : public Nan::ObjectWrap {
 public:
   static void Init(v8::Local<v8::Object> exports);
 
 private:
-  explicit SandboxWrap();
+  explicit Sandbox();
 
-  ~SandboxWrap();
+  ~Sandbox();
 
   static NAN_METHOD(New);
 
@@ -47,7 +47,7 @@ private:
 
   std::string Dispatch(const char *arguments, Local<Function> *callback);
 
-  static SandboxWrap *GetSandboxFromContext();
+  static Sandbox *GetSandboxFromContext();
 
   Nan::Callback *callback_;
 
