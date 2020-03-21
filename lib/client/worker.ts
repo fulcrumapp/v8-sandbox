@@ -44,9 +44,7 @@ export default class Worker {
   }
 
   _execute(code) {
-    return this.native.execute(code, (result) => {
-      process.send({ type: 'result', result });
-    });
+    return this.native.execute(code);
   }
 
   reset(force) {

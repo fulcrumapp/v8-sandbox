@@ -41,6 +41,10 @@ private:
 
   void Callback(int id, const char *args);
 
+  void Connect();
+
+  void Disconnect();
+
   void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
 
   std::string Dispatch(const char *arguments, Local<Function> *callback);

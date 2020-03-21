@@ -58,6 +58,9 @@ class Host extends _events.default {
 
     if (this.worker) {
       this.worker.removeAllListeners();
+      this.worker.send({
+        type: 'exit'
+      });
       this.worker.kill();
       this.worker = null;
     }

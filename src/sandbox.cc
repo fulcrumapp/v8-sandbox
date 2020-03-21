@@ -62,7 +62,6 @@ NAN_METHOD(Sandbox::New) {
 
     obj->socket_ = *socket;
     obj->nodeContext_ = Nan::GetCurrentContext();
-    obj->nodeContext_.Reset(Nan::New(obj->nodeContext_));
 
     info.GetReturnValue().Set(info.This());
   } else {
@@ -83,7 +82,6 @@ NAN_METHOD(Sandbox::Initialize) {
 
 NAN_METHOD(Sandbox::Execute) {
   NODE_ARG_STRING(0, "code");
-  NODE_ARG_FUNCTION(1, "callback");
 
   Nan::Utf8String code(info[0]);
 
@@ -192,41 +190,51 @@ NAN_METHOD(Sandbox::Dispatch) {
 NAN_METHOD(Sandbox::Connect) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  if (sandbox->loop_) {
-    return;
-  }
-
-  sandbox->loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
-
-  uv_loop_init(sandbox->loop_);
-
-  uv_connect_t *request = (uv_connect_t *)malloc(sizeof(uv_connect_t));
-
-  sandbox->pipe_ = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
-
-  uv_pipe_init(sandbox->loop_, sandbox->pipe_, 0);
-
-  sandbox->pipe_->data = (void *)sandbox;
-
-  uv_pipe_connect(request, sandbox->pipe_, sandbox->socket_.c_str(), OnConnected);
-
-  uv_run(sandbox->loop_, UV_RUN_DEFAULT);
+  sandbox->Connect();
 }
 
 NAN_METHOD(Sandbox::Disconnect) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  if (!sandbox->loop_) {
+  sandbox->Disconnect();
+}
+
+void Sandbox::Connect() {
+  if (loop_) {
     return;
   }
 
-  Debug("disconnect");
+  loop_ = (uv_loop_t *)malloc(sizeof(uv_loop_t));
 
-  uv_loop_close(sandbox->loop_);
+  uv_loop_init(loop_);
 
-  // free(request);
-  // free(pipe);
-  free(sandbox->loop_);
+  uv_connect_t *request = (uv_connect_t *)malloc(sizeof(uv_connect_t));
+
+  pipe_ = (uv_pipe_t *)malloc(sizeof(uv_pipe_t));
+
+  uv_pipe_init(loop_, pipe_, 0);
+
+  pipe_->data = (void *)this;
+
+  uv_pipe_connect(request, pipe_, socket_.c_str(), OnConnected);
+
+  uv_run(loop_, UV_RUN_DEFAULT);
+}
+
+void Sandbox::Disconnect() {
+  if (!loop_) {
+    return;
+  }
+
+  uv_close((uv_handle_t *)pipe_, nullptr);
+
+  uv_loop_close(loop_);
+
+  free(pipe_);
+  free(loop_);
+
+  loop_ = nullptr;
+  pipe_ = nullptr;
 }
 
 void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
@@ -308,6 +316,8 @@ void Sandbox::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer)
 }
 
 void Sandbox::OnConnected(uv_connect_t *request, int status) {
+  free(request);
+
   if (status != 0) {
     std::cout << getpid() << " OnConnected failed, status: " << status << " : " << uv_strerror(status) << std::endl;
   }
@@ -331,14 +341,10 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
       chunkLength -= sizeof(int32_t);
     }
 
-    // std::cout << getpid() << " : reading " << sandbox->bytesExpected_ << " : " << bytesRead << " : " << chunkLength << std::endl;
-
     std::string chunkString(chunk, chunkLength);
 
     sandbox->buffers_.push_back(chunkString);
     sandbox->bytesRead_ += chunkLength;
-
-    // std::cout << getpid() << " : expected " << sandbox->bytesExpected_ << " : got " << sandbox->bytesRead_ << std::endl;
 
     if (sandbox->bytesRead_ == sandbox->bytesExpected_) {
       for (const auto &chunk : sandbox->buffers_) {
@@ -350,7 +356,7 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
     }
   }
   else if (bytesRead < 0) {
-    // uv_close((uv_handle_t *)pipe, OnClose);
+    uv_close((uv_handle_t *)pipe, OnClose);
   }
 
   free(buffer->base);
