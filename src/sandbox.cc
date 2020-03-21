@@ -81,12 +81,19 @@ NAN_METHOD(Sandbox::Initialize) {
 
 NAN_METHOD(Sandbox::Execute) {
   NODE_ARG_STRING(0, "code");
+  NODE_ARG_BOOLEAN_OPTIONAL(1, "autoFinish");
 
   Nan::Utf8String code(info[0]);
 
+  bool autoFinish = true;
+
+  if (!info[1]->IsNull()) {
+    autoFinish = Nan::To<bool>(info[1]).FromJust();
+  }
+
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  sandbox->Execute(*code);
+  sandbox->Execute(*code, autoFinish);
 
   info.GetReturnValue().Set(info.This());
 }
@@ -105,7 +112,7 @@ void Sandbox::Initialize() {
   Nan::SetMethod(global, "_dispatch", Dispatch);
 }
 
-void Sandbox::Execute(const char *code) {
+void Sandbox::Execute(const char *code, bool autoFinish) {
   auto context = Nan::New(sandboxContext_);
 
   Context::Scope context_scope(context);
@@ -117,6 +124,20 @@ void Sandbox::Execute(const char *code) {
   if (!tryCatch.HasCaught()) {
     (void)script.ToLocalChecked()->Run(context);
   }
+
+  // If the script ran to completion and has no pending operations, return the result.
+  // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
+  // if (autoFinish && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
+  //   auto result = Nan::New<Object>();
+
+  //   auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());
+
+  //   Nan::Utf8String resultValue(value.ToLocalChecked());
+
+  //   Nan::Set(result, Nan::New("value").ToLocalChecked(), value.ToLocalChecked());
+
+  //   SetResult(context, result);
+  // }
 
   MaybeHandleError(tryCatch, context);
 }
@@ -239,10 +260,8 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
     return;
   }
 
-  auto invocation = Nan::New<Object>();
   auto result = Nan::New<Object>();
   auto error = Nan::New<Object>();
-  auto arguments = Nan::New<Array>();
 
   Nan::Utf8String message(tryCatch.Message()->Get());
   Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
@@ -254,6 +273,13 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
   Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
+
+  SetResult(context, result);
+}
+
+void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
+  auto invocation = Nan::New<Object>();
+  auto arguments = Nan::New<Array>();
 
   Nan::Set(arguments, 0, result);
 

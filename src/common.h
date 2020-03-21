@@ -37,3 +37,11 @@
   if (!(info[num]->IsFunction() || info[num]->IsNull())) {                           \
     return Nan::ThrowTypeError((std::string(name) + " must be a function").c_str()); \
   }
+
+#define NODE_ARG_BOOLEAN_OPTIONAL(num, name)                                        \
+  if (info.Length() < num + 1) {                                                    \
+    return Nan::ThrowTypeError((std::string(name) + " must be given").c_str());     \
+  }                                                                                 \
+  if (!(info[num]->IsBoolean() || info[num]->IsNull())) {                           \
+    return Nan::ThrowTypeError((std::string(name) + " must be a boolean").c_str()); \
+  }

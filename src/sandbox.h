@@ -37,7 +37,7 @@ private:
 
   void Initialize();
 
-  void Execute(const char *code);
+  void Execute(const char *code, bool autoFinish);
 
   void Callback(int id, const char *args);
 
@@ -46,6 +46,8 @@ private:
   void Disconnect();
 
   void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
+
+  void SetResult(Local<Context> &context, Local<Object> result);
 
   std::string Dispatch(const char *arguments, Local<Function> *callback);
 

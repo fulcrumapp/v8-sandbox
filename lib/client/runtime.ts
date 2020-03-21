@@ -14,7 +14,7 @@ global._try = (func) => {
 
 global._execute = () => {
   global._try(() => {
-    eval(global._code);
+    global._result = eval(global._code);
   });
 };
 
