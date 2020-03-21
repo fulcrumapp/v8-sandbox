@@ -128,11 +128,11 @@ class Sandbox {
   } = {
     timeout: null
   }) {
-    if (this.host.worker.initialized) {
-      return {};
-    }
-
     return new Promise(resolve => {
+      if (this.host.worker.initialized) {
+        return resolve({});
+      }
+
       this.queue.push({
         type: 'initialize',
         template: [this.defines().join('\n'), this.template].join('\n'),

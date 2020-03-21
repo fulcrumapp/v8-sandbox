@@ -4,7 +4,6 @@ import path from 'path';
 const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
 const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
-// const LINECOUNT = RUNTIME.split('\n').length;
 
 const wrapCode = (code) => {
   return `
@@ -14,6 +13,10 @@ const wrapCode = (code) => {
 };
 
 export default class Worker {
+  native: any;
+
+  connected: boolean;
+
   constructor() {
     this.native = new NativeSandbox(process.argv[2]);
   }
@@ -33,7 +36,7 @@ export default class Worker {
   }
 
   execute({ code }) {
-    this.reset();
+    this.reset(false);
 
     this.connect();
 

@@ -22,7 +22,7 @@ interface Log {
 }
 
 export interface Result {
-  value: any;
+  value?: any;
   error?: {
     name: string;
     message: string;
@@ -151,11 +151,11 @@ export default class Sandbox {
   };
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
-    if (this.host.worker.initialized) {
-      return {};
-    }
-
     return new Promise(resolve => {
+      if (this.host.worker.initialized) {
+        return resolve({});
+      }
+
       this.queue.push({
         type: 'initialize',
         template: [ this.defines().join('\n'), this.template ].join('\n'),

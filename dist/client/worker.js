@@ -15,8 +15,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
-const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString(); // const LINECOUNT = RUNTIME.split('\n').length;
-
+const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString();
 
 const wrapCode = code => {
   return `
@@ -27,6 +26,10 @@ const wrapCode = code => {
 
 class Worker {
   constructor() {
+    _defineProperty(this, "native", void 0);
+
+    _defineProperty(this, "connected", void 0);
+
     _defineProperty(this, "handleMessage", message => {
       switch (message.type) {
         case 'initialize':
@@ -62,7 +65,7 @@ class Worker {
   execute({
     code
   }) {
-    this.reset();
+    this.reset(false);
     this.connect();
 
     this._execute(wrapCode(code));
