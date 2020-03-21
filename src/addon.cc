@@ -1,4 +1,4 @@
-#include "sandbox-wrap.h"
+#include "sandbox.h"
 
 using v8::FunctionTemplate;
 

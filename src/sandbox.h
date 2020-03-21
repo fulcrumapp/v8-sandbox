@@ -10,7 +10,7 @@ using namespace v8;
 
 class Sandbox;
 
-typedef Baton<Sandbox> AsyncOperationBaton;
+typedef Baton<Sandbox> AsyncOperation;
 
 class Sandbox : public Nan::ObjectWrap {
 public:
@@ -51,11 +51,7 @@ private:
 
   static Sandbox *GetSandboxFromContext();
 
-  Nan::Global<Context> nodeContext_;
-
   Nan::Global<Context> sandboxContext_;
-
-  Nan::Global<Object> sandboxGlobal_;
 
   std::string result_;
 
@@ -71,6 +67,8 @@ private:
 
   uv_loop_t *loop_;
 
+  std::map<int, std::shared_ptr<AsyncOperation>> pendingOperations_;
+
   static Nan::Persistent<v8::Function> constructor;
 
   static void AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer);
@@ -84,10 +82,6 @@ private:
   static void WriteData(uv_stream_t *pipe, int id, std::string &message);
 
   static void OnWriteComplete(uv_write_t *request, int status);
-
-  typedef std::map<int, std::shared_ptr<AsyncOperationBaton>> AsyncOperationMap;
-
-  AsyncOperationMap pendingOperations_;
 };
 
 #endif

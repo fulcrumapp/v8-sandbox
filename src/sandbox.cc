@@ -61,7 +61,6 @@ NAN_METHOD(Sandbox::New) {
     Nan::Utf8String socket(info[0]);
 
     obj->socket_ = *socket;
-    obj->nodeContext_ = Nan::GetCurrentContext();
 
     info.GetReturnValue().Set(info.This());
   } else {
@@ -101,8 +100,6 @@ void Sandbox::Initialize() {
 
   auto global = context->Global();
 
-  sandboxGlobal_.Reset(global);
-
   Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
   Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
   Nan::SetMethod(global, "_dispatch", Dispatch);
@@ -127,9 +124,9 @@ void Sandbox::Execute(const char *code) {
 void Sandbox::Callback(int id, const char *args) {
   assert(id > 0);
 
-  auto baton = pendingOperations_[id];
+  auto operation = pendingOperations_[id];
 
-  assert(baton);
+  assert(operation);
 
   auto context = Nan::New(sandboxContext_);
 
@@ -139,7 +136,7 @@ void Sandbox::Callback(int id, const char *args) {
 
   Nan::TryCatch tryCatch;
 
-  Local<Function> callback = Nan::New(baton->callback->As<Function>());
+  Local<Function> callback = Nan::New(operation->callback->As<Function>());
 
   if (callback->IsFunction()) {
     v8::Local<v8::Value> argv[] = {
@@ -282,24 +279,23 @@ Sandbox *Sandbox::GetSandboxFromContext() {
   return sandbox;
 }
 
-// make a single interface with (const char *arguments, Local<Function> callback)
-// always dispatch batons the same way, no different with sync or async, just the presence of the callback
 std::string Sandbox::Dispatch(const char *arguments, Local<Function> *callback) {
   int id = 0;
 
   if (callback) {
     auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
-    auto baton = std::make_shared<AsyncOperationBaton>(this, cb);
+    auto operation = std::make_shared<AsyncOperation>(this, cb);
 
-    id = baton->id;
+    id = operation->id;
 
-    pendingOperations_[baton->id] = baton;
+    pendingOperations_[operation->id] = operation;
   }
 
   bytesRead_ = -1;
   bytesExpected_ = -1;
+
   buffers_.clear();
-  result_ = "";
+  result_.clear();
 
   std::string message(arguments);
 
@@ -337,8 +333,8 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
       sandbox->bytesRead_ = 0;
       sandbox->result_ = "";
 
-      chunk += sizeof(int32_t);
-      chunkLength -= sizeof(int32_t);
+      chunk += sizeof(sandbox->bytesExpected_);
+      chunkLength -= sizeof(sandbox->bytesExpected_);
     }
 
     std::string chunkString(chunk, chunkLength);
@@ -352,7 +348,6 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
       }
 
       uv_read_stop(pipe);
-      // uv_close((uv_handle_t *)pipe, OnClose);
     }
   }
   else if (bytesRead < 0) {
