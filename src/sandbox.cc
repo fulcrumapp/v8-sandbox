@@ -71,6 +71,18 @@ NAN_METHOD(Sandbox::New) {
   }
 }
 
+NAN_METHOD(Sandbox::Connect) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Connect();
+}
+
+NAN_METHOD(Sandbox::Disconnect) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Disconnect();
+}
+
 NAN_METHOD(Sandbox::Initialize) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
@@ -96,80 +108,6 @@ NAN_METHOD(Sandbox::Execute) {
   sandbox->Execute(*code, autoFinish);
 
   info.GetReturnValue().Set(info.This());
-}
-
-void Sandbox::Initialize() {
-  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
-
-  auto context = Nan::New(sandboxContext_);
-
-  Context::Scope context_scope(context);
-
-  auto global = context->Global();
-
-  Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
-  Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(global, "_dispatch", Dispatch);
-}
-
-void Sandbox::Execute(const char *code, bool autoFinish) {
-  auto context = Nan::New(sandboxContext_);
-
-  Context::Scope context_scope(context);
-
-  Nan::TryCatch tryCatch;
-
-  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
-
-  if (!tryCatch.HasCaught()) {
-    (void)script.ToLocalChecked()->Run(context);
-  }
-
-  // If the script ran to completion and has no pending operations, return the result.
-  // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
-  // if (autoFinish && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
-  //   auto result = Nan::New<Object>();
-
-  //   auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());
-
-  //   Nan::Utf8String resultValue(value.ToLocalChecked());
-
-  //   Nan::Set(result, Nan::New("value").ToLocalChecked(), value.ToLocalChecked());
-
-  //   SetResult(context, result);
-  // }
-
-  MaybeHandleError(tryCatch, context);
-}
-
-void Sandbox::Callback(int id, const char *args) {
-  assert(id > 0);
-
-  auto operation = pendingOperations_[id];
-
-  assert(operation);
-
-  auto context = Nan::New(sandboxContext_);
-
-  auto global = context->Global();
-
-  Context::Scope context_scope(context);
-
-  Nan::TryCatch tryCatch;
-
-  Local<Function> callback = Nan::New(operation->callback->As<Function>());
-
-  if (callback->IsFunction()) {
-    v8::Local<v8::Value> argv[] = {
-      Nan::New(args).ToLocalChecked()
-    };
-
-    Nan::Call(callback, global, 1, argv);
-  }
-
-  MaybeHandleError(tryCatch, context);
-
-  pendingOperations_.erase(id);
 }
 
 NAN_METHOD(Sandbox::Callback) {
@@ -203,18 +141,6 @@ NAN_METHOD(Sandbox::Dispatch) {
   }
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
-}
-
-NAN_METHOD(Sandbox::Connect) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
-
-  sandbox->Connect();
-}
-
-NAN_METHOD(Sandbox::Disconnect) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
-
-  sandbox->Disconnect();
 }
 
 void Sandbox::Connect() {
@@ -255,6 +181,98 @@ void Sandbox::Disconnect() {
   pipe_ = nullptr;
 }
 
+
+void Sandbox::Initialize() {
+  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
+
+  auto context = Nan::New(sandboxContext_);
+
+  Context::Scope context_scope(context);
+
+  auto global = context->Global();
+
+  Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
+  Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
+  Nan::SetMethod(global, "_dispatch", Dispatch);
+}
+
+void Sandbox::Execute(const char *code, bool autoFinish) {
+  auto context = Nan::New(sandboxContext_);
+
+  Context::Scope context_scope(context);
+
+  Nan::TryCatch tryCatch;
+
+  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
+
+  if (!tryCatch.HasCaught()) {
+    (void)script.ToLocalChecked()->Run(context);
+  }
+
+  // If the script ran to completion and has no pending operations, return the result.
+  // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
+  if (autoFinish && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
+    auto result = Nan::New<Object>();
+
+    auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());
+
+    Nan::Utf8String resultValue(value.ToLocalChecked());
+
+    Nan::Set(result, Nan::New("value").ToLocalChecked(), value.ToLocalChecked());
+
+    SetResult(context, result);
+  }
+
+  MaybeHandleError(tryCatch, context);
+}
+
+void Sandbox::Callback(int id, const char *args) {
+  assert(id > 0);
+
+  auto operation = pendingOperations_[id];
+
+  assert(operation);
+
+  auto context = Nan::New(sandboxContext_);
+
+  auto global = context->Global();
+
+  Context::Scope context_scope(context);
+
+  Nan::TryCatch tryCatch;
+
+  Local<Function> callback = Nan::New(operation->callback->As<Function>());
+
+  if (callback->IsFunction()) {
+    v8::Local<v8::Value> argv[] = {
+      Nan::New(args).ToLocalChecked()
+    };
+
+    Nan::Call(callback, global, 1, argv);
+  }
+
+  MaybeHandleError(tryCatch, context);
+
+  pendingOperations_.erase(id);
+}
+
+
+void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
+  auto invocation = Nan::New<Object>();
+  auto arguments = Nan::New<Array>();
+
+  Nan::Set(arguments, 0, result);
+
+  Nan::Set(invocation, Nan::New("name").ToLocalChecked(), Nan::New("setResult").ToLocalChecked());
+  Nan::Set(invocation, Nan::New("args").ToLocalChecked(), arguments);
+
+  auto json = JSON::Stringify(context, invocation).ToLocalChecked();
+
+  std::string args = *Nan::Utf8String(json);
+
+  Dispatch(args.c_str(), nullptr);
+}
+
 void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
   if (!tryCatch.HasCaught()) {
     return;
@@ -275,22 +293,6 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
 
   SetResult(context, result);
-}
-
-void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
-  auto invocation = Nan::New<Object>();
-  auto arguments = Nan::New<Array>();
-
-  Nan::Set(arguments, 0, result);
-
-  Nan::Set(invocation, Nan::New("name").ToLocalChecked(), Nan::New("setResult").ToLocalChecked());
-  Nan::Set(invocation, Nan::New("args").ToLocalChecked(), arguments);
-
-  auto json = JSON::Stringify(context, invocation).ToLocalChecked();
-
-  std::string args = *Nan::Utf8String(json);
-
-  Dispatch(args.c_str(), nullptr);
 }
 
 Sandbox *Sandbox::GetSandboxFromContext() {
