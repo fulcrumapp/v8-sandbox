@@ -1,16 +1,13 @@
-import Sandbox from '../dist/server/sandbox';
-// import Sandbox from '../dist/cluster/cluster';
+// import Sandbox from '../dist/server/sandbox';
+import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
-import wtf from 'wtfnode';
 
 import assert from 'assert';
 
 const sandbox = new Sandbox();
 
 const runWithTimeout = async (code, timeout) => {
-  // await sandbox.initialize({ template: '', timeout });
-
   return sandbox.execute({ code, timeout });
 };
 
@@ -25,16 +22,31 @@ const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f6
 describe('sandbox', () => {
   after(() => {
     sandbox.shutdown();
-    // wtf.dump();
   });
 
-  // it('should execute simple script', async () => {
-  //   const js = '"hi"';
+  it('should execute simple script', async () => {
+    const js = '1 + 2';
 
-  //   const { value } = await run(js);
+    const { value } = await run(js);
 
-  //   assert.equal(value, 'hi');
-  // });
+    assert.equal(value, 3);
+  });
+
+  it('should execute simple script with setResult', async () => {
+    const js = 'setResult({ value: "hi" })';
+
+    const { value } = await run(js);
+
+    assert.equal(value, 'hi');
+  });
+
+  it('should execute simple script with multiple setResult calls', async () => {
+    const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
+
+    const { value } = await run(js);
+
+    assert.equal(value, 'hi');
+  });
 
   it('should execute simple httpRequest', async () => {
     const js = `
@@ -531,12 +543,26 @@ setTimeout(() => {
       const invocation = JSON.stringify({ name: 'setTimeout', args: [ 1 ] });
       const callback = () => { throw new Error('hi'); };
 
-      _dispatch(invocation, callback);
+      _dispatch('setTimeout', invocation, callback);
     `;
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle nasty parameter errors when crossing between nodejs and sandbox', async () => {
+    const template = '';
+
+    const sandbox = new Sandbox({ template });
+
+    const code = '_dispatch(null)';
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error.message, 'name must be a string');
 
     sandbox.shutdown();
   });
@@ -640,6 +666,41 @@ setTimeout(() => {
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: uh oh: 3');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle errors throw from custom nodejs functions', async () => {
+    const template = '';
+
+    const sandbox = new Sandbox({ template, require: REQUIRE });
+
+    // hack the _try method to directly invoke the function. This would only be possible if someone stomped
+    // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
+    // test exercises the TryCatch on the OnEndNodeInvocation from C++
+    const code = `
+errorAsync(1, 2);
+`;
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error.message, 'hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle errors throw from custom nodejs functions with bad definitions', async () => {
+    const template = '';
+
+    const sandbox = new Sandbox({ template, require: REQUIRE });
+
+    const code = `
+errorAsyncCallback();
+`;
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error.message, 'hi');
 
     sandbox.shutdown();
   });

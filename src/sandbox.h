@@ -49,11 +49,13 @@ private:
 
   void SetResult(Local<Context> &context, Local<Object> result);
 
-  std::string Dispatch(const char *arguments, Local<Function> *callback);
+  std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
 
   static Sandbox *GetSandboxFromContext();
 
   Nan::Global<Context> sandboxContext_;
+
+  bool hasResult_;
 
   std::string result_;
 

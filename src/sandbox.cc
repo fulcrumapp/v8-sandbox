@@ -17,7 +17,8 @@ using namespace v8;
 Nan::Persistent<v8::Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
-  : result_(""),
+  : hasResult_(false),
+    result_(""),
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
@@ -122,22 +123,24 @@ NAN_METHOD(Sandbox::Callback) {
 }
 
 NAN_METHOD(Sandbox::Dispatch) {
-  NODE_ARG_STRING(0, "parameters");
-  NODE_ARG_FUNCTION_OPTIONAL(1, "callback");
+  NODE_ARG_STRING(0, "name");
+  NODE_ARG_STRING(1, "parameters");
+  NODE_ARG_FUNCTION_OPTIONAL(2, "callback");
 
-  Nan::Utf8String arguments(info[0]);
+  Nan::Utf8String name(info[0]);
+  Nan::Utf8String arguments(info[1]);
 
   Sandbox* sandbox = GetSandboxFromContext();
 
   std::string result;
 
-  if (info[1]->IsNull()) {
-    result = sandbox->Dispatch(*arguments, nullptr);
+  if (info[2]->IsNull()) {
+    result = sandbox->Dispatch(*name, *arguments, nullptr);
   }
   else {
-    Local<Function> callback = info[1].As<Function>();
+    Local<Function> callback = info[2].As<Function>();
 
-    result = sandbox->Dispatch(*arguments, &callback);
+    result = sandbox->Dispatch(*name, *arguments, &callback);
   }
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
@@ -203,6 +206,10 @@ void Sandbox::Execute(const char *code, bool autoFinish) {
 
   Nan::TryCatch tryCatch;
 
+  if (autoFinish) {
+    hasResult_ = false;
+  }
+
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 
   if (!tryCatch.HasCaught()) {
@@ -211,7 +218,7 @@ void Sandbox::Execute(const char *code, bool autoFinish) {
 
   // If the script ran to completion and has no pending operations, return the result.
   // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
-  if (autoFinish && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
+  if (autoFinish && !hasResult_ && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
     auto result = Nan::New<Object>();
 
     auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());
@@ -256,7 +263,6 @@ void Sandbox::Callback(int id, const char *args) {
   pendingOperations_.erase(id);
 }
 
-
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
   auto invocation = Nan::New<Object>();
   auto arguments = Nan::New<Array>();
@@ -270,7 +276,7 @@ void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
 
   std::string args = *Nan::Utf8String(json);
 
-  Dispatch(args.c_str(), nullptr);
+  Dispatch("setResult", args.c_str(), nullptr);
 }
 
 void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
@@ -307,7 +313,7 @@ Sandbox *Sandbox::GetSandboxFromContext() {
   return sandbox;
 }
 
-std::string Sandbox::Dispatch(const char *arguments, Local<Function> *callback) {
+std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Function> *callback) {
   int id = 0;
 
   if (callback) {
@@ -330,6 +336,10 @@ std::string Sandbox::Dispatch(const char *arguments, Local<Function> *callback) 
   WriteData((uv_stream_t *)pipe_, id, message);
 
   uv_run(loop_, UV_RUN_DEFAULT);
+
+  if (std::string(name) == "setResult") {
+    hasResult_ = true;
+  }
 
   return result_;
 }

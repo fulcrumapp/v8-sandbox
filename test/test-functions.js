@@ -26,3 +26,9 @@ defineAsync('addNumbersAsync', ([ value1, value2 ], { respond, callback }) => {
 defineAsync('errorAsync', ({ callback }) => {
   throw new Error('hi');
 });
+
+defineAsync('errorAsyncCallback', ([ param1 ], { fail, callback }) => {
+  setTimeout(() => {
+    fail(new Error('hi'));
+  }, 1);
+});

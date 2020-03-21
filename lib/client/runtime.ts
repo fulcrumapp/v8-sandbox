@@ -23,7 +23,7 @@ global.dispatch = (name, args, callback) => {
     callback = null;
   }
 
-  const parameters = [ JSON.stringify({ name, args: args || [] }) ];
+  const parameters = [ name, JSON.stringify({ name, args: args || [] }) ];
 
   const wrappedCallback = callback && ((...args) => {
     global._try(() => {
