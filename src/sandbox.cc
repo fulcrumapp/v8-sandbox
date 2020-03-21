@@ -17,9 +17,7 @@ using namespace v8;
 Nan::Persistent<v8::Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
-  : callback_(nullptr),
-    result_(""),
-    dispatchResult_(""),
+  : dispatchResult_(""),
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
@@ -260,9 +258,6 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   auto json = JSON::Stringify(context, invocation).ToLocalChecked();
 
   std::string args = *Nan::Utf8String(json);
-
-  // std::cout << getpid() << " MaybeHandleError: " << args << std::endl;
-  // result_ = *Nan::Utf8String(json);
 
   Dispatch(args.c_str(), nullptr);
 }

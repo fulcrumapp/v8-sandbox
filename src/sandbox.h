@@ -37,8 +37,6 @@ private:
 
   void Initialize();
 
-  void Dispose();
-
   void Execute(const char *code);
 
   void Callback(int id, const char *args);
@@ -49,15 +47,11 @@ private:
 
   static Sandbox *GetSandboxFromContext();
 
-  Nan::Callback *callback_;
-
   Nan::Global<Context> nodeContext_;
 
   Nan::Global<Context> sandboxContext_;
 
   Nan::Global<Object> sandboxGlobal_;
-
-  std::string result_;
 
   std::string dispatchResult_;
 
