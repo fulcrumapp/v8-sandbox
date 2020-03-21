@@ -17,11 +17,10 @@ using namespace v8;
 Nan::Persistent<v8::Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
-  : dispatchResult_(""),
+  : result_(""),
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
-    message_(""),
     socket_(""),
     pipe_(nullptr),
     loop_(nullptr)
@@ -35,6 +34,7 @@ void Sandbox::Init(v8::Local<v8::Object> exports) {
   Nan::HandleScope scope;
 
   v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
+
   tpl->SetClassName(Nan::New("Sandbox").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
@@ -291,14 +291,15 @@ std::string Sandbox::Dispatch(const char *arguments, Local<Function> *callback) 
   bytesRead_ = -1;
   bytesExpected_ = -1;
   buffers_.clear();
-  message_ = arguments;
-  dispatchResult_ = "";
+  result_ = "";
 
-  WriteData((uv_stream_t *)pipe_, id, message_);
+  std::string message(arguments);
+
+  WriteData((uv_stream_t *)pipe_, id, message);
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
-  return dispatchResult_;
+  return result_;
 }
 
 void Sandbox::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {
@@ -324,7 +325,7 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
     if (sandbox->bytesExpected_ == -1) {
       sandbox->bytesExpected_ = ntohl(((int32_t *)chunk)[0]);
       sandbox->bytesRead_ = 0;
-      sandbox->dispatchResult_ = "";
+      sandbox->result_ = "";
 
       chunk += sizeof(int32_t);
       chunkLength -= sizeof(int32_t);
@@ -341,7 +342,7 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
 
     if (sandbox->bytesRead_ == sandbox->bytesExpected_) {
       for (const auto &chunk : sandbox->buffers_) {
-        sandbox->dispatchResult_ += chunk;
+        sandbox->result_ += chunk;
       }
 
       uv_read_stop(pipe);
@@ -370,8 +371,6 @@ void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
 
   base[0] = htonl(id);
 
-  // std::cout << getpid() << " : writing " << message.c_str() << std::endl;
-
   memcpy(&base[1], message.c_str(), message.length());
 
   uv_buf_t buffers[] = {
@@ -379,8 +378,6 @@ void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
   };
 
   write->data = data;
-
-  // std::cout << getpid() << " WriteData: " << message << std::endl;
 
   uv_write(write, pipe, buffers, 1, OnWriteComplete);
 

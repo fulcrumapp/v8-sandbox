@@ -53,15 +53,13 @@ private:
 
   Nan::Global<Object> sandboxGlobal_;
 
-  std::string dispatchResult_;
+  std::string result_;
 
   std::vector<std::string> buffers_;
 
   int32_t bytesRead_;
 
   int32_t bytesExpected_;
-
-  std::string message_;
 
   std::string socket_;
 
