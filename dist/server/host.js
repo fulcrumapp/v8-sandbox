@@ -96,6 +96,7 @@ class Host extends _events.default {
     timeout
   }) {
     this.executeTimeout.start(timeout, this.handleTimeout);
+    global.context = context;
     this.worker.send({
       type: 'execute',
       code,

@@ -1,5 +1,5 @@
-// import Sandbox from '../dist/server/sandbox';
-import Sandbox from '../dist/cluster/cluster';
+import Sandbox from '../dist/server/sandbox';
+// import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
 
@@ -689,18 +689,20 @@ errorAsync(1, 2);
     sandbox.shutdown();
   });
 
-  it('should handle errors throw from custom nodejs functions with bad definitions', async () => {
-    const template = '';
-
-    const sandbox = new Sandbox({ template, require: REQUIRE });
+  it('should support context variable for custom nodejs functions', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
-errorAsyncCallback();
+setResult({ value: executeWithContext() });
 `;
 
-    const { error } = await sandbox.execute({ code, timeout: 3000 });
+    const context = {
+      customValue: 'hi'
+    };
 
-    assert.equal(error.message, 'hi');
+    const { value } = await sandbox.execute({ code, context, timeout: 3000 });
+
+    assert.equal(value, 'hi');
 
     sandbox.shutdown();
   });

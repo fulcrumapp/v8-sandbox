@@ -30,8 +30,7 @@ class Worker {
 
     _defineProperty(this, "onExecute", async message => {
       await this.wait();
-      global.context = JSON.parse(message.context);
-      await this.execute(message.code);
+      await this.execute(message);
     });
 
     this.queue = _async.default.queue(this.worker, 1);
@@ -86,13 +85,17 @@ class Worker {
     });
   }
 
-  async execute(code) {
+  async execute({
+    code,
+    context
+  }) {
     (0, _assert.default)(this.initialized);
     let result;
 
     if (!this.error) {
       result = await this.sandbox.execute({
-        code
+        code,
+        context: JSON.parse(context)
       });
     } else {
       result = {

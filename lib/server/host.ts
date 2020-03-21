@@ -75,6 +75,8 @@ export default class Host extends EventEmitter {
   execute({ code, context, timeout }) {
     this.executeTimeout.start(timeout, this.handleTimeout);
 
+    global.context = context;
+
     this.worker.send({ type: 'execute', code, context: JSON.stringify(context) });
   }
 
