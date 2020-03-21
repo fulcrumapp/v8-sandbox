@@ -94,19 +94,12 @@ NAN_METHOD(Sandbox::Initialize) {
 
 NAN_METHOD(Sandbox::Execute) {
   NODE_ARG_STRING(0, "code");
-  NODE_ARG_BOOLEAN_OPTIONAL(1, "autoFinish");
 
   Nan::Utf8String code(info[0]);
 
-  bool autoFinish = true;
-
-  if (!info[1]->IsNull()) {
-    autoFinish = Nan::To<bool>(info[1]).FromJust();
-  }
-
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  sandbox->Execute(*code, autoFinish);
+  sandbox->Execute(*code);
 
   info.GetReturnValue().Set(info.This());
 }
@@ -199,16 +192,14 @@ void Sandbox::Initialize() {
   Nan::SetMethod(global, "_dispatch", Dispatch);
 }
 
-void Sandbox::Execute(const char *code, bool autoFinish) {
+void Sandbox::Execute(const char *code) {
   auto context = Nan::New(sandboxContext_);
 
   Context::Scope context_scope(context);
 
   Nan::TryCatch tryCatch;
 
-  if (autoFinish) {
-    hasResult_ = false;
-  }
+  hasResult_ = false;
 
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
 
@@ -218,7 +209,7 @@ void Sandbox::Execute(const char *code, bool autoFinish) {
 
   // If the script ran to completion and has no pending operations, return the result.
   // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
-  if (autoFinish && !hasResult_ && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
+  if (!hasResult_ && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
     auto result = Nan::New<Object>();
 
     auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());

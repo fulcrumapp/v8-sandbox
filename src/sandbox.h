@@ -37,7 +37,7 @@ private:
 
   void Initialize();
 
-  void Execute(const char *code, bool autoFinish);
+  void Execute(const char *code);
 
   void Callback(int id, const char *args);
 
