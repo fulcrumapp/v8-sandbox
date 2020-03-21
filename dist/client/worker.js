@@ -59,7 +59,7 @@ class Worker {
     this.connect();
     const code = [RUNTIME, wrapCode(template), 'setResult()'].join('\n');
 
-    this._execute(code);
+    this._execute(code, false);
   }
 
   execute({
@@ -68,11 +68,11 @@ class Worker {
     this.reset(false);
     this.connect();
 
-    this._execute(wrapCode(code));
+    this._execute(wrapCode(code), true);
   }
 
-  _execute(code) {
-    return this.native.execute(code);
+  _execute(code, autoFinish) {
+    return this.native.execute(code, autoFinish);
   }
 
   reset(force) {

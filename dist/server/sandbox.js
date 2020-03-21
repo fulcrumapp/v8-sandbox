@@ -36,6 +36,7 @@ class TimeoutError extends Error {
 
 const SYNC_FUNCTIONS = {};
 const ASYNC_FUNCTIONS = {};
+let nextID = 0;
 
 class Sandbox {
   constructor({
@@ -75,7 +76,7 @@ class Sandbox {
       console.error('server error', error);
     });
 
-    this.id = `v8-sandbox-socket-${process.pid}`;
+    this.id = `v8-sandbox-socket-${process.pid}-${++nextID}`;
     this.template = template || '';
     this.require = require;
     this.server = _net.default.createServer();

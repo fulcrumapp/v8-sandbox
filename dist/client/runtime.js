@@ -1,5 +1,3 @@
-"use strict";
-
 global._try = func => {
   try {
     func();
@@ -16,7 +14,7 @@ global._try = func => {
 
 global._execute = () => {
   global._try(() => {
-    eval(global._code);
+    global._result = eval(global._code);
   });
 };
 
@@ -25,7 +23,7 @@ global.dispatch = (name, args, callback) => {
     callback = null;
   }
 
-  const parameters = [JSON.stringify({
+  const parameters = [name, JSON.stringify({
     name,
     args: args || []
   })];
