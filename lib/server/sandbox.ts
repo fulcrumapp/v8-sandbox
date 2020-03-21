@@ -7,7 +7,6 @@ import { once } from 'lodash';
 import Socket from './socket';
 import Host from './host';
 import Timer from './timer';
-import { HeapCodeStatistics } from 'v8';
 
 class TimeoutError extends Error {
   get isTimeout() {
@@ -332,22 +331,26 @@ export default class Sandbox {
     respond();
   }
 
-  httpRequest([ options ], { respond, callback }) {
-    const { sync } = options || {};
+  httpRequest([ options ], { respond, fail, callback }) {
+    options = options || {};
 
-    request(options, (err, response, body) => {
+    request(this.processRequestOptions(options), (err, response, body) => {
       if (response && Buffer.isBuffer(response.body)) {
         response.body = body = response.body.toString('base64');
       }
 
-      if (sync) {
-        respond(err, response, body);
+      if (!callback) {
+        if (err) {
+          fail(err);
+        } else {
+          respond(response);
+        }
       } else {
         callback(err, response, body);
       }
     });
 
-    if (!sync) {
+    if (callback) {
       respond();
     }
   }
@@ -366,5 +369,9 @@ export default class Sandbox {
 
   write({ type, args }) {
     this.item.output.push({ type, time: new Date(), message: util.format(...args) });
+  }
+
+  processRequestOptions(options) {
+    return options;
   }
 }

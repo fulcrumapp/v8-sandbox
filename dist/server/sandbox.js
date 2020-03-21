@@ -338,24 +338,27 @@ class Sandbox {
 
   httpRequest([options], {
     respond,
+    fail,
     callback
   }) {
-    const {
-      sync
-    } = options || {};
-    (0, _request.default)(options, (err, response, body) => {
+    options = options || {};
+    (0, _request.default)(this.processRequestOptions(options), (err, response, body) => {
       if (response && Buffer.isBuffer(response.body)) {
         response.body = body = response.body.toString('base64');
       }
 
-      if (sync) {
-        respond(err, response, body);
+      if (!callback) {
+        if (err) {
+          fail(err);
+        } else {
+          respond(response);
+        }
       } else {
         callback(err, response, body);
       }
     });
 
-    if (!sync) {
+    if (callback) {
       respond();
     }
   }
@@ -393,6 +396,10 @@ class Sandbox {
       time: new Date(),
       message: _util.default.format(...args)
     });
+  }
+
+  processRequestOptions(options) {
+    return options;
   }
 
 }

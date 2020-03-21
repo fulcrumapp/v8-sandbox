@@ -30,13 +30,13 @@ global.dispatch = (name, args, callback) => {
     args: args || []
   })];
 
-  const wrappedCallback = (...args) => {
+  const wrappedCallback = callback && ((...args) => {
     global._try(() => {
       if (callback) {
         callback.apply(null, JSON.parse(args));
       }
     });
-  };
+  });
 
   parameters.push(wrappedCallback);
 

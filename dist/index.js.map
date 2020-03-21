@@ -1,0 +1,1 @@
+{"version":3,"sources":["../lib/index.js"],"names":["Sandbox"],"mappings":";;;;;;;;;;;;;AAAA;;AACA;;;;eAEeA,gB","sourcesContent":["import Sandbox from './server/sandbox';\nimport SandboxCluster from './cluster/cluster';\n\nexport default Sandbox;\nexport { SandboxCluster };\n"],"file":"index.js"}

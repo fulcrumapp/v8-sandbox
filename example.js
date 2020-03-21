@@ -1,12 +1,12 @@
 const Sandbox = require('./dist').default;
 const path = require('path');
 
-const sandbox = new Sandbox({require: path.join(process.cwd(), 'example-functions.js')});
+const sandbox = new Sandbox({ require: path.join(process.cwd(), 'example-functions.js') });
 
 const timeout = 1000;
 
 const run = (code) => {
-  return sandbox.execute({code, timeout});
+  return sandbox.execute({ code, timeout });
 };
 
 const example1 = `
@@ -39,7 +39,7 @@ var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de
 `;
 
 const runExample = async (code) => {
-  const {error, value} = await run(code);
+  const { error, value } = await run(code);
 
   if (error) {
     console.error(error);

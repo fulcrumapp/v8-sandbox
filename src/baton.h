@@ -13,7 +13,7 @@ template<class T>
 class Baton {
 public:
   Baton(T *object, PersistentCallback callback)
-    : id(Baton::nextID()),
+    : id(++nextBatonID),
       instance(object),
       callback(callback)
   {}
@@ -25,10 +25,6 @@ public:
   T *instance;
 
   PersistentCallback callback;
-
-  static int nextID() {
-    return ++nextBatonID;
-  }
 };
 
 #endif

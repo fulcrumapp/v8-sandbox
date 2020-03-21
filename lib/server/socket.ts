@@ -53,11 +53,11 @@ export default class Socket extends EventEmitter {
 
     const message = tryParseJSON(json);
 
-    const callback = (...args) => {
+    const callback = id > 0 && ((...args) => {
       if (this.isConnected) {
         this.sandbox.host.callback(id, args);
       }
-    };
+    });
 
     const write = (result) => {
       const string = JSON.stringify({ id, result: result || { value: undefined } });

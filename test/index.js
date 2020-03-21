@@ -28,26 +28,36 @@ describe('sandbox', () => {
     // wtf.dump();
   });
 
-  it('HTTP should execute simple httpRequest', async () => {
+  it('should execute simple httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   setResult({value: body});
 });
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 'hi there');
   });
 
-  it('HTTP should handle errors from httpRequest', async () => {
+  it('should execute simple synchronous httpRequest', async () => {
+    const js = `
+setResult({ value: httpRequest({uri: '${TEST_URL}'}).body });
+`;
+
+    const { value } = await run(js);
+
+    assert.equal(value, 'hi there');
+  });
+
+  it('should handle errors from httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   throw new Error('yoyo');
 });
 `;
 
-    const {error} = await run(js);
+    const { error } = await run(js);
 
     assert.equal(error.message, 'yoyo');
   });
@@ -69,7 +79,7 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 'hi there');
   });
@@ -84,7 +94,7 @@ new Promise((resolve) => {
 });
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -102,7 +112,7 @@ new Promise((resolve) => {
 })();
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -132,7 +142,7 @@ new Promise((resolve) => {
 })();
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -164,7 +174,7 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 12);
   });
@@ -182,31 +192,31 @@ objects = [];
 setResult({value: 1});
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
 
   it('should handle syntax errors', async () => {
-    const js = `}`;
+    const js = '}';
 
-    const {error} = await run(js);
+    const { error } = await run(js);
 
     assert.ok(error && error.stack.indexOf('SyntaxError') >= 0);
   });
 
   it('should capture logs', async () => {
-    const js = `console.log('hi'); console.error('there'); console.log('yo'); setResult();`;
+    const js = 'console.log(\'hi\'); console.error(\'there\'); console.log(\'yo\'); setResult();';
 
     const { output } = await runWithTimeout(js, 30);
 
-    assert.deepStrictEqual(output.map(o => o.message), ['hi', 'there', 'yo']);
+    assert.deepStrictEqual(output.map(o => o.message), [ 'hi', 'there', 'yo' ]);
   });
 
   it('should run simple script', async () => {
-    const js = `setResult({value: 1337});`;
+    const js = 'setResult({value: 1337});';
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1337);
   });
@@ -218,7 +228,7 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -234,7 +244,7 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -254,7 +264,7 @@ setTimeout(() => {
 }, 5);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -274,7 +284,7 @@ setTimeout(() => {
   setResult({value});
 }, 15);
 `;
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -292,31 +302,31 @@ setTimeout(() => {
 }, 15);
 `;
 
-    const {value} = await run(js);
+    const { value } = await run(js);
 
     assert.equal(value, 2);
   });
 
   it('should timeout when locked up in js', async () => {
-    const js = `while (true) {}`;
+    const js = 'while (true) {}';
 
-    const {error} = await runWithTimeout(js, 30);
+    const { error } = await runWithTimeout(js, 30);
 
     assert.equal(error.isTimeout, true);
   });
 
   it('should timeout when idling in the run loop', async () => {
-    const js = `setTimeout(() => {}, 10000)`;
+    const js = 'setTimeout(() => {}, 10000)';
 
-    const {error} = await runWithTimeout(js, 30);
+    const { error } = await runWithTimeout(js, 30);
 
     assert.equal(error.isTimeout, true);
   });
 
   it('should timeout many times', async () => {
-    const js = `while (true) {}`;
+    const js = 'while (true) {}';
 
-    let count = 20;
+    const count = 20;
 
     const operations = [];
 
@@ -326,7 +336,7 @@ setTimeout(() => {
 
     const results = await Promise.all(operations);
 
-    for (const {error} of results) {
+    for (const { error } of results) {
       assert.equal(error.isTimeout, true);
     }
 
@@ -334,9 +344,9 @@ setTimeout(() => {
   });
 
   it('should throw errors from top level script', async () => {
-    const js = `throw new Error('yoyo')`;
+    const js = 'throw new Error(\'yoyo\')';
 
-    const {error} = await run(js);
+    const { error } = await run(js);
 
     assert.equal(error.message, 'yoyo');
   });
@@ -348,7 +358,7 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const {error} = await run(js);
+    const { error } = await run(js);
 
     assert.equal(error.message, 'yoyo');
   });
@@ -385,7 +395,7 @@ setTimeout(() => {
       ]});
 `;
 
-    const {value, error} = await run(js);
+    const { value, error } = await run(js);
 
     assert.equal(value.length, 18);
   });
@@ -393,7 +403,7 @@ setTimeout(() => {
   it('should handle stress', async () => {
     const iterations = 500;
 
-    let count = 0;
+    const count = 0;
     const operations = [];
 
     for (let i = 0; i < iterations; ++i) {
@@ -429,7 +439,7 @@ setTimeout(() => {
   `;
 
         setImmediate(() => {
-          run(js).then(({error, value}) => {
+          run(js).then(({ error, value }) => {
             count++;
 
             assert.equal(value, i);
@@ -451,7 +461,7 @@ setTimeout(() => {
 setResult({value: ${i}});
 `;
 
-      run(js).then(({error, value}) => {
+      run(js).then(({ error, value }) => {
         assert.equal(value, i);
 
         if (i === iterations) {
@@ -488,13 +498,13 @@ setTimeout(() => {
   });
 
   it('should handle syntax errors in template scripts', async () => {
-    const template = `{`;
+    const template = '{';
 
-    const sandbox = new Sandbox({template});
+    const sandbox = new Sandbox({ template });
 
-    const code = `setResult({value: 1});`;
+    const code = 'setResult({value: 1});';
 
-    const { error } = await sandbox.execute({code, timeout: 3000});
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Unexpected end of input');
 
@@ -504,7 +514,7 @@ setTimeout(() => {
   it('should handle errors when crossing between nodejs and sandbox', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({template});
+    const sandbox = new Sandbox({ template });
 
     // must use the raw _setTimeout which doesn't wrap in try/catch. Assume everything in the sandbox
     // can be overwritten or called manually. This test exercises the TryCatch in OnTimer from C++.
@@ -516,7 +526,7 @@ setTimeout(() => {
       _dispatch(invocation, callback);
     `;
 
-    const {error} = await sandbox.execute({code, timeout: 3000});
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: hi');
 
@@ -524,7 +534,7 @@ setTimeout(() => {
   });
 
   it('should allow crossing between nodejs and sandbox with custom sync functions', async () => {
-    const sandbox = new Sandbox({require: REQUIRE});
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -533,7 +543,7 @@ setTimeout(() => {
 `;
 
     for (let count = 0; count < 20; ++count) {
-      const {value} = await sandbox.execute({code, timeout: 3000});
+      const { value } = await sandbox.execute({ code, timeout: 3000 });
 
       assert.equal(value, 3);
     }
@@ -542,7 +552,7 @@ setTimeout(() => {
   });
 
   it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
-    const sandbox = new Sandbox({require: REQUIRE});
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -551,7 +561,7 @@ setTimeout(() => {
 `;
 
     for (let count = 0; count < 20; ++count) {
-      const { value, error } = await sandbox.execute({code, timeout: 3000});
+      const { value, error } = await sandbox.execute({ code, timeout: 3000 });
 
       assert.equal(value, 3);
     }
@@ -562,7 +572,7 @@ setTimeout(() => {
   it('should allow random crossing between nodejs and sandbox with custom sync functions', async function() {
     this.timeout(10000);
 
-    const sandbox = new Sandbox({require: REQUIRE});
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
 const randomTimeout = () => Math.floor(Math.random() * 5) + 1;
@@ -574,7 +584,7 @@ for (let i = 0; i < 5000; ++i) {
 }
 `;
 
-    const {value} = await sandbox.execute({code, timeout: 10000});
+    const { value } = await sandbox.execute({ code, timeout: 10000 });
 
     assert.equal(value, 3);
 
@@ -582,7 +592,7 @@ for (let i = 0; i < 5000; ++i) {
   });
 
   it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
-    const sandbox = new Sandbox({require: REQUIRE});
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -593,7 +603,7 @@ setTimeout(() => {
 `;
 
     for (let count = 0; count < 20; ++count) {
-      const {value} = await sandbox.execute({code, timeout: 3000});
+      const { value } = await sandbox.execute({ code, timeout: 3000 });
 
       assert.equal(value, 3);
     }
@@ -604,7 +614,7 @@ setTimeout(() => {
   it('should handle errors when crossing between nodejs and sandbox with custom functions', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({template, require: REQUIRE});
+    const sandbox = new Sandbox({ template, require: REQUIRE });
 
     // hack the _try method to directly invoke the function. This would only be possible if someone stomped
     // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
@@ -619,7 +629,7 @@ setTimeout(() => {
 }, 20);
 `;
 
-    const {error} = await sandbox.execute({code, timeout: 3000});
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: uh oh: 3');
 
