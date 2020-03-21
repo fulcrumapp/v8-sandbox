@@ -40,7 +40,7 @@ install:
 - source scripts/install.sh
 
 script:
-- if [ -z "$TARGET" ]; then npm test; fi
+- npm test
 
 after_success:
 - scripts/publish.sh
