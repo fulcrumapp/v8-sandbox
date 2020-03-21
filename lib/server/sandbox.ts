@@ -34,6 +34,8 @@ const SYNC_FUNCTIONS = {};
 
 const ASYNC_FUNCTIONS = {};
 
+let nextID = 0;
+
 interface Timers {
   [key: string]: Timer;
 }
@@ -79,7 +81,7 @@ export default class Sandbox {
     { template, require } =
     { template: null, require: null }
   ) {
-    this.id = `v8-sandbox-socket-${ process.pid }`;
+    this.id = `v8-sandbox-socket-${ process.pid }-${ ++nextID }`;
     this.template = template || '';
     this.require = require;
 

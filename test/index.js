@@ -1,5 +1,5 @@
-// import Sandbox from '../dist/server/sandbox';
-import Sandbox from '../dist/cluster/cluster';
+import Sandbox from '../dist/server/sandbox';
+// import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
 import wtf from 'wtfnode';
@@ -27,6 +27,14 @@ describe('sandbox', () => {
     sandbox.shutdown();
     // wtf.dump();
   });
+
+  // it('should execute simple script', async () => {
+  //   const js = '"hi"';
+
+  //   const { value } = await run(js);
+
+  //   assert.equal(value, 'hi');
+  // });
 
   it('should execute simple httpRequest', async () => {
     const js = `
