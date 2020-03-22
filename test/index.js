@@ -24,13 +24,13 @@ describe('sandbox', () => {
     sandbox.shutdown();
   });
 
-  it('should execute simple script', async () => {
-    const js = '1 + 2';
+  // it('should execute simple script', async () => {
+  //   const js = '1 + 2';
 
-    const { value } = await run(js);
+  //   const { value } = await run(js);
 
-    assert.equal(value, 3);
-  });
+  //   assert.equal(value, 3);
+  // });
 
   it('should execute simple script with setResult', async () => {
     const js = 'setResult({ value: "hi" })';
@@ -40,13 +40,13 @@ describe('sandbox', () => {
     assert.equal(value, 'hi');
   });
 
-  it('should execute simple script with multiple setResult calls', async () => {
-    const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
+  // it('should execute simple script with multiple setResult calls', async () => {
+  //   const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
 
-    const { value } = await run(js);
+  //   const { value } = await run(js);
 
-    assert.equal(value, 'hi');
-  });
+  //   assert.equal(value, 'hi');
+  // });
 
   it('should execute simple httpRequest', async () => {
     const js = `
@@ -97,6 +97,8 @@ setTimeout(() => {
     })();
   });
 }, 1);
+
+11;
 `;
 
     const { value } = await run(js);
@@ -136,6 +138,24 @@ new Promise((resolve) => {
 
     assert.equal(value, 1);
   });
+
+  //   it('should handle async function with no setResult', async () => {
+  //     const js = `
+  // (async () => {
+  //   return await new Promise((resolve) => {
+  //     setTimeout(() => {
+  //       resolve();
+  //     }, 20);
+  //   });
+  // })();
+
+  // 1;
+  // `;
+
+  //     const { value } = await run(js);
+
+  //     assert.equal(value, 1);
+  //   });
 
   it('should handle multiple async functions', async () => {
     const js = `
