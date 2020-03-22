@@ -706,4 +706,18 @@ setResult({ value: executeWithContext() });
 
     sandbox.shutdown();
   });
+
+  it('should support large payloads', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE });
+
+    const code = `
+setResult({ value: fetchLargeValue() });
+`;
+
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value.length, 3488889);
+
+    sandbox.shutdown();
+  });
 });

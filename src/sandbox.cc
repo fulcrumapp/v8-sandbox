@@ -393,15 +393,18 @@ void Sandbox::OnClose(uv_handle_t *pipe) {
 void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
   uv_write_t *write = (uv_write_t *)malloc(sizeof(uv_write_t));
 
-  size_t bufferLength = sizeof(int32_t) + message.length();
+  size_t messageLength = message.length();
+
+  size_t bufferLength = sizeof(int32_t) + sizeof(int32_t) + messageLength;
 
   char *data = (char *)malloc(bufferLength);
 
   uint32_t *base = (uint32_t *)data;
 
   base[0] = htonl(id);
+  base[1] = htonl(messageLength);
 
-  memcpy(&base[1], message.c_str(), message.length());
+  memcpy(&base[2], message.c_str(), messageLength);
 
   uv_buf_t buffers[] = {
     { .base = data, .len = bufferLength }

@@ -1,6 +1,9 @@
 // these functions have access to node and are callable from the sandbox
 
 const fs = require('fs');
+const path = require('path');
+
+const LARGE_VALUE = fs.readFileSync(path.join(__dirname, 'test.html')).toString();
 
 // Example of a synchronous function
 define('addNumbers', ([ value1, value2 ], { respond }) => {
@@ -36,5 +39,11 @@ defineAsync('errorAsyncCallback', ([ param1 ], { fail, callback }) => {
 defineAsync('executeWithContext', ([ param1 ], { fail, respond }) => {
   setTimeout(() => {
     respond(global.context.customValue);
+  }, 1);
+});
+
+defineAsync('fetchLargeValue', (args, { fail, respond }) => {
+  setTimeout(() => {
+    respond(LARGE_VALUE);
   }, 1);
 });

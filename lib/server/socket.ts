@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import Sandbox from './sandbox';
 import Worker from '../client/worker';
 import net from 'net';
+import { ChildProcess } from 'child_process';
 
 function tryParseJSON(value) {
   try {
@@ -11,18 +12,31 @@ function tryParseJSON(value) {
   }
 }
 
+type ReadState = 'idle' | 'reading';
+
+interface Message {
+  id: number;
+  length: number;
+  json: string;
+}
+
 export default class Socket extends EventEmitter {
   sandbox: Sandbox;
 
-  worker: Worker;
+  worker: ChildProcess;
 
   socket: net.Socket;
 
   closed: boolean;
 
+  state: ReadState;
+
+  message: Message;
+
   constructor(socket, sandbox) {
     super();
 
+    this.state = 'idle';
     this.sandbox = sandbox;
     this.worker = sandbox.host.worker;
     this.socket = socket;
@@ -47,53 +61,74 @@ export default class Socket extends EventEmitter {
     return !this.closed && this.worker === this.sandbox.host.worker;
   }
 
+  handleFirstBuffer = (data) => {
+
+  };
+
+  handleLastBuffer = (data) => {
+
+  };
+
   handleData = (data) => {
-    const id = data.readInt32BE();
-    const json = data.toString('utf8', 4);
+    if (!this.message) {
+      this.message = {
+        id: data.readInt32BE(0),
+        length: data.readInt32BE(4),
+        json: data.toString('utf8', 8)
+      };
+    } else {
+      this.message.json += data.toString('utf8');
+    }
 
-    const message = tryParseJSON(json);
+    if (Buffer.byteLength(this.message.json) === this.message.length) {
+      const { id, json } = this.message;
 
-    const callback = id > 0 && ((...args) => {
-      if (this.isConnected) {
-        this.sandbox.host.callback(id, args);
-      }
-    });
+      this.message = null;
 
-    const write = (result) => {
-      const string = JSON.stringify({ id, result: result || { value: undefined } });
-      const length = Buffer.byteLength(string, 'utf8');
-      const buffer = Buffer.alloc(length + 4);
+      const message = tryParseJSON(json);
 
-      buffer.writeInt32BE(length);
-      buffer.write(string, 4);
-
-      if (this.isConnected) {
-        this.socket.write(buffer);
-      }
-    };
-
-    const respond = (value) => {
-      write({ value });
-    };
-
-    const fail = (error) => {
-      write({
-        error: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
+      const callback = id > 0 && ((...args) => {
+        if (this.isConnected) {
+          this.sandbox.host.callback(id, args);
         }
       });
-    };
 
-    try {
-      if (message == null) {
-        throw new Error('invalid dispatch');
+      const write = (result) => {
+        const string = JSON.stringify({ id, result: result || { value: undefined } });
+        const length = Buffer.byteLength(string, 'utf8');
+        const buffer = Buffer.alloc(length + 4);
+
+        buffer.writeInt32BE(length);
+        buffer.write(string, 4);
+
+        if (this.isConnected) {
+          this.socket.write(buffer);
+        }
+      };
+
+      const respond = (value) => {
+        write({ value });
+      };
+
+      const fail = (error) => {
+        write({
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          }
+        });
+      };
+
+      try {
+        if (message == null) {
+          throw new Error('invalid dispatch');
+        }
+
+        this.sandbox.dispatch(message, { fail, respond, callback });
+      } catch (ex) {
+        fail(ex);
       }
-
-      this.sandbox.dispatch(message, { fail, respond, callback });
-    } catch (ex) {
-      fail(ex);
     }
   };
 
