@@ -207,20 +207,6 @@ void Sandbox::Execute(const char *code) {
     (void)script.ToLocalChecked()->Run(context);
   }
 
-  // If the script ran to completion and has no pending operations, return the result.
-  // This allows the sandbox to execute scripts without requiring setResult for simple scripts.
-  if (!hasResult_ && !tryCatch.HasCaught() && pendingOperations_.size() == 0) {
-    auto result = Nan::New<Object>();
-
-    auto value = Nan::Get(context->Global(), Nan::New("_result").ToLocalChecked());
-
-    Nan::Utf8String resultValue(value.ToLocalChecked());
-
-    Nan::Set(result, Nan::New("value").ToLocalChecked(), value.ToLocalChecked());
-
-    SetResult(context, result);
-  }
-
   MaybeHandleError(tryCatch, context);
 }
 
@@ -249,9 +235,9 @@ void Sandbox::Callback(int id, const char *args) {
     Nan::Call(callback, global, 1, argv);
   }
 
-  MaybeHandleError(tryCatch, context);
-
   pendingOperations_.erase(id);
+
+  MaybeHandleError(tryCatch, context);
 }
 
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
@@ -295,9 +281,13 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
 Sandbox *Sandbox::GetSandboxFromContext() {
   auto context = Isolate::GetCurrent()->GetCurrentContext();
 
-  auto hidden = Nan::GetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked()).ToLocalChecked();
+  auto hidden = Nan::GetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked());
 
-  Local<External> field = Local<External>::Cast(hidden);
+  if (hidden.IsEmpty()) {
+    return nullptr;
+  }
+
+  Local<External> field = Local<External>::Cast(hidden.ToLocalChecked());
 
   Sandbox *sandbox = (Sandbox *)field->Value();
 
@@ -324,13 +314,15 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
 
   std::string message(arguments);
 
+  if (std::string(name) == "setResult") {
+    // Debug("setResult");
+    // Debug(arguments);
+    hasResult_ = true;
+  }
+
   WriteData((uv_stream_t *)pipe_, id, message);
 
   uv_run(loop_, UV_RUN_DEFAULT);
-
-  if (std::string(name) == "setResult") {
-    hasResult_ = true;
-  }
 
   return result_;
 }
