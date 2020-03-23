@@ -645,7 +645,9 @@ for (let i = 0; i < 5000; ++i) {
     sandbox.shutdown();
   });
 
-  it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
+  it('should allow crossing between nodejs and sandbox with custom async functions', async function() {
+    this.timeout(6000);
+
     const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
@@ -727,7 +729,9 @@ setResult({ value: executeWithContext() });
     sandbox.shutdown();
   });
 
-  it('should support large payloads', async () => {
+  it('should support large payloads', async function() {
+    this.timeout(6000);
+
     const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
