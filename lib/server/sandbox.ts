@@ -117,7 +117,11 @@ export default class Host {
         timeout,
         context: context || {},
         output: [],
-        callback: resolve
+        callback: (result: Result) => {
+          this.initialized = false;
+
+          resolve(result);
+        }
       });
     });
   }

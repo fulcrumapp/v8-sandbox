@@ -160,7 +160,10 @@ class Host {
         timeout,
         context: context || {},
         output: [],
-        callback: resolve
+        callback: result => {
+          this.initialized = false;
+          resolve(result);
+        }
       });
     });
   }
