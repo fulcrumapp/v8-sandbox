@@ -131,10 +131,4 @@ const worker = new Worker();
 process.on('message', message => {
   worker.queue.push(message);
 });
-process.on('SIGTERM', () => {
-  if (globalSandbox) {
-    globalSandbox.shutdown();
-    process.exit();
-  }
-});
 //# sourceMappingURL=worker.js.map

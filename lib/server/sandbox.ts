@@ -6,6 +6,7 @@ import Socket from './socket';
 import Functions from './functions';
 import async from 'async';
 import { once } from 'lodash';
+import onExit from 'signal-exit';
 
 export interface Log {
   type: string;
@@ -66,17 +67,7 @@ export default class Host {
   functions: Functions;
 
   constructor({ require, template } = { require: null, template: null }) {
-    this.id = `v8-sandbox-socket-${ process.pid }-${ ++nextID }`;
-
-    this.server = net.createServer();
-    this.server.on('connection', this.handleConnection);
-    this.server.on('error', this.handleError);
-
-    this.cleanupSocket();
-
-    this.server.listen(this.socketName);
-
-    this.queue = async.queue(this.processMessage, 1);
+    this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
@@ -84,7 +75,11 @@ export default class Host {
     this.template = template || '';
     this.functions = new Functions(this, { require });
 
-    this.fork();
+    this.start();
+
+    onExit((code, signal) => {
+      this.shutdown();
+    });
   }
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
@@ -104,6 +99,8 @@ export default class Host {
   }
 
   async execute({ code, context, timeout }) {
+    this.start();
+
     const result = await this.initialize({ timeout });
 
     if (result.error) {
@@ -167,6 +164,26 @@ export default class Host {
     }
   }
 
+  start() {
+    if (this.server) {
+      return;
+    }
+
+    this.shutdown(null);
+
+    this.server = net.createServer();
+    this.server.on('connection', this.handleConnection);
+    this.server.on('error', this.handleError);
+
+    this.cleanupSocket();
+
+    this.server.listen(this.socketName);
+
+    this.queue = async.queue(this.processMessage, 1);
+
+    this.fork();
+  }
+
   shutdown(callback) {
     this.functions.clearTimers();
 
@@ -174,15 +191,20 @@ export default class Host {
 
     if (this.socket) {
       this.socket.shutdown();
+      this.socket = null;
     }
 
-    this.server.close(() => {
-      this.cleanupSocket();
+    if (this.server) {
+      this.server.close(() => {
+        this.cleanupSocket();
 
-      if (callback) {
-        callback();
-      }
-    });
+        if (callback) {
+          callback();
+        }
+      });
+
+      this.server = null;
+    }
   }
 
   handleTimeout = () => {

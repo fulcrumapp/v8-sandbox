@@ -21,6 +21,8 @@ var _async = _interopRequireDefault(require("async"));
 
 var _lodash = require("lodash");
 
+var _signalExit = _interopRequireDefault(require("signal-exit"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -105,20 +107,17 @@ class Host {
       console.error('server error', error);
     });
 
-    this.id = `v8-sandbox-socket-${process.pid}-${++nextID}`;
-    this.server = _net.default.createServer();
-    this.server.on('connection', this.handleConnection);
-    this.server.on('error', this.handleError);
-    this.cleanupSocket();
-    this.server.listen(this.socketName);
-    this.queue = _async.default.queue(this.processMessage, 1);
+    this.id = `v8-sandbox-${process.pid}-${++nextID}`;
     this.initializeTimeout = new _timer.default();
     this.executeTimeout = new _timer.default();
     this.template = template || '';
     this.functions = new _functions.default(this, {
       require
     });
-    this.fork();
+    this.start();
+    (0, _signalExit.default)((code, signal) => {
+      this.shutdown();
+    });
   }
 
   initialize({
@@ -145,6 +144,7 @@ class Host {
     context,
     timeout
   }) {
+    this.start();
     const result = await this.initialize({
       timeout
     });
@@ -218,21 +218,40 @@ class Host {
     }
   }
 
+  start() {
+    if (this.server) {
+      return;
+    }
+
+    this.shutdown(null);
+    this.server = _net.default.createServer();
+    this.server.on('connection', this.handleConnection);
+    this.server.on('error', this.handleError);
+    this.cleanupSocket();
+    this.server.listen(this.socketName);
+    this.queue = _async.default.queue(this.processMessage, 1);
+    this.fork();
+  }
+
   shutdown(callback) {
     this.functions.clearTimers();
     this.kill();
 
     if (this.socket) {
       this.socket.shutdown();
+      this.socket = null;
     }
 
-    this.server.close(() => {
-      this.cleanupSocket();
+    if (this.server) {
+      this.server.close(() => {
+        this.cleanupSocket();
 
-      if (callback) {
-        callback();
-      }
-    });
+        if (callback) {
+          callback();
+        }
+      });
+      this.server = null;
+    }
   }
 
   callback(id, args) {

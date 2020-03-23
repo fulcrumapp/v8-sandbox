@@ -13,6 +13,8 @@ var _async = _interopRequireDefault(require("async"));
 
 var _os = _interopRequireDefault(require("os"));
 
+var _signalExit = _interopRequireDefault(require("signal-exit"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -69,6 +71,9 @@ class Cluster {
     this._activeWorkers = [];
     this._queue = _async.default.queue(this.worker, this._workerCount);
     this.ensureWorkers();
+    (0, _signalExit.default)((code, signal) => {
+      this.shutdown();
+    });
   }
 
   shutdown() {

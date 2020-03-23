@@ -1,5 +1,6 @@
 // import Sandbox from '../dist/server/sandbox';
 import Sandbox from '../dist/cluster/cluster';
+import SimpleSandbox from '../dist/server/sandbox';
 import fs from 'fs';
 import path from 'path';
 
@@ -741,6 +742,42 @@ setResult({ value: fetchLargeValue() });
     const { value } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(value.length, 3488889);
+
+    sandbox.shutdown();
+  });
+
+  it('should support multiple initialization and not keep data around across execute calls', async () => {
+    const sandbox = new SimpleSandbox({ require: REQUIRE });
+
+    const code = 'global.currentValue = 1; setResult({ value: global.currentValue });';
+
+    await sandbox.initialize({ timeout: 3000 });
+    await sandbox.initialize({ timeout: 3000 });
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 1);
+
+    const result = await sandbox.execute({ code: 'setResult({ value: global.currentValue });', timeout: 3000 });
+
+    assert.equal(result.value, null);
+
+    sandbox.shutdown();
+  });
+
+  it('should support shutdown and restart', async () => {
+    const sandbox = new SimpleSandbox({ require: REQUIRE });
+
+    const code = 'setResult({ value: 1 });';
+
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 1);
+
+    sandbox.shutdown();
+
+    const result = await sandbox.execute({ code: 'setResult({ value: 1 });', timeout: 3000 });
+
+    assert.equal(result.value, 1);
 
     sandbox.shutdown();
   });

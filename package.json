@@ -1,6 +1,6 @@
 {
   "name": "v8-sandbox",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "V8 Sandbox",
   "homepage": "http://github.com/fulcrumapp/v8-sandbox",
   "main": "dist/index.js",
@@ -53,7 +53,8 @@
     "nan": "^2.14.0",
     "node-gyp": "^6.1.0",
     "node-pre-gyp": "^0.14.0",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "signal-exit": "^3.0.2"
   },
   "binary": {
     "module_name": "sandbox",

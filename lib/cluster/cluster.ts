@@ -2,6 +2,7 @@ import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
 import os from 'os';
+import onExit from 'signal-exit';
 
 class TimeoutError extends Error {
   get isTimeout() {
@@ -51,6 +52,10 @@ export default class Cluster {
     this._activeWorkers = [];
     this._queue = async.queue(this.worker, this._workerCount);
     this.ensureWorkers();
+
+    onExit((code, signal) => {
+      this.shutdown();
+    });
   }
 
   shutdown() {
