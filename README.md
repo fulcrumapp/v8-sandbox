@@ -25,12 +25,14 @@ npm install v8-sandbox
 
 ## API
 
+You must use `setResult({ value, error })` function to set the result of the execution. Using this function is required in order to fully support async code and promises within the sandbox.
+
 ```js
 import Sandbox from 'v8-sandbox';
 
 const sandbox = new Sandbox();
 
-const code = '1 + 2';
+const code = 'setResult({ value: 1 + 2 });';
 
 (async () => {
   const { error, value } = await sandbox.execute({ code, timeout: 3000 });
