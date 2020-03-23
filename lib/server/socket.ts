@@ -1,8 +1,6 @@
-import EventEmitter from 'events';
-import Sandbox from './sandbox';
-import Worker from '../client/worker';
 import net from 'net';
 import { ChildProcess } from 'child_process';
+import Sandbox from './sandbox';
 
 function tryParseJSON(value) {
   try {
@@ -12,15 +10,13 @@ function tryParseJSON(value) {
   }
 }
 
-type ReadState = 'idle' | 'reading';
-
 interface Message {
   id: number;
   length: number;
   json: string;
 }
 
-export default class Socket extends EventEmitter {
+export default class Socket {
   sandbox: Sandbox;
 
   worker: ChildProcess;
@@ -29,16 +25,11 @@ export default class Socket extends EventEmitter {
 
   closed: boolean;
 
-  state: ReadState;
-
   message: Message;
 
   constructor(socket, sandbox) {
-    super();
-
-    this.state = 'idle';
     this.sandbox = sandbox;
-    this.worker = sandbox.host.worker;
+    this.worker = sandbox.worker;
     this.socket = socket;
     this.socket.on('data', this.handleData);
     this.socket.on('end', this.handleEnd);
@@ -56,18 +47,10 @@ export default class Socket extends EventEmitter {
   }
 
   get isConnected() {
-    // make sure the current host is the host we started with. The host might've
+    // make sure the current sandbox worker is the worker we started with. The worker might've
     // been replaced by the time this is invoked.
-    return !this.closed && this.worker === this.sandbox.host.worker;
+    return !this.closed && this.worker === this.sandbox.worker;
   }
-
-  handleFirstBuffer = (data) => {
-
-  };
-
-  handleLastBuffer = (data) => {
-
-  };
 
   handleData = (data) => {
     if (!this.message) {
@@ -89,7 +72,7 @@ export default class Socket extends EventEmitter {
 
       const callback = id > 0 && ((...args) => {
         if (this.isConnected) {
-          this.sandbox.host.callback(id, args);
+          this.sandbox.callback(id, args);
         }
       });
 

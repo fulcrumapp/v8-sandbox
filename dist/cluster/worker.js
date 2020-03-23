@@ -14,6 +14,18 @@ let globalSandbox = null;
 
 class Worker {
   constructor() {
+    _defineProperty(this, "require", void 0);
+
+    _defineProperty(this, "template", void 0);
+
+    _defineProperty(this, "queue", void 0);
+
+    _defineProperty(this, "sandbox", void 0);
+
+    _defineProperty(this, "initialized", void 0);
+
+    _defineProperty(this, "error", void 0);
+
     _defineProperty(this, "worker", async message => {
       if (message.initialize) {
         await this.onInitialize(message);
@@ -87,7 +99,8 @@ class Worker {
 
   async execute({
     code,
-    context
+    context,
+    timeout
   }) {
     (0, _assert.default)(this.initialized);
     let result;
@@ -95,6 +108,7 @@ class Worker {
     if (!this.error) {
       result = await this.sandbox.execute({
         code,
+        timeout,
         context: JSON.parse(context)
       });
     } else {

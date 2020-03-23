@@ -4,7 +4,28 @@ import assert from 'assert';
 
 let globalSandbox = null;
 
+interface Message {
+  initialize: boolean;
+  require?: string;
+  template?: string;
+  code?: string;
+  context?: string;
+  timeout: string;
+}
+
 class Worker {
+  require: string;
+
+  template: string;
+
+  queue: async.AsyncQueue<Message>;
+
+  sandbox: Sandbox;
+
+  initialized: boolean;
+
+  error: any;
+
   constructor() {
     this.queue = async.queue(this.worker, 1);
   }
@@ -54,13 +75,13 @@ class Worker {
     });
   }
 
-  async execute({ code, context }) {
+  async execute({ code, context, timeout }: Message) {
     assert(this.initialized);
 
     let result;
 
     if (!this.error) {
-      result = await this.sandbox.execute({ code, context: JSON.parse(context) });
+      result = await this.sandbox.execute({ code, timeout, context: JSON.parse(context) });
     } else {
       result = { error: this.error };
     }
@@ -74,7 +95,7 @@ class Worker {
     });
   }
 
-  worker = async (message) => {
+  worker = async (message: Message) => {
     if (message.initialize) {
       await this.onInitialize(message);
     } else {
@@ -82,14 +103,14 @@ class Worker {
     }
   };
 
-  onInitialize = async (message) => {
+  onInitialize = async (message: Message) => {
     this.require = message.require;
     this.template = message.template;
 
     await this.create();
   };
 
-  onExecute = async (message) => {
+  onExecute = async (message: Message) => {
     await this.wait();
 
     await this.execute(message);

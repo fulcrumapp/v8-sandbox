@@ -5,10 +5,6 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-var _events = _interopRequireDefault(require("events"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 function tryParseJSON(value) {
@@ -19,10 +15,8 @@ function tryParseJSON(value) {
   }
 }
 
-class Socket extends _events.default {
+class Socket {
   constructor(socket, sandbox) {
-    super();
-
     _defineProperty(this, "sandbox", void 0);
 
     _defineProperty(this, "worker", void 0);
@@ -31,13 +25,7 @@ class Socket extends _events.default {
 
     _defineProperty(this, "closed", void 0);
 
-    _defineProperty(this, "state", void 0);
-
     _defineProperty(this, "message", void 0);
-
-    _defineProperty(this, "handleFirstBuffer", data => {});
-
-    _defineProperty(this, "handleLastBuffer", data => {});
 
     _defineProperty(this, "handleData", data => {
       if (!this.message) {
@@ -60,7 +48,7 @@ class Socket extends _events.default {
 
         const callback = id > 0 && ((...args) => {
           if (this.isConnected) {
-            this.sandbox.host.callback(id, args);
+            this.sandbox.callback(id, args);
           }
         });
 
@@ -129,9 +117,8 @@ class Socket extends _events.default {
       this.closed = true;
     });
 
-    this.state = 'idle';
     this.sandbox = sandbox;
-    this.worker = sandbox.host.worker;
+    this.worker = sandbox.worker;
     this.socket = socket;
     this.socket.on('data', this.handleData);
     this.socket.on('end', this.handleEnd);
@@ -149,9 +136,9 @@ class Socket extends _events.default {
   }
 
   get isConnected() {
-    // make sure the current host is the host we started with. The host might've
+    // make sure the current sandbox worker is the worker we started with. The worker might've
     // been replaced by the time this is invoked.
-    return !this.closed && this.worker === this.sandbox.host.worker;
+    return !this.closed && this.worker === this.sandbox.worker;
   }
 
 }

@@ -1,5 +1,5 @@
-import Sandbox from '../dist/server/sandbox';
-// import Sandbox from '../dist/cluster/cluster';
+// import Sandbox from '../dist/server/sandbox';
+import Sandbox from '../dist/cluster/cluster';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,7 +12,7 @@ const runWithTimeout = async (code, timeout) => {
 };
 
 const run = (code) => {
-  return runWithTimeout(code, 5000);
+  return runWithTimeout(code, 4000);
 };
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
@@ -40,13 +40,13 @@ describe('sandbox', () => {
     assert.equal(value, 'hi');
   });
 
-  // it('should execute simple script with multiple setResult calls', async () => {
-  //   const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
+  it('should execute simple script with multiple setResult calls', async () => {
+    const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
 
-  //   const { value } = await run(js);
+    const { value } = await run(js);
 
-  //   assert.equal(value, 'hi');
-  // });
+    assert.equal(value, 'hi');
+  });
 
   it('should execute simple httpRequest', async () => {
     const js = `
@@ -139,23 +139,23 @@ new Promise((resolve) => {
     assert.equal(value, 1);
   });
 
-  //   it('should handle async function with no setResult', async () => {
-  //     const js = `
-  // (async () => {
-  //   return await new Promise((resolve) => {
-  //     setTimeout(() => {
-  //       resolve();
-  //     }, 20);
-  //   });
-  // })();
+  it('should handle async function with no setResult', async function() {
+    this.timeout(6000);
 
-  // 1;
-  // `;
+    const js = `
+  (async () => {
+    return await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 20);
+    });
+  })();
+  `;
 
-  //     const { value } = await run(js);
+    const { error } = await run(js);
 
-  //     assert.equal(value, 1);
-  //   });
+    assert.equal(error.isTimeout, true);
+  });
 
   it('should handle multiple async functions', async () => {
     const js = `
@@ -597,9 +597,9 @@ setTimeout(() => {
 `;
 
     for (let count = 0; count < 20; ++count) {
-      const { value } = await sandbox.execute({ code, timeout: 3000 });
+      const res = await sandbox.execute({ code, timeout: 3000 });
 
-      assert.equal(value, 3);
+      assert.equal(res.value, 3);
     }
 
     sandbox.shutdown();
