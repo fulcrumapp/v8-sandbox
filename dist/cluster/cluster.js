@@ -15,6 +15,8 @@ var _os = _interopRequireDefault(require("os"));
 
 var _signalExit = _interopRequireDefault(require("signal-exit"));
 
+var _lodash = require("lodash");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -180,6 +182,7 @@ class Cluster {
     context,
     timeout
   }, callback) {
+    callback = (0, _lodash.once)(callback);
     this.popWorker(worker => {
       worker.removeAllListeners();
       worker.on('message', message => {

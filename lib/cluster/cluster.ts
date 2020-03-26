@@ -3,6 +3,7 @@ import path from 'path';
 import async from 'async';
 import os from 'os';
 import onExit from 'signal-exit';
+import { once } from 'lodash';
 
 class TimeoutError extends Error {
   get isTimeout() {
@@ -159,6 +160,8 @@ export default class Cluster {
   }
 
   _execute({ code, context, timeout }, callback) {
+    callback = once(callback);
+
     this.popWorker((worker) => {
       worker.removeAllListeners();
 
