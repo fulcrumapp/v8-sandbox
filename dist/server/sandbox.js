@@ -9,6 +9,8 @@ var _path = _interopRequireDefault(require("path"));
 
 var _net = _interopRequireDefault(require("net"));
 
+var _fs = _interopRequireDefault(require("fs"));
+
 var _child_process = require("child_process");
 
 var _timer = _interopRequireDefault(require("./timer"));
@@ -36,7 +38,7 @@ class TimeoutError extends Error {
 
 let nextID = 0;
 
-class Host {
+class Sandbox {
   constructor({
     require,
     template
@@ -116,7 +118,7 @@ class Host {
     });
     this.start();
     (0, _signalExit.default)((code, signal) => {
-      this.shutdown();
+      this.shutdown(null);
     });
   }
 
@@ -213,7 +215,7 @@ class Host {
 
   cleanupSocket() {
     try {
-      fs.unlinkSync(this.socketName);
+      _fs.default.unlinkSync(this.socketName);
     } catch (ex) {// silent
     }
   }
@@ -303,5 +305,5 @@ class Host {
 
 }
 
-exports.default = Host;
+exports.default = Sandbox;
 //# sourceMappingURL=sandbox.js.map

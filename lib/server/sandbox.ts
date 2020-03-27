@@ -1,5 +1,6 @@
 import path from 'path';
 import net from 'net';
+import fs from 'fs';
 import { fork, ChildProcess } from 'child_process';
 import Timer from './timer';
 import Socket from './socket';
@@ -30,7 +31,6 @@ export interface Message {
   code?: string;
   context?: any;
   output: Log[];
-  // result: Result;
   timeout: number;
   callback: Function;
 }
@@ -43,7 +43,7 @@ class TimeoutError extends Error {
 
 let nextID = 0;
 
-export default class Host {
+export default class Sandbox {
   id: string;
 
   template: string;
@@ -78,7 +78,7 @@ export default class Host {
     this.start();
 
     onExit((code, signal) => {
-      this.shutdown();
+      this.shutdown(null);
     });
   }
 
