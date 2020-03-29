@@ -38,7 +38,7 @@ defineAsync('errorAsyncCallback', ([ param1 ], { fail, callback }) => {
 
 defineAsync('executeWithContext', ([ param1 ], { fail, respond }) => {
   setTimeout(() => {
-    respond(global.context.customValue);
+    respond(global.customValue);
   }, 1);
 });
 

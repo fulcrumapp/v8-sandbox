@@ -9,8 +9,9 @@ interface Message {
   require?: string;
   template?: string;
   code?: string;
-  context?: string;
-  timeout: string;
+  globals?: string;
+  nodeGlobals?: string;
+  timeout: number;
 }
 
 class Worker {
@@ -73,13 +74,18 @@ class Worker {
     });
   }
 
-  async execute({ code, context, timeout }: Message) {
+  async execute({ code, timeout, globals, nodeGlobals }: Message) {
     assert(this.initialized);
 
     let result;
 
     if (!this.error) {
-      result = await this.sandbox.execute({ code, timeout, context: JSON.parse(context) });
+      result = await this.sandbox.execute({
+        code,
+        timeout,
+        globals: JSON.parse(globals),
+        nodeGlobals: JSON.parse(nodeGlobals)
+      });
     } else {
       result = { error: this.error };
     }

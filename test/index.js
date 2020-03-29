@@ -722,18 +722,36 @@ errorAsync(1, 2);
     sandbox.shutdown();
   });
 
-  it('should support context variable for custom nodejs functions', async () => {
+  it('should support global variable for custom nodejs functions', async () => {
     const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = `
 setResult({ value: executeWithContext() });
 `;
 
-    const context = {
+    const nodeGlobals = {
       customValue: 'hi'
     };
 
-    const { value } = await sandbox.execute({ code, context, timeout: 3000 });
+    const { value } = await sandbox.execute({ code, nodeGlobals, timeout: 3000 });
+
+    assert.equal(value, 'hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should support global variable in the sandbox', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE });
+
+    const code = `
+setResult({ value: customValue });
+`;
+
+    const globals = {
+      customValue: 'hi'
+    };
+
+    const { value } = await sandbox.execute({ code, globals, timeout: 3000 });
 
     assert.equal(value, 'hi');
 

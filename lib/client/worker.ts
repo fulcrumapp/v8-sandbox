@@ -35,12 +35,17 @@ export default class Worker {
     this._execute(code);
   }
 
-  execute({ code }) {
+  execute({ code, globals }) {
     this.reset(false);
 
     this.connect();
 
-    this._execute(wrapCode(code));
+    const withGlobals = [
+      `Object.assign(global, ${ globals });`,
+      code
+    ].join('\n');
+
+    this._execute(wrapCode(withGlobals));
   }
 
   _execute(code) {

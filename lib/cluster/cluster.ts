@@ -4,7 +4,7 @@ import async from 'async';
 import os from 'os';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
-import { Options, TimeoutError } from '../server/sandbox';
+import { Options, ExecutionOptions, TimeoutError } from '../server/sandbox';
 
 interface ClusterOptions extends Options {
   workers?: number;
@@ -18,12 +18,6 @@ function remove(array, object) {
   }
 }
 
-interface Item {
-  code: string;
-  timeout: number;
-  context: any;
-}
-
 export default class Cluster {
   workerCount: number;
 
@@ -31,7 +25,7 @@ export default class Cluster {
 
   activeWorkers: ChildProcess[];
 
-  queue: async.AsyncQueue<Item>;
+  queue: async.AsyncQueue<ExecutionOptions>;
 
   sandboxOptions: Options;
 
@@ -140,17 +134,20 @@ export default class Cluster {
     this.ensureWorkers();
   }
 
-  execute({ code, context, timeout }) {
-    const item = {
-      code, timeout, context
-    };
-
+  execute({ code, timeout, globals, nodeGlobals }: ExecutionOptions) {
     return new Promise((resolve, reject) => {
+      const item = {
+        code,
+        timeout,
+        globals: globals || {},
+        nodeGlobals: nodeGlobals || {}
+      };
+
       this.queue.push(item, resolve);
     });
   }
 
-  _execute({ code, context, timeout }, callback) {
+  _execute({ code, timeout, globals, nodeGlobals }, callback) {
     callback = once(callback);
 
     this.popWorker((worker) => {
@@ -180,13 +177,17 @@ export default class Cluster {
 
       if (timeout > 0) {
         worker.executionTimeout = setTimeout(() => {
-          // worker.kill();
           this.removeWorker(worker);
           callback({ error: new TimeoutError('timeout') });
         }, timeout);
       }
 
-      worker.send({ code, context: JSON.stringify(context || {}) });
+      worker.send({
+        code,
+        timeout,
+        globals: JSON.stringify(globals),
+        nodeGlobals: JSON.stringify(nodeGlobals)
+      });
     });
   }
 }
