@@ -20,11 +20,17 @@ const ASYNC_FUNCTIONS = {};
 
 class Functions {
   constructor(sandbox, {
-    require
+    require,
+    httpEnabled,
+    timersEnabled
   }) {
     _defineProperty(this, "sandbox", void 0);
 
     _defineProperty(this, "require", void 0);
+
+    _defineProperty(this, "httpEnabled", void 0);
+
+    _defineProperty(this, "timersEnabled", void 0);
 
     _defineProperty(this, "timers", void 0);
 
@@ -42,6 +48,8 @@ class Functions {
 
     this.sandbox = sandbox;
     this.require = require;
+    this.httpEnabled = httpEnabled !== null && httpEnabled !== void 0 ? httpEnabled : true;
+    this.timersEnabled = timersEnabled !== null && timersEnabled !== void 0 ? timersEnabled : true;
     this.timers = {};
     this.setup();
   }
@@ -140,9 +148,14 @@ class Functions {
   }
 
   setTimeout([timeout], {
+    fail,
     respond,
     callback
   }) {
+    if (!this.timersEnabled) {
+      return fail(new Error('setTimeout is disabled'));
+    }
+
     const timer = new _timer.default();
     timer.start(timeout || 0, callback);
     const id = timer.id;
@@ -151,8 +164,13 @@ class Functions {
   }
 
   clearTimeout([timerID], {
+    fail,
     respond
   }) {
+    if (!this.timersEnabled) {
+      return fail(new Error('clearTimeout is disabled'));
+    }
+
     const timer = this.timers[+timerID];
 
     if (timer) {
@@ -168,6 +186,10 @@ class Functions {
     fail,
     callback
   }) {
+    if (!this.httpEnabled) {
+      return fail(new Error('httpRequest is disabled'));
+    }
+
     options = options || {};
     (0, _request.default)(this.processRequestOptions(options), (err, response, body) => {
       if (response && Buffer.isBuffer(response.body)) {

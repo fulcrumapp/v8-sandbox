@@ -14,11 +14,9 @@ let globalSandbox = null;
 
 class Worker {
   constructor() {
-    _defineProperty(this, "require", void 0);
-
-    _defineProperty(this, "template", void 0);
-
     _defineProperty(this, "queue", void 0);
+
+    _defineProperty(this, "sandboxOptions", void 0);
 
     _defineProperty(this, "sandbox", void 0);
 
@@ -35,8 +33,7 @@ class Worker {
     });
 
     _defineProperty(this, "onInitialize", async message => {
-      this.require = message.require;
-      this.template = message.template;
+      this.sandboxOptions = message;
       await this.create();
     });
 
@@ -50,10 +47,7 @@ class Worker {
 
   create() {
     if (!globalSandbox) {
-      globalSandbox = new _sandbox.default({
-        require: this.require,
-        template: this.template
-      });
+      globalSandbox = new _sandbox.default(this.sandboxOptions);
     }
 
     this.sandbox = globalSandbox;

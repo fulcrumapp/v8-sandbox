@@ -17,16 +17,11 @@ var _signalExit = _interopRequireDefault(require("signal-exit"));
 
 var _lodash = require("lodash");
 
+var _sandbox = require("../server/sandbox");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-class TimeoutError extends Error {
-  get isTimeout() {
-    return true;
-  }
-
-}
 
 function remove(array, object) {
   const index = array.indexOf(object);
@@ -39,39 +34,31 @@ function remove(array, object) {
 class Cluster {
   constructor({
     workers,
-    require,
-    template
-  } = {
-    workers: null,
-    require: null,
-    template: null
-  }) {
-    _defineProperty(this, "_workerCount", void 0);
+    ...options
+  } = {}) {
+    _defineProperty(this, "workerCount", void 0);
 
-    _defineProperty(this, "_require", void 0);
+    _defineProperty(this, "inactiveWorkers", void 0);
 
-    _defineProperty(this, "_template", void 0);
+    _defineProperty(this, "activeWorkers", void 0);
 
-    _defineProperty(this, "_inactiveWorkers", void 0);
+    _defineProperty(this, "queue", void 0);
 
-    _defineProperty(this, "_activeWorkers", void 0);
-
-    _defineProperty(this, "_queue", void 0);
+    _defineProperty(this, "sandboxOptions", void 0);
 
     _defineProperty(this, "worker", (task, callback) => {
       this._execute(task, callback);
     });
 
-    this._workerCount = workers || Math.max(_os.default.cpus().length, 4);
-    this._require = require;
-    this._template = template;
+    this.workerCount = workers || Math.max(_os.default.cpus().length, 4);
+    this.sandboxOptions = options;
     this.start();
   }
 
   start() {
-    this._inactiveWorkers = [];
-    this._activeWorkers = [];
-    this._queue = _async.default.queue(this.worker, this._workerCount);
+    this.inactiveWorkers = [];
+    this.activeWorkers = [];
+    this.queue = _async.default.queue(this.worker, this.workerCount);
     this.ensureWorkers();
     (0, _signalExit.default)((code, signal) => {
       this.shutdown();
@@ -79,40 +66,38 @@ class Cluster {
   }
 
   shutdown() {
-    for (const worker of this._inactiveWorkers) {
+    for (const worker of this.inactiveWorkers) {
       this.clearWorkerTimeout(worker);
       worker.removeAllListeners();
       worker.kill();
     }
 
-    for (const worker of this._activeWorkers) {
+    for (const worker of this.activeWorkers) {
       this.clearWorkerTimeout(worker);
       worker.removeAllListeners();
       worker.kill();
     }
 
-    this._inactiveWorkers = [];
-    this._activeWorkers = [];
+    this.inactiveWorkers = [];
+    this.activeWorkers = [];
 
-    if (this._queue) {
-      this._queue.kill();
+    if (this.queue) {
+      this.queue.kill();
     }
 
-    this._queue = _async.default.queue(this.worker, this._workerCount);
+    this.queue = _async.default.queue(this.worker, this.workerCount);
   }
 
   ensureWorkers() {
-    const total = this._inactiveWorkers.length + this._activeWorkers.length;
+    const total = this.inactiveWorkers.length + this.activeWorkers.length;
 
-    for (let i = 0; i < this._workerCount - total; ++i) {
+    for (let i = 0; i < this.workerCount - total; ++i) {
       const worker = this.forkWorker();
       worker.send({
         initialize: true,
-        require: this._require,
-        template: this._template
+        ...this.sandboxOptions
       });
-
-      this._inactiveWorkers.push(worker);
+      this.inactiveWorkers.push(worker);
     }
   }
 
@@ -123,18 +108,17 @@ class Cluster {
   popWorker(callback) {
     this.ensureWorkers();
 
-    if (this._inactiveWorkers.length === 0) {
+    if (this.inactiveWorkers.length === 0) {
       setImmediate(() => {
         this.popWorker(callback);
       });
       return;
     }
 
-    const worker = this._inactiveWorkers.shift();
+    const worker = this.inactiveWorkers.shift();
+    this.activeWorkers.push(worker);
 
-    this._activeWorkers.push(worker);
-
-    if (this._activeWorkers.length + this._inactiveWorkers.length !== this._workerCount) {
+    if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
       throw new Error('invalid worker count');
     }
 
@@ -148,17 +132,16 @@ class Cluster {
 
   finishWorker(worker) {
     this.clearWorkerTimeout(worker);
-    remove(this._activeWorkers, worker);
-
-    this._inactiveWorkers.push(worker);
+    remove(this.activeWorkers, worker);
+    this.inactiveWorkers.push(worker);
   }
 
   removeWorker(worker) {
     this.clearWorkerTimeout(worker);
     worker.kill();
     worker.removeAllListeners();
-    remove(this._activeWorkers, worker);
-    remove(this._inactiveWorkers, worker);
+    remove(this.activeWorkers, worker);
+    remove(this.inactiveWorkers, worker);
     this.ensureWorkers();
   }
 
@@ -173,7 +156,7 @@ class Cluster {
       context
     };
     return new Promise((resolve, reject) => {
-      this._queue.push(item, resolve);
+      this.queue.push(item, resolve);
     });
   }
 
@@ -210,7 +193,7 @@ class Cluster {
           // worker.kill();
           this.removeWorker(worker);
           callback({
-            error: new TimeoutError('timeout')
+            error: new _sandbox.TimeoutError('timeout')
           });
         }, timeout);
       }

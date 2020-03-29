@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = void 0;
+exports.default = exports.TimeoutError = void 0;
 
 var _path = _interopRequireDefault(require("path"));
 
@@ -13,17 +13,17 @@ var _fs = _interopRequireDefault(require("fs"));
 
 var _child_process = require("child_process");
 
-var _timer = _interopRequireDefault(require("./timer"));
-
-var _socket = _interopRequireDefault(require("./socket"));
-
-var _functions = _interopRequireDefault(require("./functions"));
-
 var _async = _interopRequireDefault(require("async"));
 
 var _lodash = require("lodash");
 
 var _signalExit = _interopRequireDefault(require("signal-exit"));
+
+var _timer = _interopRequireDefault(require("./timer"));
+
+var _socket = _interopRequireDefault(require("./socket"));
+
+var _functions = _interopRequireDefault(require("./functions"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -36,21 +36,25 @@ class TimeoutError extends Error {
 
 }
 
+exports.TimeoutError = TimeoutError;
 let nextID = 0;
 
 class Sandbox {
   constructor({
     require,
-    template
-  } = {
-    require: null,
-    template: null
-  }) {
+    template,
+    httpEnabled,
+    timersEnabled,
+    memory,
+    argv
+  } = {}) {
     _defineProperty(this, "id", void 0);
 
     _defineProperty(this, "template", void 0);
 
     _defineProperty(this, "initializeTimeout", void 0);
+
+    _defineProperty(this, "argv", void 0);
 
     _defineProperty(this, "executeTimeout", void 0);
 
@@ -67,6 +71,10 @@ class Sandbox {
     _defineProperty(this, "message", void 0);
 
     _defineProperty(this, "functions", void 0);
+
+    _defineProperty(this, "running", void 0);
+
+    _defineProperty(this, "memory", void 0);
 
     _defineProperty(this, "handleTimeout", () => {
       this.fork();
@@ -112,9 +120,13 @@ class Sandbox {
     this.id = `v8-sandbox-${process.pid}-${++nextID}`;
     this.initializeTimeout = new _timer.default();
     this.executeTimeout = new _timer.default();
+    this.memory = memory;
+    this.argv = argv !== null && argv !== void 0 ? argv : [];
     this.template = template || '';
     this.functions = new _functions.default(this, {
-      require
+      require,
+      httpEnabled,
+      timersEnabled
     });
     this.start();
     (0, _signalExit.default)((code, signal) => {
@@ -189,11 +201,30 @@ class Sandbox {
 
   fork() {
     this.kill();
-    this.worker = (0, _child_process.fork)(_path.default.join(__dirname, '..', 'client', 'worker'), [this.socketName]);
+    const execArgv = [...this.argv];
+
+    if (this.memory) {
+      execArgv.push(`--max-old-space-size=${this.memory}`);
+    }
+
+    const workerPath = _path.default.join(__dirname, '..', 'client', 'worker');
+
+    this.worker = (0, _child_process.fork)(workerPath, [this.socketName], {
+      execArgv
+    });
     this.worker.on('error', error => {
       this.fork();
       this.finish({
         error
+      });
+    });
+    this.worker.on('exit', () => {
+      if (this.running) {
+        this.fork();
+      }
+
+      this.finish({
+        error: new Error('worker exited')
       });
     });
   }
@@ -204,9 +235,13 @@ class Sandbox {
 
     if (this.worker) {
       this.worker.removeAllListeners();
-      this.worker.send({
-        type: 'exit'
-      });
+
+      if (this.worker.connected) {
+        this.worker.send({
+          type: 'exit'
+        });
+      }
+
       this.worker.kill();
       this.worker = null;
       this.initialized = false;
@@ -221,6 +256,8 @@ class Sandbox {
   }
 
   start() {
+    this.running = true;
+
     if (this.server) {
       return;
     }
@@ -236,6 +273,7 @@ class Sandbox {
   }
 
   shutdown(callback) {
+    this.running = false;
     this.functions.clearTimers();
     this.kill();
 
@@ -246,12 +284,11 @@ class Sandbox {
 
     if (this.server) {
       this.server.close(() => {
-        this.cleanupSocket();
-
         if (callback) {
           callback();
         }
       });
+      this.cleanupSocket();
       this.server = null;
     }
   }
