@@ -2,12 +2,12 @@ import path from 'path';
 import net from 'net';
 import fs from 'fs';
 import { fork, ChildProcess } from 'child_process';
-import Timer from './timer';
-import Socket from './socket';
-import Functions from './functions';
 import async from 'async';
 import { once } from 'lodash';
 import onExit from 'signal-exit';
+import Timer from './timer';
+import Socket from './socket';
+import Functions from './functions';
 
 export interface Log {
   type: string;
@@ -35,7 +35,16 @@ export interface Message {
   callback: Function;
 }
 
-class TimeoutError extends Error {
+export interface Options {
+  require?: string;
+  template?: string;
+  httpEnabled?: boolean;
+  timersEnabled?: boolean;
+  memory?: number;
+  argv?: string[];
+}
+
+export class TimeoutError extends Error {
   get isTimeout() {
     return true;
   }
@@ -49,6 +58,8 @@ export default class Sandbox {
   template: string;
 
   initializeTimeout: Timer;
+
+  argv: string[];
 
   executeTimeout: Timer;
 
@@ -66,14 +77,20 @@ export default class Sandbox {
 
   functions: Functions;
 
-  constructor({ require, template } = { require: null, template: null }) {
+  running: boolean;
+
+  memory: number;
+
+  constructor({ require, template, httpEnabled, timersEnabled, memory, argv }: Options = {}) {
     this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
+    this.memory = memory;
+    this.argv = argv ?? [];
 
     this.template = template || '';
-    this.functions = new Functions(this, { require });
+    this.functions = new Functions(this, { require, httpEnabled, timersEnabled });
 
     this.start();
 
@@ -135,11 +152,27 @@ export default class Sandbox {
   fork() {
     this.kill();
 
-    this.worker = fork(path.join(__dirname, '..', 'client', 'worker'), [ this.socketName ]);
+    const execArgv = [ ...this.argv ];
+
+    if (this.memory) {
+      execArgv.push(`--max-old-space-size=${this.memory}`);
+    }
+
+    const workerPath = path.join(__dirname, '..', 'client', 'worker');
+
+    this.worker = fork(workerPath, [ this.socketName ], { execArgv });
 
     this.worker.on('error', (error) => {
       this.fork();
       this.finish({ error });
+    });
+
+    this.worker.on('exit', () => {
+      if (this.running) {
+        this.fork();
+      }
+
+      this.finish({ error: new Error('worker exited') });
     });
   }
 
@@ -149,7 +182,11 @@ export default class Sandbox {
 
     if (this.worker) {
       this.worker.removeAllListeners();
-      this.worker.send({ type: 'exit' });
+
+      if (this.worker.connected) {
+        this.worker.send({ type: 'exit' });
+      }
+
       this.worker.kill();
       this.worker = null;
       this.initialized = false;
@@ -165,6 +202,8 @@ export default class Sandbox {
   }
 
   start() {
+    this.running = true;
+
     if (this.server) {
       return;
     }
@@ -185,6 +224,8 @@ export default class Sandbox {
   }
 
   shutdown(callback) {
+    this.running = false;
+
     this.functions.clearTimers();
 
     this.kill();
@@ -196,12 +237,12 @@ export default class Sandbox {
 
     if (this.server) {
       this.server.close(() => {
-        this.cleanupSocket();
-
         if (callback) {
           callback();
         }
       });
+
+      this.cleanupSocket();
 
       this.server = null;
     }

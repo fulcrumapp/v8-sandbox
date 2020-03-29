@@ -20,15 +20,21 @@ export default class Functions {
 
   require: string;
 
+  httpEnabled: boolean;
+
+  timersEnabled: boolean;
+
   timers: Timers;
 
   syncFunctions: CustomFunctions;
 
   asyncFunctions: CustomFunctions;
 
-  constructor(sandbox, { require }) {
+  constructor(sandbox, { require, httpEnabled, timersEnabled }) {
     this.sandbox = sandbox;
     this.require = require;
+    this.httpEnabled = httpEnabled ?? true;
+    this.timersEnabled = timersEnabled ?? true;
     this.timers = {};
 
     this.setup();
@@ -73,7 +79,7 @@ export default class Functions {
   }
 
   dispatch({ name, args }, { message, fail, respond, callback }) {
-    const params = [ args, { message, respond, fail, callback } ];
+    const params: [ any, any ] = [ args, { message, respond, fail, callback } ];
 
     switch (name) {
       case 'setResult': {
@@ -112,7 +118,11 @@ export default class Functions {
     respond();
   }
 
-  setTimeout([ timeout ], { respond, callback }) {
+  setTimeout([ timeout ], { fail, respond, callback }) {
+    if (!this.timersEnabled) {
+      return fail(new Error('setTimeout is disabled'));
+    }
+
     const timer = new Timer();
 
     timer.start(timeout || 0, callback);
@@ -124,7 +134,11 @@ export default class Functions {
     respond(id);
   }
 
-  clearTimeout([ timerID ], { respond }) {
+  clearTimeout([ timerID ], { fail, respond }) {
+    if (!this.timersEnabled) {
+      return fail(new Error('clearTimeout is disabled'));
+    }
+
     const timer = this.timers[+timerID];
 
     if (timer) {
@@ -136,6 +150,10 @@ export default class Functions {
   }
 
   httpRequest([ options ], { respond, fail, callback }) {
+    if (!this.httpEnabled) {
+      return fail(new Error('httpRequest is disabled'));
+    }
+
     options = options || {};
 
     request(this.processRequestOptions(options), (err, response, body) => {

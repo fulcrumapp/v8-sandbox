@@ -4,11 +4,10 @@ import async from 'async';
 import os from 'os';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
+import { Options, TimeoutError } from '../server/sandbox';
 
-class TimeoutError extends Error {
-  get isTimeout() {
-    return true;
-  }
+interface ClusterOptions extends Options {
+  workers?: number;
 }
 
 function remove(array, object) {
@@ -26,32 +25,26 @@ interface Item {
 }
 
 export default class Cluster {
-  _workerCount: number;
+  workerCount: number;
 
-  _require: string;
+  inactiveWorkers: ChildProcess[];
 
-  _template: string;
+  activeWorkers: ChildProcess[];
 
-  _inactiveWorkers: ChildProcess[];
+  queue: async.AsyncQueue<Item>;
 
-  _activeWorkers: ChildProcess[];
+  sandboxOptions: Options;
 
-  _queue: async.AsyncQueue<Item>;
-
-  constructor(
-    { workers, require, template } =
-    { workers: null, require: null, template: null }
-  ) {
-    this._workerCount = workers || Math.max(os.cpus().length, 4);
-    this._require = require;
-    this._template = template;
+  constructor({ workers, ...options }: ClusterOptions = {}) {
+    this.workerCount = workers || Math.max(os.cpus().length, 4);
+    this.sandboxOptions = options;
     this.start();
   }
 
   start() {
-    this._inactiveWorkers = [];
-    this._activeWorkers = [];
-    this._queue = async.queue(this.worker, this._workerCount);
+    this.inactiveWorkers = [];
+    this.activeWorkers = [];
+    this.queue = async.queue(this.worker, this.workerCount);
     this.ensureWorkers();
 
     onExit((code, signal) => {
@@ -60,26 +53,26 @@ export default class Cluster {
   }
 
   shutdown() {
-    for (const worker of this._inactiveWorkers) {
+    for (const worker of this.inactiveWorkers) {
       this.clearWorkerTimeout(worker);
       worker.removeAllListeners();
       worker.kill();
     }
 
-    for (const worker of this._activeWorkers) {
+    for (const worker of this.activeWorkers) {
       this.clearWorkerTimeout(worker);
       worker.removeAllListeners();
       worker.kill();
     }
 
-    this._inactiveWorkers = [];
-    this._activeWorkers = [];
+    this.inactiveWorkers = [];
+    this.activeWorkers = [];
 
-    if (this._queue) {
-      this._queue.kill();
+    if (this.queue) {
+      this.queue.kill();
     }
 
-    this._queue = async.queue(this.worker, this._workerCount);
+    this.queue = async.queue(this.worker, this.workerCount);
   }
 
   worker = (task, callback) => {
@@ -87,16 +80,14 @@ export default class Cluster {
   };
 
   ensureWorkers() {
-    const total = this._inactiveWorkers.length + this._activeWorkers.length;
+    const total = this.inactiveWorkers.length + this.activeWorkers.length;
 
-    for (let i = 0; i < this._workerCount - total; ++i) {
+    for (let i = 0; i < this.workerCount - total; ++i) {
       const worker = this.forkWorker();
 
-      worker.send({ initialize: true,
-                    require: this._require,
-                    template: this._template });
+      worker.send({ initialize: true, ...this.sandboxOptions });
 
-      this._inactiveWorkers.push(worker);
+      this.inactiveWorkers.push(worker);
     }
   }
 
@@ -107,7 +98,7 @@ export default class Cluster {
   popWorker(callback) {
     this.ensureWorkers();
 
-    if (this._inactiveWorkers.length === 0) {
+    if (this.inactiveWorkers.length === 0) {
       setImmediate(() => {
         this.popWorker(callback);
       });
@@ -115,11 +106,11 @@ export default class Cluster {
       return;
     }
 
-    const worker = this._inactiveWorkers.shift();
+    const worker = this.inactiveWorkers.shift();
 
-    this._activeWorkers.push(worker);
+    this.activeWorkers.push(worker);
 
-    if (this._activeWorkers.length + this._inactiveWorkers.length !== this._workerCount) {
+    if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
       throw new Error('invalid worker count');
     }
 
@@ -133,8 +124,8 @@ export default class Cluster {
 
   finishWorker(worker) {
     this.clearWorkerTimeout(worker);
-    remove(this._activeWorkers, worker);
-    this._inactiveWorkers.push(worker);
+    remove(this.activeWorkers, worker);
+    this.inactiveWorkers.push(worker);
   }
 
   removeWorker(worker) {
@@ -143,8 +134,8 @@ export default class Cluster {
     worker.kill();
     worker.removeAllListeners();
 
-    remove(this._activeWorkers, worker);
-    remove(this._inactiveWorkers, worker);
+    remove(this.activeWorkers, worker);
+    remove(this.inactiveWorkers, worker);
 
     this.ensureWorkers();
   }
@@ -155,7 +146,7 @@ export default class Cluster {
     };
 
     return new Promise((resolve, reject) => {
-      this._queue.push(item, resolve);
+      this.queue.push(item, resolve);
     });
   }
 

@@ -312,13 +312,11 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
   buffers_.clear();
   result_.clear();
 
-  std::string message(arguments);
-
   if (std::string(name) == "setResult") {
-    // Debug("setResult");
-    // Debug(arguments);
     hasResult_ = true;
   }
+
+  std::string message(arguments);
 
   WriteData((uv_stream_t *)pipe_, id, message);
 

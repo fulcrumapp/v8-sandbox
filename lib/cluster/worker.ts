@@ -1,4 +1,4 @@
-import Sandbox from '../server/sandbox';
+import Sandbox, { Options } from '../server/sandbox';
 import async from 'async';
 import assert from 'assert';
 
@@ -14,11 +14,9 @@ interface Message {
 }
 
 class Worker {
-  require: string;
-
-  template: string;
-
   queue: async.AsyncQueue<Message>;
+
+  sandboxOptions: Options;
 
   sandbox: Sandbox;
 
@@ -32,7 +30,7 @@ class Worker {
 
   create() {
     if (!globalSandbox) {
-      globalSandbox = new Sandbox({ require: this.require, template: this.template });
+      globalSandbox = new Sandbox(this.sandboxOptions);
     }
 
     this.sandbox = globalSandbox;
@@ -104,8 +102,7 @@ class Worker {
   };
 
   onInitialize = async (message: Message) => {
-    this.require = message.require;
-    this.template = message.template;
+    this.sandboxOptions = message;
 
     await this.create();
   };

@@ -3,3 +3,4 @@ build/
 npm-debug.log
 test.db
 bench/*.db
+report.*

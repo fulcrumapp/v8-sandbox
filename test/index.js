@@ -83,6 +83,18 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     assert.equal(error.message, 'yoyo');
   });
 
+  it('should handle network errors from httpRequest', async () => {
+    const js = `
+httpRequest({uri: 'http://no-way-this-exists-12345.net'}, (error, res, body) => {
+  setResult({ error });
+});
+`;
+
+    const { error } = await run(js);
+
+    assert.equal(error.code, 'ENOTFOUND');
+  });
+
   it('should execute httpRequest within a timeout and async function', async () => {
     const js = `
 setTimeout(() => {
@@ -140,9 +152,7 @@ new Promise((resolve) => {
     assert.equal(value, 1);
   });
 
-  it('should handle async function with no setResult', async function() {
-    this.timeout(6000);
-
+  it('should handle async function with no setResult', async () => {
     const js = `
   (async () => {
     return await new Promise((resolve) => {
@@ -153,7 +163,7 @@ new Promise((resolve) => {
   })();
   `;
 
-    const { error } = await run(js);
+    const { error } = await runWithTimeout(js, 300);
 
     assert.equal(error.isTimeout, true);
   });
@@ -778,6 +788,66 @@ setResult({ value: fetchLargeValue() });
     const result = await sandbox.execute({ code: 'setResult({ value: 1 });', timeout: 3000 });
 
     assert.equal(result.value, 1);
+
+    sandbox.shutdown();
+  });
+
+  it('should support disabling networking and timers', async function() {
+    this.timeout(10000);
+
+    const sandbox = new SimpleSandbox({ require: REQUIRE, httpEnabled: false, timersEnabled: false });
+
+    let code = 'setTimeout(() => {}, 1);';
+
+    let result = await sandbox.execute({ code, timeout: 8000 });
+
+    assert.equal(result.error.message, 'setTimeout is disabled');
+
+    code = 'httpRequest({ url: "http://example.com" });';
+
+    result = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(result.error.message, 'httpRequest is disabled');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle hard memory crash in the sandbox', async function() {
+    this.timeout(4000);
+
+    const sandbox = new SimpleSandbox({ require: REQUIRE, memory: 32 });
+
+    const code = `
+    const value = 'here is a string value';
+    const values = [];
+    while (true) {
+      values.push(value);
+    }
+    `;
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    console.log('=============================================================');
+    console.log(' ☝️  This crash is supposed to happen. It\'s part of the test.');
+    console.log('=============================================================');
+
+    assert.equal(error.message, 'worker exited');
+
+    const { value } = await sandbox.execute({ code: 'setResult({ value: 1 });', timeout: 3000 });
+
+    assert.equal(value, 1);
+
+    sandbox.shutdown();
+  });
+
+  it('should handle custom flags', async () => {
+    const sandbox = new SimpleSandbox({ require: REQUIRE, argv: [ '--harmony' ] });
+
+    const code = 'setResult({ value: null ?? 1 });';
+
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 1);
 
     sandbox.shutdown();
   });
