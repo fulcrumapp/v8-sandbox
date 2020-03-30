@@ -152,6 +152,24 @@ new Promise((resolve) => {
     assert.equal(value, 1);
   });
 
+  it('should handle strings with null bytes', async () => {
+    const string = 'test\u0000\u0000\u0000string';
+
+    const js = `setResult({ value: ${ JSON.stringify(string) } })`;
+
+    const { value } = await run(js);
+
+    assert.equal(value, string);
+  });
+
+  it('should handle buffers', async () => {
+    const js = 'setResult({ value: new SharedArrayBuffer(1024).byteLength })';
+
+    const { value } = await run(js);
+
+    assert.equal(value, 1024);
+  });
+
   it('should handle async function with no setResult', async () => {
     const js = `
   (async () => {

@@ -134,7 +134,7 @@ class Sandbox {
     });
     this.start();
     (0, _signalExit.default)((code, signal) => {
-      this.shutdown(null);
+      this.shutdown();
     });
   }
 
@@ -268,7 +268,7 @@ class Sandbox {
       return;
     }
 
-    this.shutdown(null);
+    this.shutdown();
     this.server = _net.default.createServer();
     this.server.on('connection', this.handleConnection);
     this.server.on('error', this.handleError);
@@ -278,25 +278,23 @@ class Sandbox {
     this.fork();
   }
 
-  shutdown(callback) {
-    this.running = false;
-    this.functions.clearTimers();
-    this.kill();
+  shutdown() {
+    return new Promise(resolve => {
+      this.running = false;
+      this.functions.clearTimers();
+      this.kill();
 
-    if (this.socket) {
-      this.socket.shutdown();
-      this.socket = null;
-    }
+      if (this.socket) {
+        this.socket.shutdown();
+        this.socket = null;
+      }
 
-    if (this.server) {
-      this.server.close(() => {
-        if (callback) {
-          callback();
-        }
-      });
-      this.cleanupSocket();
-      this.server = null;
-    }
+      if (this.server) {
+        this.server.close(resolve);
+        this.cleanupSocket();
+        this.server = null;
+      }
+    });
   }
 
   callback(id, args) {

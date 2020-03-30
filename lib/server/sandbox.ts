@@ -107,7 +107,7 @@ export default class Sandbox {
     this.start();
 
     onExit((code, signal) => {
-      this.shutdown(null);
+      this.shutdown();
     });
   }
 
@@ -221,7 +221,7 @@ export default class Sandbox {
       return;
     }
 
-    this.shutdown(null);
+    this.shutdown();
 
     this.server = net.createServer();
     this.server.on('connection', this.handleConnection);
@@ -236,29 +236,27 @@ export default class Sandbox {
     this.fork();
   }
 
-  shutdown(callback) {
-    this.running = false;
+  shutdown() {
+    return new Promise(resolve => {
+      this.running = false;
 
-    this.functions.clearTimers();
+      this.functions.clearTimers();
 
-    this.kill();
+      this.kill();
 
-    if (this.socket) {
-      this.socket.shutdown();
-      this.socket = null;
-    }
+      if (this.socket) {
+        this.socket.shutdown();
+        this.socket = null;
+      }
 
-    if (this.server) {
-      this.server.close(() => {
-        if (callback) {
-          callback();
-        }
-      });
+      if (this.server) {
+        this.server.close(resolve);
 
-      this.cleanupSocket();
+        this.cleanupSocket();
 
-      this.server = null;
-    }
+        this.server = null;
+      }
+    });
   }
 
   handleTimeout = () => {
