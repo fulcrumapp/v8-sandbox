@@ -184,7 +184,6 @@ export default class Cluster {
 
       worker.send({
         code,
-        timeout,
         globals: JSON.stringify(globals),
         context: JSON.stringify(context)
       });
