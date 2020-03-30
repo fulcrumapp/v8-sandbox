@@ -66,12 +66,8 @@ class Worker {
       if (error) {
         this.error = error;
       }
-    } catch (ex) {
-      this.error = {
-        name: ex.name,
-        message: ex.message,
-        stack: ex.stack
-      };
+    } catch (error) {
+      this.error = error;
     }
 
     this.initialized = true;
@@ -109,7 +105,18 @@ class Worker {
       });
     } else {
       result = {
-        error: this.error
+        error: this.error,
+        output: []
+      };
+    } // convert native error objects into an object that can be serialized
+
+
+    if (result.error) {
+      result.error = {
+        name: result.error.name,
+        message: result.error.message,
+        stack: result.error.stack,
+        ...result.error
       };
     }
 
