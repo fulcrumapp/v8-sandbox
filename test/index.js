@@ -747,11 +747,11 @@ errorAsync(1, 2);
 setResult({ value: executeWithContext() });
 `;
 
-    const nodeGlobals = {
+    const context = {
       customValue: 'hi'
     };
 
-    const { value } = await sandbox.execute({ code, nodeGlobals, timeout: 3000 });
+    const { value } = await sandbox.execute({ code, context, timeout: 3000 });
 
     assert.equal(value, 'hi');
 

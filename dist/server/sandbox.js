@@ -161,7 +161,7 @@ class Sandbox {
     code,
     timeout,
     globals,
-    nodeGlobals
+    context
   }) {
     this.start();
     const result = await this.initialize({
@@ -178,7 +178,7 @@ class Sandbox {
         code,
         timeout,
         globals: globals || {},
-        nodeGlobals: nodeGlobals || {},
+        context: context || {},
         output: [],
         callback: res => {
           this.initialized = false;
@@ -324,10 +324,9 @@ class Sandbox {
     code,
     timeout,
     globals,
-    nodeGlobals
+    context
   }) {
     this.executeTimeout.start(timeout, this.handleTimeout);
-    Object.assign(global, nodeGlobals);
     this.worker.send({
       type: 'execute',
       code,

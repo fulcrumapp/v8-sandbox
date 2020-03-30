@@ -95,7 +95,7 @@ class Worker {
     code,
     timeout,
     globals,
-    nodeGlobals
+    context
   }) {
     (0, _assert.default)(this.initialized);
     let result;
@@ -105,7 +105,7 @@ class Worker {
         code,
         timeout,
         globals: JSON.parse(globals),
-        nodeGlobals: JSON.parse(nodeGlobals)
+        context: JSON.parse(context)
       });
     } else {
       result = {

@@ -134,20 +134,20 @@ export default class Cluster {
     this.ensureWorkers();
   }
 
-  execute({ code, timeout, globals, nodeGlobals }: ExecutionOptions) {
+  execute({ code, timeout, globals, context }: ExecutionOptions) {
     return new Promise((resolve, reject) => {
       const item = {
         code,
         timeout,
         globals: globals || {},
-        nodeGlobals: nodeGlobals || {}
+        context: context || {}
       };
 
       this.queue.push(item, resolve);
     });
   }
 
-  _execute({ code, timeout, globals, nodeGlobals }, callback) {
+  _execute({ code, timeout, globals, context }, callback) {
     callback = once(callback);
 
     this.popWorker((worker) => {
@@ -186,7 +186,7 @@ export default class Cluster {
         code,
         timeout,
         globals: JSON.stringify(globals),
-        nodeGlobals: JSON.stringify(nodeGlobals)
+        context: JSON.stringify(context)
       });
     });
   }

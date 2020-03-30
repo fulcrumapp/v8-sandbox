@@ -36,24 +36,24 @@ npm install v8-sandbox
 - `memory`: `number` (optional) set the amount of memory available to the sandbox (default: `null`, nodejs defaults)
 - `argv`: `string[]` (optional) set the flags passed to the nodejs process hosting the sandbox (default: `[]`) example: `[ '--harmony' ]`
 
-**`async execute({ code, timeout, globals, nodeGlobals })`**
+**`async execute({ code, timeout, globals, context })`**
 
 - `code`: `string` code to execute
 - `timeout`: `number` (optional) script timeout
-- `globals`: `object` (optional) globals variables to make available to the script
-- `nodeGlobals`: `object` (optional) global variables to make available to the nodejs host process
+- `globals`: `object` (optional) variables to make available to the script
+- `context`: `object` (optional) data to make available to the nodejs host process. This is only necessary if you're using a `require` script. `context` is how you pass data in to make it available to the custom `require` script.
 
-You *must* use `setResult({ value, error })` function to set the result of the execution. Using this function is required in order to fully support async code and promises within the sandbox.
+You *must* use the `setResult({ value, error })` function in the `code` to set the result of the execution. Using this function is required in order to fully support async code and promises within the sandbox.
 
 **`async initialize({ timeout })`**
 
 - `timeout`: `number` (optional) initialization timeout
 
-Initialize the sandbox by evaluating the built-in runtime and any `template` script. Can be useful if your template script is complex and you want `execute()` to be as fast as possible with no "start-up" overhead. This method is automatically called by `execute()` if the sandbox is not already initialized. The cluster feature uses this method to warm up a sandbox instance so its ready to use.
+Initialize the sandbox by evaluating the built-in runtime and any `template` script. Can be useful if your template script is complex and you want `execute()` to be as fast as possible with no "start-up" overhead. This method is automatically called by `execute()` if the sandbox is not already initialized. The cluster feature uses this method to warm up a sandbox instance so it's ready to use.
 
 **`async shutdown()`**
 
-Shutdown the sandbox instance. Stops the nodejs host process.
+Shutdown the sandbox instance. Stops the nodejs host process. You must call `shutdown()` at some point in your program if you want the nodejs process to exit.
 
 ## Examples
 
@@ -67,7 +67,7 @@ const code = 'setResult({ value: 1 + inputValue });';
 (async () => {
   const { error, value } = await sandbox.execute({ code, timeout: 3000, globals: { inputValue: 2 } });
 
-  sandbox.shutdown();
+  await sandbox.shutdown();
 
   console.log(value);
   //=> 3
@@ -92,7 +92,7 @@ setTimeout(() => {
 (async () => {
   const { error, value } = await sandbox.execute({ code, timeout: 3000 });
 
-  sandbox.shutdown();
+  await sandbox.shutdown();
 
   console.log(value);
   //=> 2
@@ -108,6 +108,8 @@ const code = 'while (true) {}';
 
 (async () => {
   const { error, value } = await sandbox.execute({ code, timeout: 3000 });
+
+  await sandbox.shutdown();
 
   console.log(error.isTimeout);
   //=> true

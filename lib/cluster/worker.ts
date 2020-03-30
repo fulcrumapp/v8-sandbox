@@ -10,7 +10,7 @@ interface Message {
   template?: string;
   code?: string;
   globals?: string;
-  nodeGlobals?: string;
+  context?: string;
   timeout: number;
 }
 
@@ -74,7 +74,7 @@ class Worker {
     });
   }
 
-  async execute({ code, timeout, globals, nodeGlobals }: Message) {
+  async execute({ code, timeout, globals, context }: Message) {
     assert(this.initialized);
 
     let result;
@@ -84,7 +84,7 @@ class Worker {
         code,
         timeout,
         globals: JSON.parse(globals),
-        nodeGlobals: JSON.parse(nodeGlobals)
+        context: JSON.parse(context)
       });
     } else {
       result = { error: this.error };

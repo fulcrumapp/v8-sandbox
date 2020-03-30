@@ -149,14 +149,14 @@ class Cluster {
     code,
     timeout,
     globals,
-    nodeGlobals
+    context
   }) {
     return new Promise((resolve, reject) => {
       const item = {
         code,
         timeout,
         globals: globals || {},
-        nodeGlobals: nodeGlobals || {}
+        context: context || {}
       };
       this.queue.push(item, resolve);
     });
@@ -166,7 +166,7 @@ class Cluster {
     code,
     timeout,
     globals,
-    nodeGlobals
+    context
   }, callback) {
     callback = (0, _lodash.once)(callback);
     this.popWorker(worker => {
@@ -204,7 +204,7 @@ class Cluster {
         code,
         timeout,
         globals: JSON.stringify(globals),
-        nodeGlobals: JSON.stringify(nodeGlobals)
+        context: JSON.stringify(context)
       });
     });
   }

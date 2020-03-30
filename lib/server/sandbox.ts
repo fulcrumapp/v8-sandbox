@@ -30,7 +30,7 @@ export interface Message {
   template?: string;
   code?: string;
   globals?: object;
-  nodeGlobals?: object;
+  context?: object;
   output: Log[];
   timeout: number;
   callback: Function;
@@ -50,7 +50,7 @@ export interface ExecutionOptions {
   code: string;
   timeout?: number;
   globals?: object;
-  nodeGlobals?: object;
+  context?: object;
 }
 
 export class TimeoutError extends Error {
@@ -127,7 +127,7 @@ export default class Sandbox {
     });
   }
 
-  async execute({ code, timeout, globals, nodeGlobals }: ExecutionOptions) {
+  async execute({ code, timeout, globals, context }: ExecutionOptions) {
     this.start();
 
     const result = await this.initialize({ timeout });
@@ -142,7 +142,7 @@ export default class Sandbox {
         code,
         timeout,
         globals: globals || {},
-        nodeGlobals: nodeGlobals || {},
+        context: context || {},
         output: [],
         callback: (res: Result) => {
           this.initialized = false;
@@ -300,10 +300,8 @@ export default class Sandbox {
     this.worker.send({ type: 'initialize', template });
   }
 
-  onExecute({ code, timeout, globals, nodeGlobals }: Message) {
+  onExecute({ code, timeout, globals, context }: Message) {
     this.executeTimeout.start(timeout, this.handleTimeout);
-
-    Object.assign(global, nodeGlobals);
 
     this.worker.send({ type: 'execute', code, globals: JSON.stringify(globals) });
   }

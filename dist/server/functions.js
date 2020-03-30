@@ -92,7 +92,8 @@ class Functions {
       message,
       respond,
       fail,
-      callback
+      callback,
+      context: message.context
     }];
 
     switch (name) {

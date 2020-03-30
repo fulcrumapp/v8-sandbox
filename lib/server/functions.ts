@@ -79,7 +79,7 @@ export default class Functions {
   }
 
   dispatch({ name, args }, { message, fail, respond, callback }) {
-    const params: [ any, any ] = [ args, { message, respond, fail, callback } ];
+    const params: [ any, any ] = [ args, { message, respond, fail, callback, context: message.context } ];
 
     switch (name) {
       case 'setResult': {
