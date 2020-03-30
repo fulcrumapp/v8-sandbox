@@ -195,7 +195,7 @@ class Cluster {
         worker.executionTimeout = setTimeout(() => {
           this.removeWorker(worker);
           callback({
-            error: new _sandbox.TimeoutError('timeout')
+            error: new _sandbox.TimeoutError(timeout)
           });
         }, timeout);
       }

@@ -54,6 +54,10 @@ export interface ExecutionOptions {
 }
 
 export class TimeoutError extends Error {
+  constructor(timeout) {
+    super(`timeout: ${timeout}ms`);
+  }
+
   get isTimeout() {
     return true;
   }
@@ -261,7 +265,7 @@ export default class Sandbox {
 
   handleTimeout = () => {
     this.fork();
-    this.finish({ error: new TimeoutError(`timeout: ${this.message.timeout }ms`) });
+    this.finish({ error: new TimeoutError(this.message.timeout) });
   };
 
   callback(id, args) {

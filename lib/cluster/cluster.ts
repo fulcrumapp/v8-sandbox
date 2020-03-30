@@ -178,7 +178,7 @@ export default class Cluster {
       if (timeout > 0) {
         worker.executionTimeout = setTimeout(() => {
           this.removeWorker(worker);
-          callback({ error: new TimeoutError('timeout') });
+          callback({ error: new TimeoutError(timeout) });
         }, timeout);
       }
 
