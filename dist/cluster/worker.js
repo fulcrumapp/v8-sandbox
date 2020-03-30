@@ -93,8 +93,9 @@ class Worker {
 
   async execute({
     code,
-    context,
-    timeout
+    timeout,
+    globals,
+    nodeGlobals
   }) {
     (0, _assert.default)(this.initialized);
     let result;
@@ -103,7 +104,8 @@ class Worker {
       result = await this.sandbox.execute({
         code,
         timeout,
-        context: JSON.parse(context)
+        globals: JSON.parse(globals),
+        nodeGlobals: JSON.parse(nodeGlobals)
       });
     } else {
       result = {

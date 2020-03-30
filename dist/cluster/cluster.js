@@ -147,23 +147,26 @@ class Cluster {
 
   execute({
     code,
-    context,
-    timeout
+    timeout,
+    globals,
+    nodeGlobals
   }) {
-    const item = {
-      code,
-      timeout,
-      context
-    };
     return new Promise((resolve, reject) => {
+      const item = {
+        code,
+        timeout,
+        globals: globals || {},
+        nodeGlobals: nodeGlobals || {}
+      };
       this.queue.push(item, resolve);
     });
   }
 
   _execute({
     code,
-    context,
-    timeout
+    timeout,
+    globals,
+    nodeGlobals
   }, callback) {
     callback = (0, _lodash.once)(callback);
     this.popWorker(worker => {
@@ -190,7 +193,6 @@ class Cluster {
 
       if (timeout > 0) {
         worker.executionTimeout = setTimeout(() => {
-          // worker.kill();
           this.removeWorker(worker);
           callback({
             error: new _sandbox.TimeoutError('timeout')
@@ -200,7 +202,9 @@ class Cluster {
 
       worker.send({
         code,
-        context: JSON.stringify(context || {})
+        timeout,
+        globals: JSON.stringify(globals),
+        nodeGlobals: JSON.stringify(nodeGlobals)
       });
     });
   }

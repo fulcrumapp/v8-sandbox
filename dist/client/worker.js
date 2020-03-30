@@ -63,12 +63,14 @@ class Worker {
   }
 
   execute({
-    code
+    code,
+    globals
   }) {
     this.reset(false);
     this.connect();
+    const withGlobals = [`Object.assign(global, ${globals});`, code].join('\n');
 
-    this._execute(wrapCode(code));
+    this._execute(wrapCode(withGlobals));
   }
 
   _execute(code) {

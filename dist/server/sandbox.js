@@ -46,7 +46,8 @@ class Sandbox {
     httpEnabled,
     timersEnabled,
     memory,
-    argv
+    argv,
+    debug
   } = {}) {
     _defineProperty(this, "id", void 0);
 
@@ -73,6 +74,8 @@ class Sandbox {
     _defineProperty(this, "functions", void 0);
 
     _defineProperty(this, "running", void 0);
+
+    _defineProperty(this, "debug", void 0);
 
     _defineProperty(this, "memory", void 0);
 
@@ -122,6 +125,7 @@ class Sandbox {
     this.executeTimeout = new _timer.default();
     this.memory = memory;
     this.argv = argv !== null && argv !== void 0 ? argv : [];
+    this.debug = debug !== null && debug !== void 0 ? debug : false;
     this.template = template || '';
     this.functions = new _functions.default(this, {
       require,
@@ -155,8 +159,9 @@ class Sandbox {
 
   async execute({
     code,
-    context,
-    timeout
+    timeout,
+    globals,
+    nodeGlobals
   }) {
     this.start();
     const result = await this.initialize({
@@ -172,11 +177,12 @@ class Sandbox {
         type: 'execute',
         code,
         timeout,
-        context: context || {},
+        globals: globals || {},
+        nodeGlobals: nodeGlobals || {},
         output: [],
-        callback: result => {
+        callback: res => {
           this.initialized = false;
-          resolve(result);
+          resolve(res);
         }
       });
     });
@@ -318,15 +324,16 @@ class Sandbox {
 
   onExecute({
     code,
-    context,
-    timeout
+    timeout,
+    globals,
+    nodeGlobals
   }) {
     this.executeTimeout.start(timeout, this.handleTimeout);
-    global.context = context;
+    Object.assign(global, nodeGlobals);
     this.worker.send({
       type: 'execute',
       code,
-      context: JSON.stringify(context)
+      globals: JSON.stringify(globals)
     });
   }
 

@@ -66,6 +66,10 @@ global.clearTimeout = id => {
   return dispatch('clearTimeout', [id]);
 };
 
+global.info = id => {
+  return dispatch('info', []);
+};
+
 global.console = {
   log: (...args) => {
     return dispatch('log', [args]);

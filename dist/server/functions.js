@@ -126,6 +126,11 @@ class Functions {
           return this.error(...params);
         }
 
+      case 'info':
+        {
+          return this.info(...params);
+        }
+
       default:
         {
           const fn = this.syncFunctions[name] || this.asyncFunctions[name];
@@ -249,6 +254,21 @@ class Functions {
       type,
       time: new Date(),
       message: _util.default.format(...args)
+    });
+  }
+
+  info(args, {
+    message,
+    fail,
+    respond
+  }) {
+    if (!this.sandbox.debug) {
+      return fail(new Error('info is disabled'));
+    }
+
+    respond({
+      versions: process.versions,
+      argv: this.sandbox.argv
     });
   }
 
