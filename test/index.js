@@ -859,13 +859,13 @@ setResult({ value: fetchLargeValue() });
   });
 
   it('should handle custom flags', async () => {
-    const sandbox = new SimpleSandbox({ require: REQUIRE, argv: [ '--harmony' ] });
+    const sandbox = new SimpleSandbox({ require: REQUIRE, argv: [ '--harmony' ], debug: true });
 
-    const code = 'setResult({ value: null ?? 1 });';
+    const code = 'setResult({ value: info() });';
 
     const { value } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(value, 1);
+    assert.deepStrictEqual(value.argv, [ '--harmony' ]);
 
     sandbox.shutdown();
   });

@@ -1,4 +1,4 @@
-import Sandbox from './sandbox';
+import Sandbox, { Message } from './sandbox';
 import Timer from './timer';
 import request from 'request';
 import util from 'util';
@@ -100,6 +100,9 @@ export default class Functions {
       case 'error': {
         return this.error(...params);
       }
+      case 'info': {
+        return this.info(...params);
+      }
       default: {
         const fn = this.syncFunctions[name] || this.asyncFunctions[name];
 
@@ -189,8 +192,19 @@ export default class Functions {
     respond();
   }
 
-  write({ message, type, args }) {
+  write({ message, type, args }: { message: Message; type: string; args: [ any, any ]}) {
     message.output.push({ type, time: new Date(), message: util.format(...args) });
+  }
+
+  info(args, { message, fail, respond }) {
+    if (!this.sandbox.debug) {
+      return fail(new Error('info is disabled'));
+    }
+
+    respond({
+      versions: process.versions,
+      argv: this.sandbox.argv
+    });
   }
 
   processRequestOptions(options) {

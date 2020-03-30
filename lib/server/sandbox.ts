@@ -43,6 +43,7 @@ export interface Options {
   timersEnabled?: boolean;
   memory?: number;
   argv?: string[];
+  debug?: boolean;
 }
 
 export interface ExecutionOptions {
@@ -87,15 +88,18 @@ export default class Sandbox {
 
   running: boolean;
 
+  debug: boolean;
+
   memory: number;
 
-  constructor({ require, template, httpEnabled, timersEnabled, memory, argv }: Options = {}) {
+  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, debug }: Options = {}) {
     this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
     this.memory = memory;
     this.argv = argv ?? [];
+    this.debug = debug ?? false;
 
     this.template = template || '';
     this.functions = new Functions(this, { require, httpEnabled, timersEnabled });
