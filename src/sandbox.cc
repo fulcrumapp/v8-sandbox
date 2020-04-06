@@ -5,12 +5,10 @@
 #include <memory>
 #include <v8.h>
 
-#include <unistd.h>
-#include <iostream>
-
-void Debug(const char *msg) {
-  std::cout << getpid() << " : " << msg << std::endl;
-}
+// #include <unistd.h>
+// void Debug(const char *msg) {
+//  std::cout << getpid() << " : " << msg << std::endl;
+// }
 
 using namespace v8;
 
@@ -334,7 +332,7 @@ void Sandbox::OnConnected(uv_connect_t *request, int status) {
   free(request);
 
   if (status != 0) {
-    std::cout << getpid() << " OnConnected failed, status: " << status << " : " << uv_strerror(status) << std::endl;
+    std::cout << " OnConnected failed, status: " << status << " : " << uv_strerror(status) << std::endl;
   }
 
   assert(status == 0);
@@ -409,7 +407,7 @@ void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
 
 void Sandbox::OnWriteComplete(uv_write_t *request, int status) {
   if (status != 0) {
-    std::cout << getpid() << " OnWriteComplete failed, status: " << status << " : " << uv_strerror(status) << " : " << (char *)request->data << std::endl;
+    std::cout << " OnWriteComplete failed, status: " << status << " : " << uv_strerror(status) << " : " << (char *)request->data << std::endl;
   }
 
   assert(status == 0);
