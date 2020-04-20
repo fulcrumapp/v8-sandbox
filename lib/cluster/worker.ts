@@ -128,6 +128,15 @@ class Worker {
 
 const worker = new Worker();
 
+// heartbeat the parent process to make sure this worker process never gets orphaned
+// if the parent process is killed with SIGKILL, the atExit() handler never runs, which
+// leaves this process around forever.
+setInterval(() => {
+  if (!process.connected) {
+    process.exit();
+  }
+}, 5000);
+
 process.on('message', (message) => {
   worker.queue.push(message);
 });
