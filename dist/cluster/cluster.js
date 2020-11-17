@@ -102,7 +102,10 @@ class Cluster {
   }
 
   forkWorker() {
-    return (0, _child_process.fork)(_path.default.join(__dirname, 'worker'));
+    return (0, _child_process.fork)(_path.default.join(__dirname, 'worker'), [], {
+      gid: this.sandboxOptions.gid,
+      uid: this.sandboxOptions.uid
+    });
   }
 
   popWorker(callback) {

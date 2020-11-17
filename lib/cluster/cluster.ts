@@ -86,7 +86,7 @@ export default class Cluster {
   }
 
   forkWorker() {
-    return fork(path.join(__dirname, 'worker'));
+    return fork(path.join(__dirname, 'worker'), [], { gid: this.sandboxOptions.gid, uid: this.sandboxOptions.uid });
   }
 
   popWorker(callback) {
