@@ -51,6 +51,8 @@ class Sandbox {
     timersEnabled,
     memory,
     argv,
+    uid,
+    gid,
     debug
   } = {}) {
     _defineProperty(this, "id", void 0);
@@ -82,6 +84,10 @@ class Sandbox {
     _defineProperty(this, "debug", void 0);
 
     _defineProperty(this, "memory", void 0);
+
+    _defineProperty(this, "uid", void 0);
+
+    _defineProperty(this, "gid", void 0);
 
     _defineProperty(this, "handleTimeout", () => {
       this.fork();
@@ -129,6 +135,8 @@ class Sandbox {
     this.executeTimeout = new _timer.default();
     this.memory = memory;
     this.argv = argv !== null && argv !== void 0 ? argv : [];
+    this.uid = uid !== null && uid !== void 0 ? uid : null;
+    this.gid = gid !== null && gid !== void 0 ? gid : null;
     this.debug = debug !== null && debug !== void 0 ? debug : false;
     this.template = template || '';
     this.functions = new _functions.default(this, {
@@ -220,7 +228,9 @@ class Sandbox {
     const workerPath = _path.default.join(__dirname, '..', 'client', 'worker');
 
     this.worker = (0, _child_process.fork)(workerPath, [this.socketName], {
-      execArgv
+      execArgv,
+      uid: this.uid,
+      gid: this.gid
     });
     this.worker.on('error', error => {
       this.fork();

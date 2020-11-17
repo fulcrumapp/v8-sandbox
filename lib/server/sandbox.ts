@@ -44,6 +44,8 @@ export interface Options {
   memory?: number;
   argv?: string[];
   debug?: boolean;
+  uid?: number;
+  gid?: number;
 }
 
 export interface ExecutionOptions {
@@ -96,13 +98,19 @@ export default class Sandbox {
 
   memory: number;
 
-  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, debug }: Options = {}) {
+  uid: number;
+
+  gid: number;
+
+  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug }: Options = {}) {
     this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
     this.memory = memory;
     this.argv = argv ?? [];
+    this.uid = uid ?? null;
+    this.gid = gid ?? null;
     this.debug = debug ?? false;
 
     this.template = template || '';
@@ -177,7 +185,7 @@ export default class Sandbox {
 
     const workerPath = path.join(__dirname, '..', 'client', 'worker');
 
-    this.worker = fork(workerPath, [ this.socketName ], { execArgv });
+    this.worker = fork(workerPath, [ this.socketName ], { execArgv, uid: this.uid, gid: this.gid });
 
     this.worker.on('error', (error) => {
       this.fork();
