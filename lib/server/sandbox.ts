@@ -46,6 +46,7 @@ export interface Options {
   debug?: boolean;
   uid?: number;
   gid?: number;
+  socketPath?: string;
 }
 
 export interface ExecutionOptions {
@@ -102,7 +103,9 @@ export default class Sandbox {
 
   gid: number;
 
-  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug }: Options = {}) {
+  socketPath: string;
+
+  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath }: Options = {}) {
     this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
 
     this.initializeTimeout = new Timer();
@@ -111,6 +114,7 @@ export default class Sandbox {
     this.argv = argv ?? [];
     this.uid = uid ?? null;
     this.gid = gid ?? null;
+    this.socketPath = socketPath ?? '/tmp';
     this.debug = debug ?? false;
 
     this.template = template || '';
@@ -167,7 +171,7 @@ export default class Sandbox {
 
   get socketName() {
     return process.platform === 'win32' ? path.join('\\\\?\\pipe', process.cwd(), this.id)
-      : `/tmp/${ this.id }`;
+      : `${ this.socketPath }/${ this.id }`;
   }
 
   dispatch(invocation, { fail, respond, callback }) {

@@ -53,7 +53,8 @@ class Sandbox {
     argv,
     uid,
     gid,
-    debug
+    debug,
+    socketPath
   } = {}) {
     _defineProperty(this, "id", void 0);
 
@@ -88,6 +89,8 @@ class Sandbox {
     _defineProperty(this, "uid", void 0);
 
     _defineProperty(this, "gid", void 0);
+
+    _defineProperty(this, "socketPath", void 0);
 
     _defineProperty(this, "handleTimeout", () => {
       this.fork();
@@ -137,6 +140,7 @@ class Sandbox {
     this.argv = argv !== null && argv !== void 0 ? argv : [];
     this.uid = uid !== null && uid !== void 0 ? uid : null;
     this.gid = gid !== null && gid !== void 0 ? gid : null;
+    this.socketPath = socketPath !== null && socketPath !== void 0 ? socketPath : '/tmp';
     this.debug = debug !== null && debug !== void 0 ? debug : false;
     this.template = template || '';
     this.functions = new _functions.default(this, {
@@ -201,7 +205,7 @@ class Sandbox {
   }
 
   get socketName() {
-    return process.platform === 'win32' ? _path.default.join('\\\\?\\pipe', process.cwd(), this.id) : `/tmp/${this.id}`;
+    return process.platform === 'win32' ? _path.default.join('\\\\?\\pipe', process.cwd(), this.id) : `${this.socketPath}/${this.id}`;
   }
 
   dispatch(invocation, {
