@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import request from 'request';
 import util from 'util';
 import Sandbox, { Message } from './sandbox';

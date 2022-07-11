@@ -1,6 +1,7 @@
 {
   "include": ["lib/**/*"],
   "compilerOptions": {
+    "target": "es2020",
     "sourceMap": true,
     "outDir": "dist",
     "strict": true,

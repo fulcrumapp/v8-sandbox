@@ -9,7 +9,7 @@
     "build": "node-gyp configure build && tsc",
     "build-debug": "node-gyp --debug configure build && tsc",
     "rebuild": "node-gyp configure rebuild",
-    "test": "mocha test/setup.js test/index.js",
+    "test": "TS_NODE_IGNORE='node_modules,dist' mocha -r ts-node/register test/index.js",
     "clean": "rm -rf dist build",
     "lint": "eslint 'lib/**/*.js'",
     "install": "node-pre-gyp install --fallback-to-build"

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import async from 'async';
 import assert from 'assert';
 import Sandbox, { Options } from '../server/sandbox';

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';

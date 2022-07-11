@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 global._try = (func) => {
   try {
     func();

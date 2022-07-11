@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import path from 'path';
 import net from 'net';
 import fs from 'fs';

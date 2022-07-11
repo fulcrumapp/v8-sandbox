@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import net from 'net';
 import { ChildProcess } from 'child_process';
 import Sandbox from './sandbox';
