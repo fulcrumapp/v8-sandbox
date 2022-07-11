@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 let nextID = 0;
 
 const TIMERS = {};

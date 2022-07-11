@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import path from 'path';
 import net from 'net';
 import fs from 'fs';
@@ -34,7 +32,7 @@ export interface Message {
   globals?: object;
   context?: object;
   output: Log[];
-  timeout: number;
+  timeout?: number;
   callback: Function;
 }
 
@@ -59,7 +57,7 @@ export interface ExecutionOptions {
 }
 
 export class TimeoutError extends Error {
-  constructor(timeout) {
+  constructor(timeout: number) {
     super(`timeout: ${timeout}ms`);
   }
 
@@ -81,29 +79,29 @@ export default class Sandbox {
 
   executeTimeout: Timer;
 
-  server: net.Server;
+  server?: net.Server;
 
-  worker: ChildProcess;
+  worker?: ChildProcess;
 
-  initialized: boolean;
+  initialized: boolean = false;
 
-  socket: Socket;
+  socket?: Socket;
 
-  queue: async.AsyncQueue<Message>;
+  queue?: async.QueueObject<Message>;
 
-  message: Message;
+  message?: Message;
 
   functions: Functions;
 
-  running: boolean;
+  running: boolean = false;
 
-  debug: boolean;
+  debug: boolean = false;
 
-  memory: number;
+  memory: number | null;
 
-  uid: number;
+  uid: number | null;
 
-  gid: number;
+  gid: number | null;
 
   socketPath: string;
 
@@ -114,7 +112,7 @@ export default class Sandbox {
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
-    this.memory = memory;
+    this.memory = memory ?? null;
     this.argv = argv ?? [];
     this.uid = uid ?? null;
     this.gid = gid ?? null;
@@ -163,8 +161,8 @@ export default class Sandbox {
         type: 'execute',
         code,
         timeout,
-        globals: globals || {},
-        context: context || {},
+        globals: globals ?? {},
+        context: context ?? {},
         output: [],
         callback: (res: Result) => {
           this.initialized = false;
@@ -295,7 +293,7 @@ export default class Sandbox {
   processMessage = async (message: Message) => {
     this.message = message;
 
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
       const { callback } = this.message;
 
       this.message.callback = once((result) => {
