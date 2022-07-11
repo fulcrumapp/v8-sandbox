@@ -1,5 +1,4 @@
 "use strict";
-// @ts-nocheck
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -27,6 +26,9 @@ exports.TimeoutError = TimeoutError;
 let nextID = 0;
 class Sandbox {
     constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath, } = {}) {
+        this.initialized = false;
+        this.running = false;
+        this.debug = false;
         this.handleTimeout = () => {
             this.fork();
             this.finish({ error: new TimeoutError(this.message.timeout) });
@@ -58,7 +60,7 @@ class Sandbox {
         this.id = `v8-sandbox-${process.pid}-${++nextID}`;
         this.initializeTimeout = new timer_1.default();
         this.executeTimeout = new timer_1.default();
-        this.memory = memory;
+        this.memory = memory ?? null;
         this.argv = argv ?? [];
         this.uid = uid ?? null;
         this.gid = gid ?? null;
@@ -96,8 +98,8 @@ class Sandbox {
                 type: 'execute',
                 code,
                 timeout,
-                globals: globals || {},
-                context: context || {},
+                globals: globals ?? {},
+                context: context ?? {},
                 output: [],
                 callback: (res) => {
                     this.initialized = false;

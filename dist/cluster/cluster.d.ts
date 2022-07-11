@@ -9,7 +9,7 @@ export default class Cluster {
     workerCount: number;
     inactiveWorkers: ChildProcess[];
     activeWorkers: ChildProcess[];
-    queue: async.AsyncQueue<ExecutionOptions>;
+    queue?: async.QueueObject<ExecutionOptions>;
     sandboxOptions: Options;
     constructor({ workers, ...options }?: ClusterOptions);
     start(): void;

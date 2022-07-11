@@ -1,5 +1,4 @@
 "use strict";
-// @ts-nocheck
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -19,6 +18,8 @@ function remove(array, object) {
 }
 class Cluster {
     constructor({ workers, ...options } = {}) {
+        this.inactiveWorkers = [];
+        this.activeWorkers = [];
         this.worker = (task, callback) => {
             this._execute(task, callback);
         };
@@ -73,6 +74,9 @@ class Cluster {
             return;
         }
         const worker = this.inactiveWorkers.shift();
+        if (worker == null) {
+            throw new Error('no inactive worker');
+        }
         this.activeWorkers.push(worker);
         if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
             throw new Error('invalid worker count');
@@ -104,6 +108,9 @@ class Cluster {
                 globals: globals || {},
                 context: context || {},
             };
+            if (!this.queue) {
+                throw new Error('invalid queue');
+            }
             this.queue.push(item, resolve);
         });
     }

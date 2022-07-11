@@ -1,5 +1,4 @@
 "use strict";
-// @ts-nocheck
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -10,6 +9,7 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 const RUNTIME = fs_1.default.readFileSync(path_1.default.join(__dirname, 'runtime.js')).toString();
 class Worker {
     constructor() {
+        this.connected = false;
         this.handleMessage = (message) => {
             switch (message.type) {
                 case 'initialize':

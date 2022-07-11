@@ -1,5 +1,4 @@
 "use strict";
-// @ts-nocheck
 Object.defineProperty(exports, "__esModule", { value: true });
 let nextID = 0;
 const TIMERS = {};

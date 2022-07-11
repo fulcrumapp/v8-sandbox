@@ -27,7 +27,7 @@ export interface Message {
     globals?: object;
     context?: object;
     output: Log[];
-    timeout: number;
+    timeout?: number;
     callback: Function;
 }
 export interface Options {
@@ -49,7 +49,7 @@ export interface ExecutionOptions {
     context?: object;
 }
 export declare class TimeoutError extends Error {
-    constructor(timeout: any);
+    constructor(timeout: number);
     get isTimeout(): boolean;
 }
 export default class Sandbox {
@@ -58,24 +58,24 @@ export default class Sandbox {
     initializeTimeout: Timer;
     argv: string[];
     executeTimeout: Timer;
-    server: net.Server;
-    worker: ChildProcess;
+    server?: net.Server;
+    worker?: ChildProcess;
     initialized: boolean;
-    socket: Socket;
-    queue: async.AsyncQueue<Message>;
-    message: Message;
+    socket?: Socket;
+    queue?: async.QueueObject<Message>;
+    message?: Message;
     functions: Functions;
     running: boolean;
     debug: boolean;
-    memory: number;
-    uid: number;
-    gid: number;
+    memory: number | null;
+    uid: number | null;
+    gid: number | null;
     socketPath: string;
     constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath, }?: Options);
     initialize({ timeout }?: {
-        timeout: null;
+        timeout: any;
     }): Promise<Result>;
-    execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<unknown>;
+    execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<Result>;
     get socketName(): string;
     dispatch(invocation: any, { fail, respond, callback }: {
         fail: any;
@@ -89,7 +89,7 @@ export default class Sandbox {
     shutdown(): Promise<unknown>;
     handleTimeout: () => void;
     callback(id: any, args: any): void;
-    processMessage: (message: Message) => Promise<unknown>;
+    processMessage: (message: Message) => Promise<void>;
     onInitialize({ template, timeout }: Message): void;
     onExecute({ code, timeout, globals, context, }: Message): void;
     finish(result: any): void;
