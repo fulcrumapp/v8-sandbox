@@ -1,4 +1,3 @@
-"use strict";
 // @ts-nocheck
 global._try = (func) => {
     try {
