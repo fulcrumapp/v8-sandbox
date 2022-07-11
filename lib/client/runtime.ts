@@ -1,26 +1,5 @@
 // @ts-nocheck
 
-global._try = (func) => {
-  try {
-    func();
-  } catch (ex) {
-    global.setResult({
-      error: {
-        name: ex.name,
-        message: ex.message,
-        stack: ex.stack,
-      },
-    });
-  }
-};
-
-global._execute = () => {
-  global._try(() => {
-    global._result = null;
-    global._result = eval(global._code);
-  });
-};
-
 global.dispatch = (name, args, callback) => {
   if (typeof callback !== 'function') {
     callback = null;
@@ -29,11 +8,9 @@ global.dispatch = (name, args, callback) => {
   const parameters = [name, JSON.stringify({ name, args: args || [] })];
 
   const wrappedCallback = callback && ((...args) => {
-    global._try(() => {
-      if (callback) {
-        callback.apply(null, JSON.parse(args));
-      }
-    });
+    if (callback) {
+      callback.apply(null, JSON.parse(args));
+    }
   });
 
   parameters.push(wrappedCallback);

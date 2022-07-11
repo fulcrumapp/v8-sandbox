@@ -80,7 +80,7 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'yoyo');
+    assert.equal(error.message, 'Uncaught Error: yoyo');
   });
 
   it('should handle network errors from httpRequest', async () => {
@@ -467,7 +467,7 @@ setTimeout(() => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'yoyo');
+    assert.equal(error.message, 'Uncaught Error: yoyo');
   });
 
   it('should not crash when calling native functions with invalid arguments', async () => {
