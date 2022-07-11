@@ -1,4 +1,4 @@
-import request from 'request';
+import axios from 'axios';
 import util from 'util';
 import Sandbox, { Message } from './sandbox';
 import Timer from './timer';
@@ -163,21 +163,25 @@ export default class Functions {
 
     options = options || {};
 
-    request(this.processRequestOptions(options), (err, response, body) => {
-      if (response && Buffer.isBuffer(response.body)) {
-        response.body = body = response.body.toString('base64');
-      }
+    axios(this.processHttpRequest(options))
+      .then((response) => {
+        const httpResponse = this.processHttpResponse(response);
 
-      if (!callback) {
-        if (err) {
-          fail(err);
+        if (!callback) {
+          respond(httpResponse);
         } else {
-          respond(response);
+          callback(null, httpResponse, httpResponse.body);
         }
-      } else {
-        callback(err, response, body);
-      }
-    });
+      })
+      .catch((err) => {
+        const httpError = this.processHttpError(err);
+
+        if (!callback) {
+          fail(httpError);
+        } else {
+          callback(httpError);
+        }
+      });
 
     if (callback) {
       respond();
@@ -211,7 +215,39 @@ export default class Functions {
     });
   }
 
-  processRequestOptions(options) {
-    return options;
+  processHttpRequest(options) {
+    return {
+      method: options.method ?? 'GET',
+      url: options.uri ?? options.url,
+      ...(options.proxy ? options.proxy : {}),
+      ...(options.headers ? options.headers : {}),
+      ...(options.params ? options.params : {}),
+      ...(options.data ? options.data : {}),
+      ...(options.auth ? options.auth : {}),
+      ...(options.responseType ? options.responseType : {}),
+      ...(options.responseEncoding ? options.responseEncoding : {}),
+      ...(options.timeout ? options.timeout : {}),
+    };
+  }
+
+  processHttpResponse(response) {
+    if (response && Buffer.isBuffer(response.data)) {
+      response.data = response.data.toString('base64');
+    }
+
+    return {
+      body: response.data,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    };
+  }
+
+  processHttpError(err) {
+    return {
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+    };
   }
 }

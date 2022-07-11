@@ -71,6 +71,17 @@ export default class Functions {
         fail: any;
         respond: any;
     }): any;
-    processRequestOptions(options: any): any;
+    processHttpRequest(options: any): any;
+    processHttpResponse(response: any): {
+        body: any;
+        status: any;
+        statusText: any;
+        headers: any;
+    };
+    processHttpError(err: any): {
+        message: any;
+        code: any;
+        errno: any;
+    };
 }
 export {};

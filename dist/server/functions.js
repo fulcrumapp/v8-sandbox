@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const request_1 = __importDefault(require("request"));
+const axios_1 = __importDefault(require("axios"));
 const util_1 = __importDefault(require("util"));
 const timer_1 = __importDefault(require("./timer"));
 const SYNC_FUNCTIONS = {};
@@ -114,20 +114,23 @@ class Functions {
             return fail(new Error('httpRequest is disabled'));
         }
         options = options || {};
-        (0, request_1.default)(this.processRequestOptions(options), (err, response, body) => {
-            if (response && Buffer.isBuffer(response.body)) {
-                response.body = body = response.body.toString('base64');
-            }
+        (0, axios_1.default)(this.processHttpRequest(options))
+            .then((response) => {
+            const httpResponse = this.processHttpResponse(response);
             if (!callback) {
-                if (err) {
-                    fail(err);
-                }
-                else {
-                    respond(response);
-                }
+                respond(httpResponse);
             }
             else {
-                callback(err, response, body);
+                callback(null, httpResponse, httpResponse.body);
+            }
+        })
+            .catch((err) => {
+            const httpError = this.processHttpError(err);
+            if (!callback) {
+                fail(httpError);
+            }
+            else {
+                callback(httpError);
             }
         });
         if (callback) {
@@ -156,8 +159,37 @@ class Functions {
             argv: this.sandbox.argv,
         });
     }
-    processRequestOptions(options) {
-        return options;
+    processHttpRequest(options) {
+        return {
+            method: options.method ?? 'GET',
+            url: options.uri ?? options.url,
+            ...(options.proxy ? options.proxy : {}),
+            ...(options.headers ? options.headers : {}),
+            ...(options.params ? options.params : {}),
+            ...(options.data ? options.data : {}),
+            ...(options.auth ? options.auth : {}),
+            ...(options.responseType ? options.responseType : {}),
+            ...(options.responseEncoding ? options.responseEncoding : {}),
+            ...(options.timeout ? options.timeout : {}),
+        };
+    }
+    processHttpResponse(response) {
+        if (response && Buffer.isBuffer(response.data)) {
+            response.data = response.data.toString('base64');
+        }
+        return {
+            body: response.data,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+        };
+    }
+    processHttpError(err) {
+        return {
+            message: err.message,
+            code: err.code,
+            errno: err.errno,
+        };
     }
 }
 exports.default = Functions;
