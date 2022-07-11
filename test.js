@@ -63,6 +63,22 @@ setTimeout(() => {
 }, 1000);
 `;
 
+const jsTest5 = `
+function test() {
+  // xxxxxxx%
+
+
+  throw new Error('wha')
+  setResult({value: 1});
+}
+
+(() => {
+  test();
+})();
+`.trim();
+
+const jsTest6 = '}';
+
 // run(jsAsync, (err, result) => {
 //   assert.equal(result, 'hi there');
 //   console.log('success!');
@@ -73,7 +89,7 @@ setTimeout(() => {
 // });
 
 (async () => {
-  const { error, value } = await sandbox.execute({ code: jsTest4, timeout: 4000 });
+  const { error, value } = await sandbox.execute({ code: jsTest5, timeout: 4000 });
 
   if (error && error.isTimeout) {
     console.log('TIMEOUT!');
