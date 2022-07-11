@@ -1,29 +1,27 @@
-// @ts-nocheck
-
 import async from 'async';
 import assert from 'assert';
 import Sandbox, { Options } from '../server/sandbox';
 
-let globalSandbox = null;
+let globalSandbox: Sandbox | null = null;
 
 interface Message {
   initialize: boolean;
   require?: string;
   template?: string;
-  code?: string;
-  globals?: string;
-  context?: string;
+  code: string;
+  globals: string;
+  context: string;
   timeout: number;
 }
 
 class Worker {
-  queue: async.AsyncQueue<Message>;
+  queue: async.QueueObject<Message>;
 
-  sandboxOptions: Options;
+  sandboxOptions?: Options;
 
-  sandbox: Sandbox;
+  sandbox?: Sandbox;
 
-  initialized: boolean;
+  initialized: boolean = false;
 
   error: any;
 
@@ -59,7 +57,7 @@ class Worker {
   }
 
   wait() {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const check = () => {
         if (this.initialized) {
           resolve();
@@ -142,5 +140,5 @@ setInterval(() => {
 }, 5000);
 
 process.on('message', (message) => {
-  worker.queue.push(message);
+  worker.queue.push(message as Message);
 });

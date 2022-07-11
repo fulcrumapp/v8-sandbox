@@ -132,7 +132,7 @@ export default class Sandbox {
   }
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
-    return new Promise((resolve) => {
+    return new Promise<Result>((resolve) => {
       this.queue.push({
         type: 'initialize',
         template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
@@ -149,7 +149,7 @@ export default class Sandbox {
 
   async execute({
     code, timeout, globals, context,
-  }: ExecutionOptions) {
+  }: ExecutionOptions): Promise<Result> {
     this.start();
 
     const result = await this.initialize({ timeout });
@@ -158,7 +158,7 @@ export default class Sandbox {
       return result;
     }
 
-    return new Promise((resolve) => {
+    return new Promise<Result>((resolve) => {
       this.queue.push({
         type: 'execute',
         code,

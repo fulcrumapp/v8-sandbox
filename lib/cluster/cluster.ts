@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
@@ -23,11 +21,11 @@ function remove(array, object) {
 export default class Cluster {
   workerCount: number;
 
-  inactiveWorkers: ChildProcess[];
+  inactiveWorkers: ChildProcess[] = [];
 
-  activeWorkers: ChildProcess[];
+  activeWorkers: ChildProcess[] = [];
 
-  queue: async.AsyncQueue<ExecutionOptions>;
+  queue?: async.QueueObject<ExecutionOptions>;
 
   sandboxOptions: Options;
 
@@ -104,6 +102,10 @@ export default class Cluster {
 
     const worker = this.inactiveWorkers.shift();
 
+    if (worker == null) {
+      throw new Error('no inactive worker');
+    }
+
     this.activeWorkers.push(worker);
 
     if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
@@ -146,6 +148,10 @@ export default class Cluster {
         globals: globals || {},
         context: context || {},
       };
+
+      if (!this.queue) {
+        throw new Error('invalid queue');
+      }
 
       this.queue.push(item, resolve);
     });
