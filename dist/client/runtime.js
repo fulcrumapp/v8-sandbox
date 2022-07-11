@@ -1,94 +1,87 @@
-global._try = func => {
-  try {
-    func();
-  } catch (ex) {
-    global.setResult({
-      error: {
-        name: ex.name,
-        message: ex.message,
-        stack: ex.stack
-      }
+"use strict";
+var environment = global;
+environment._try = function (func) {
+    try {
+        func();
+    }
+    catch (ex) {
+        environment.setResult({
+            error: {
+                name: ex.name,
+                message: ex.message,
+                stack: ex.stack
+            }
+        });
+    }
+};
+environment._execute = function () {
+    environment._try(function () {
+        environment._result = null;
+        environment._result = eval(environment._code); // eslint-disable-line no-eval
     });
-  }
 };
-
-global._execute = () => {
-  global._try(() => {
-    global._result = null;
-    global._result = eval(global._code);
-  });
-};
-
-global.dispatch = (name, args, callback) => {
-  if (typeof callback !== 'function') {
-    callback = null;
-  }
-
-  const parameters = [name, JSON.stringify({
-    name,
-    args: args || []
-  })];
-
-  const wrappedCallback = callback && ((...args) => {
-    global._try(() => {
-      if (callback) {
-        callback.apply(null, JSON.parse(args));
-      }
+environment.dispatch = function (name, args, callback) {
+    if (typeof callback !== 'function') {
+        callback = null;
+    }
+    var parameters = [name, JSON.stringify({ name: name, args: args || [] })];
+    var wrappedCallback = callback && (function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        environment._try(function () {
+            if (callback) {
+                callback.apply(null, JSON.parse(args));
+            }
+        });
     });
-  });
-
-  parameters.push(wrappedCallback);
-
-  const json = global._dispatch.apply(global, parameters);
-
-  const result = json != null ? JSON.parse(json).result : null;
-
-  if (result && result.error) {
-    throw new Error(result.error.message);
-  }
-
-  return result != null ? result.value : null;
+    parameters.push(wrappedCallback);
+    var json = environment._dispatch.apply(global, parameters);
+    var result = json != null ? JSON.parse(json).result : null;
+    if (result && result.error) {
+        throw new Error(result.error.message);
+    }
+    return result != null ? result.value : null;
 };
-
-global.httpRequest = (options, callback) => {
-  return dispatch('httpRequest', [options], callback);
+environment.httpRequest = function (options, callback) { return environment.dispatch('httpRequest', [options], callback); };
+environment.setResult = function (result) { return environment.dispatch('setResult', result != null ? [result] : null); };
+environment.setTimeout = function (callback, timeout) { return environment.dispatch('setTimeout', [timeout], callback); };
+environment.clearTimeout = function (id) { return environment.dispatch('clearTimeout', [id]); };
+environment.info = function (id) { return environment.dispatch('info', []); };
+environment.console = {
+    log: function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        return environment.dispatch('log', [args]);
+    },
+    error: function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        return environment.dispatch('error', [args]);
+    }
 };
-
-global.setResult = result => {
-  return dispatch('setResult', result != null ? [result] : null);
+environment.define = function (name) {
+    global[name] = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        return environment.dispatch(name, args);
+    };
 };
-
-global.setTimeout = (callback, timeout) => {
-  return dispatch('setTimeout', [timeout], callback);
-};
-
-global.clearTimeout = id => {
-  return dispatch('clearTimeout', [id]);
-};
-
-global.info = id => {
-  return dispatch('info', []);
-};
-
-global.console = {
-  log: (...args) => {
-    return dispatch('log', [args]);
-  },
-  error: (...args) => {
-    return dispatch('error', [args]);
-  }
-};
-
-global.define = name => {
-  global[name] = (...args) => {
-    return dispatch(name, args);
-  };
-};
-
-global.defineAsync = name => {
-  global[name] = (...args) => {
-    const callback = args.pop();
-    return dispatch(name, args, callback);
-  };
+environment.defineAsync = function (name) {
+    global[name] = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var callback = args.pop();
+        return environment.dispatch(name, args, callback);
+    };
 };
 //# sourceMappingURL=runtime.js.map

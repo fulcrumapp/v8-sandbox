@@ -1,368 +1,313 @@
 "use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = exports.TimeoutError = void 0;
-
-var _path = _interopRequireDefault(require("path"));
-
-var _net = _interopRequireDefault(require("net"));
-
-var _fs = _interopRequireDefault(require("fs"));
-
-var _child_process = require("child_process");
-
-var _async = _interopRequireDefault(require("async"));
-
-var _lodash = require("lodash");
-
-var _signalExit = _interopRequireDefault(require("signal-exit"));
-
-var _timer = _interopRequireDefault(require("./timer"));
-
-var _socket = _interopRequireDefault(require("./socket"));
-
-var _functions = _interopRequireDefault(require("./functions"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-class TimeoutError extends Error {
-  constructor(timeout) {
-    super(`timeout: ${timeout}ms`);
-  }
-
-  get isTimeout() {
-    return true;
-  }
-
-}
-
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+exports.__esModule = true;
+exports.TimeoutError = void 0;
+var path_1 = __importDefault(require("path"));
+var net_1 = __importDefault(require("net"));
+var fs_1 = __importDefault(require("fs"));
+var child_process_1 = require("child_process");
+var async_1 = __importDefault(require("async"));
+var lodash_1 = require("lodash");
+var signal_exit_1 = __importDefault(require("signal-exit"));
+var timer_1 = __importDefault(require("./timer"));
+var socket_1 = __importDefault(require("./socket"));
+var functions_1 = __importDefault(require("./functions"));
+var TimeoutError = /** @class */ (function (_super) {
+    __extends(TimeoutError, _super);
+    function TimeoutError(timeout) {
+        return _super.call(this, "timeout: ".concat(timeout, "ms")) || this;
+    }
+    Object.defineProperty(TimeoutError.prototype, "isTimeout", {
+        get: function () {
+            return true;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    return TimeoutError;
+}(Error));
 exports.TimeoutError = TimeoutError;
-let nextID = 0;
-
-class Sandbox {
-  constructor({
-    require,
-    template,
-    httpEnabled,
-    timersEnabled,
-    memory,
-    argv,
-    uid,
-    gid,
-    debug,
-    socketPath
-  } = {}) {
-    _defineProperty(this, "id", void 0);
-
-    _defineProperty(this, "template", void 0);
-
-    _defineProperty(this, "initializeTimeout", void 0);
-
-    _defineProperty(this, "argv", void 0);
-
-    _defineProperty(this, "executeTimeout", void 0);
-
-    _defineProperty(this, "server", void 0);
-
-    _defineProperty(this, "worker", void 0);
-
-    _defineProperty(this, "initialized", void 0);
-
-    _defineProperty(this, "socket", void 0);
-
-    _defineProperty(this, "queue", void 0);
-
-    _defineProperty(this, "message", void 0);
-
-    _defineProperty(this, "functions", void 0);
-
-    _defineProperty(this, "running", void 0);
-
-    _defineProperty(this, "debug", void 0);
-
-    _defineProperty(this, "memory", void 0);
-
-    _defineProperty(this, "uid", void 0);
-
-    _defineProperty(this, "gid", void 0);
-
-    _defineProperty(this, "socketPath", void 0);
-
-    _defineProperty(this, "handleTimeout", () => {
-      this.fork();
-      this.finish({
-        error: new TimeoutError(this.message.timeout)
-      });
-    });
-
-    _defineProperty(this, "processMessage", async message => {
-      this.message = message;
-      return new Promise(resolve => {
-        const {
-          callback
-        } = this.message;
-        this.message.callback = (0, _lodash.once)(result => {
-          callback(result);
-          resolve();
-        });
-
-        switch (message.type) {
-          case 'initialize':
-            return this.onInitialize(message);
-
-          case 'execute':
-            return this.onExecute(message);
-
-          default:
-            this.finish({
-              error: new Error('invalid message')
+var nextID = 0;
+var Sandbox = /** @class */ (function () {
+    function Sandbox(_a) {
+        var _b = _a === void 0 ? {} : _a, require = _b.require, template = _b.template, httpEnabled = _b.httpEnabled, timersEnabled = _b.timersEnabled, memory = _b.memory, argv = _b.argv, uid = _b.uid, gid = _b.gid, debug = _b.debug, socketPath = _b.socketPath;
+        var _this = this;
+        this.handleTimeout = function () {
+            _this.fork();
+            _this.finish({ error: new TimeoutError(_this.message.timeout) });
+        };
+        this.processMessage = function (message) { return __awaiter(_this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.message = message;
+                return [2 /*return*/, new Promise(function (resolve) {
+                        var callback = _this.message.callback;
+                        _this.message.callback = (0, lodash_1.once)(function (result) {
+                            callback(result);
+                            resolve();
+                        });
+                        switch (message.type) {
+                            case 'initialize':
+                                return _this.onInitialize(message);
+                            case 'execute':
+                                return _this.onExecute(message);
+                            default:
+                                _this.finish({ error: new Error('invalid message') });
+                        }
+                    })];
             });
-        }
-      });
-    });
-
-    _defineProperty(this, "handleConnection", socket => {
-      this.socket = new _socket.default(socket, this);
-    });
-
-    _defineProperty(this, "handleError", error => {
-      console.error('server error', error);
-    });
-
-    this.id = `v8-sandbox-${process.pid}-${++nextID}`;
-    this.initializeTimeout = new _timer.default();
-    this.executeTimeout = new _timer.default();
-    this.memory = memory;
-    this.argv = argv !== null && argv !== void 0 ? argv : [];
-    this.uid = uid !== null && uid !== void 0 ? uid : null;
-    this.gid = gid !== null && gid !== void 0 ? gid : null;
-    this.socketPath = socketPath !== null && socketPath !== void 0 ? socketPath : '/tmp';
-    this.debug = debug !== null && debug !== void 0 ? debug : false;
-    this.template = template || '';
-    this.functions = new _functions.default(this, {
-      require,
-      httpEnabled,
-      timersEnabled
-    });
-    this.start();
-    (0, _signalExit.default)((code, signal) => {
-      this.shutdown();
-    });
-  }
-
-  initialize({
-    timeout
-  } = {
-    timeout: null
-  }) {
-    return new Promise(resolve => {
-      this.queue.push({
-        type: 'initialize',
-        template: [this.functions.defines().join('\n'), this.template].join('\n'),
-        timeout,
-        output: [],
-        callback: result => {
-          this.initialized = true;
-          resolve(result);
-        }
-      });
-    });
-  }
-
-  async execute({
-    code,
-    timeout,
-    globals,
-    context
-  }) {
-    this.start();
-    const result = await this.initialize({
-      timeout
-    });
-
-    if (result.error) {
-      return result;
-    }
-
-    return new Promise(resolve => {
-      this.queue.push({
-        type: 'execute',
-        code,
-        timeout,
-        globals: globals || {},
-        context: context || {},
-        output: [],
-        callback: res => {
-          this.initialized = false;
-          resolve(res);
-        }
-      });
-    });
-  }
-
-  get socketName() {
-    return process.platform === 'win32' ? _path.default.join('\\\\?\\pipe', process.cwd(), this.id) : `${this.socketPath}/${this.id}`;
-  }
-
-  dispatch(invocation, {
-    fail,
-    respond,
-    callback
-  }) {
-    this.functions.dispatch(invocation, {
-      message: this.message,
-      fail,
-      respond,
-      callback
-    });
-  }
-
-  fork() {
-    this.kill();
-    const execArgv = [...this.argv];
-
-    if (this.memory) {
-      execArgv.push(`--max-old-space-size=${this.memory}`);
-    }
-
-    const workerPath = _path.default.join(__dirname, '..', 'client', 'worker');
-
-    this.worker = (0, _child_process.fork)(workerPath, [this.socketName], {
-      execArgv,
-      uid: this.uid,
-      gid: this.gid
-    });
-    this.worker.on('error', error => {
-      this.fork();
-      this.finish({
-        error
-      });
-    });
-    this.worker.on('exit', () => {
-      if (this.running) {
-        this.fork();
-      }
-
-      this.finish({
-        error: new Error('worker exited')
-      });
-    });
-  }
-
-  kill() {
-    this.initializeTimeout.clear();
-    this.executeTimeout.clear();
-
-    if (this.worker) {
-      this.worker.removeAllListeners();
-
-      if (this.worker.connected) {
-        this.worker.send({
-          type: 'exit'
+        }); };
+        this.handleConnection = function (socket) {
+            _this.socket = new socket_1["default"](socket, _this);
+        };
+        this.handleError = function (error) {
+            console.error('server error', error);
+        };
+        this.id = "v8-sandbox-".concat(process.pid, "-").concat(++nextID);
+        this.initializeTimeout = new timer_1["default"]();
+        this.executeTimeout = new timer_1["default"]();
+        this.memory = memory;
+        this.argv = argv !== null && argv !== void 0 ? argv : [];
+        this.uid = uid !== null && uid !== void 0 ? uid : null;
+        this.gid = gid !== null && gid !== void 0 ? gid : null;
+        this.socketPath = socketPath !== null && socketPath !== void 0 ? socketPath : '/tmp';
+        this.debug = debug !== null && debug !== void 0 ? debug : false;
+        this.template = template || '';
+        this.functions = new functions_1["default"](this, { require: require, httpEnabled: httpEnabled, timersEnabled: timersEnabled });
+        this.start();
+        (0, signal_exit_1["default"])(function (code, signal) {
+            _this.shutdown();
         });
-      }
-
-      this.worker.kill();
-      this.worker = null;
-      this.initialized = false;
     }
-  }
-
-  cleanupSocket() {
-    try {
-      _fs.default.unlinkSync(this.socketName);
-    } catch (ex) {// silent
-    }
-  }
-
-  start() {
-    this.running = true;
-
-    if (this.server) {
-      return;
-    }
-
-    this.shutdown();
-    this.server = _net.default.createServer();
-    this.server.on('connection', this.handleConnection);
-    this.server.on('error', this.handleError);
-    this.cleanupSocket();
-    this.server.listen(this.socketName);
-    this.queue = _async.default.queue(this.processMessage, 1);
-    this.fork();
-  }
-
-  shutdown() {
-    return new Promise(resolve => {
-      this.running = false;
-      this.functions.clearTimers();
-      this.kill();
-
-      if (this.socket) {
-        this.socket.shutdown();
-        this.socket = null;
-      }
-
-      if (this.server) {
-        this.server.close(resolve);
+    Sandbox.prototype.initialize = function (_a) {
+        var _this = this;
+        var _b = _a === void 0 ? { timeout: null } : _a, timeout = _b.timeout;
+        return new Promise(function (resolve) {
+            _this.queue.push({
+                type: 'initialize',
+                template: [_this.functions.defines().join('\n'), _this.template].join('\n'),
+                timeout: timeout,
+                output: [],
+                callback: function (result) {
+                    _this.initialized = true;
+                    resolve(result);
+                }
+            });
+        });
+    };
+    Sandbox.prototype.execute = function (_a) {
+        var code = _a.code, timeout = _a.timeout, globals = _a.globals, context = _a.context;
+        return __awaiter(this, void 0, void 0, function () {
+            var result;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        this.start();
+                        return [4 /*yield*/, this.initialize({ timeout: timeout })];
+                    case 1:
+                        result = _b.sent();
+                        if (result.error) {
+                            return [2 /*return*/, result];
+                        }
+                        return [2 /*return*/, new Promise(function (resolve) {
+                                _this.queue.push({
+                                    type: 'execute',
+                                    code: code,
+                                    timeout: timeout,
+                                    globals: globals || {},
+                                    context: context || {},
+                                    output: [],
+                                    callback: function (res) {
+                                        _this.initialized = false;
+                                        resolve(res);
+                                    }
+                                });
+                            })];
+                }
+            });
+        });
+    };
+    Object.defineProperty(Sandbox.prototype, "socketName", {
+        get: function () {
+            return process.platform === 'win32' ? path_1["default"].join('\\\\?\\pipe', process.cwd(), this.id)
+                : "".concat(this.socketPath, "/").concat(this.id);
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Sandbox.prototype.dispatch = function (invocation, _a) {
+        var fail = _a.fail, respond = _a.respond, callback = _a.callback;
+        this.functions.dispatch(invocation, { message: this.message, fail: fail, respond: respond, callback: callback });
+    };
+    Sandbox.prototype.fork = function () {
+        var _this = this;
+        this.kill();
+        var execArgv = __spreadArray([], this.argv, true);
+        if (this.memory) {
+            execArgv.push("--max-old-space-size=".concat(this.memory));
+        }
+        var workerPath = path_1["default"].join(__dirname, '..', 'client', 'worker');
+        this.worker = (0, child_process_1.fork)(workerPath, [this.socketName], { execArgv: execArgv, uid: this.uid, gid: this.gid });
+        this.worker.on('error', function (error) {
+            _this.fork();
+            _this.finish({ error: error });
+        });
+        this.worker.on('exit', function () {
+            if (_this.running) {
+                _this.fork();
+            }
+            _this.finish({ error: new Error('worker exited') });
+        });
+    };
+    Sandbox.prototype.kill = function () {
+        this.initializeTimeout.clear();
+        this.executeTimeout.clear();
+        if (this.worker) {
+            this.worker.removeAllListeners();
+            if (this.worker.connected) {
+                this.worker.send({ type: 'exit' });
+            }
+            this.worker.kill();
+            this.worker = null;
+            this.initialized = false;
+        }
+    };
+    Sandbox.prototype.cleanupSocket = function () {
+        try {
+            fs_1["default"].unlinkSync(this.socketName);
+        }
+        catch (ex) {
+            // silent
+        }
+    };
+    Sandbox.prototype.start = function () {
+        this.running = true;
+        if (this.server) {
+            return;
+        }
+        this.shutdown();
+        this.server = net_1["default"].createServer();
+        this.server.on('connection', this.handleConnection);
+        this.server.on('error', this.handleError);
         this.cleanupSocket();
-        this.server = null;
-      }
-    });
-  }
-
-  callback(id, args) {
-    this.worker.send({
-      type: 'callback',
-      id,
-      args
-    });
-  }
-
-  onInitialize({
-    template,
-    timeout
-  }) {
-    if (this.initialized) {
-      return this.finish({});
-    }
-
-    this.initializeTimeout.start(timeout, this.handleTimeout);
-    this.worker.send({
-      type: 'initialize',
-      template
-    });
-  }
-
-  onExecute({
-    code,
-    timeout,
-    globals,
-    context
-  }) {
-    this.executeTimeout.start(timeout, this.handleTimeout);
-    this.worker.send({
-      type: 'execute',
-      code,
-      globals: JSON.stringify(globals)
-    });
-  }
-
-  finish(result) {
-    this.functions.clearTimers();
-
-    if (this.message) {
-      this.message.callback({ ...result,
-        output: this.message.output
-      });
-    }
-  }
-
-}
-
-exports.default = Sandbox;
+        this.server.listen(this.socketName);
+        this.queue = async_1["default"].queue(this.processMessage, 1);
+        this.fork();
+    };
+    Sandbox.prototype.shutdown = function () {
+        var _this = this;
+        return new Promise(function (resolve) {
+            _this.running = false;
+            _this.functions.clearTimers();
+            _this.kill();
+            if (_this.socket) {
+                _this.socket.shutdown();
+                _this.socket = null;
+            }
+            if (_this.server) {
+                _this.server.close(resolve);
+                _this.cleanupSocket();
+                _this.server = null;
+            }
+        });
+    };
+    Sandbox.prototype.callback = function (id, args) {
+        this.worker.send({ type: 'callback', id: id, args: args });
+    };
+    Sandbox.prototype.onInitialize = function (_a) {
+        var template = _a.template, timeout = _a.timeout;
+        if (this.initialized) {
+            return this.finish({});
+        }
+        this.initializeTimeout.start(timeout, this.handleTimeout);
+        this.worker.send({ type: 'initialize', template: template });
+    };
+    Sandbox.prototype.onExecute = function (_a) {
+        var code = _a.code, timeout = _a.timeout, globals = _a.globals, context = _a.context;
+        this.executeTimeout.start(timeout, this.handleTimeout);
+        this.worker.send({ type: 'execute', code: code, globals: JSON.stringify(globals) });
+    };
+    Sandbox.prototype.finish = function (result) {
+        this.functions.clearTimers();
+        if (this.message) {
+            this.message.callback(__assign(__assign({}, result), { output: this.message.output }));
+        }
+    };
+    return Sandbox;
+}());
+exports["default"] = Sandbox;
 //# sourceMappingURL=sandbox.js.map

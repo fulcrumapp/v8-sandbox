@@ -1,122 +1,88 @@
 "use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _fs = _interopRequireDefault(require("fs"));
-
-var _path = _interopRequireDefault(require("path"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-const NativeSandbox = require('bindings')('sandbox').Sandbox;
-
-const RUNTIME = _fs.default.readFileSync(_path.default.join(__dirname, 'runtime.js')).toString();
-
-const wrapCode = code => {
-  return `
-    global._code = ${JSON.stringify(code)};
-    global._execute();
-  `;
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-
-class Worker {
-  constructor() {
-    _defineProperty(this, "native", void 0);
-
-    _defineProperty(this, "connected", void 0);
-
-    _defineProperty(this, "handleMessage", message => {
-      switch (message.type) {
-        case 'initialize':
-          return this.initialize(message);
-
-        case 'execute':
-          return this.execute(message);
-
-        case 'callback':
-          return this.callback(message);
-
-        case 'exit':
-          return this.exit(message);
-
-        default:
-          throw new Error('invalid message');
-      }
-    });
-
-    this.native = new NativeSandbox(process.argv[2]);
-  }
-
-  initialize({
-    template
-  }) {
-    this.reset(true);
-    this.connect();
-    const code = [RUNTIME, wrapCode(template), 'setResult()'].join('\n');
-
-    this._execute(code);
-  }
-
-  execute({
-    code,
-    globals
-  }) {
-    this.reset(false);
-    this.connect();
-    const withGlobals = [`Object.assign(global, ${globals});`, code].join('\n');
-
-    this._execute(wrapCode(withGlobals));
-  }
-
-  _execute(code) {
-    return this.native.execute(code);
-  }
-
-  reset(force) {
-    if (force || !this.native.initialized) {
-      this.native.initialize();
-      this.native.initialized = true;
+exports.__esModule = true;
+var fs_1 = __importDefault(require("fs"));
+var path_1 = __importDefault(require("path"));
+var NativeSandbox = require('bindings')('sandbox').Sandbox;
+var RUNTIME = fs_1["default"].readFileSync(path_1["default"].join(__dirname, 'runtime.js')).toString();
+var wrapCode = function (code) { return "\n    global._code = ".concat(JSON.stringify(code), ";\n    global._execute();\n  "); };
+var Worker = /** @class */ (function () {
+    function Worker() {
+        var _this = this;
+        this.connected = false;
+        this.handleMessage = function (message) {
+            switch (message.type) {
+                case 'initialize':
+                    return _this.initialize(message);
+                case 'execute':
+                    return _this.execute(message);
+                case 'callback':
+                    return _this.callback(message);
+                case 'exit':
+                    return _this.exit(message);
+                default:
+                    throw new Error('invalid message');
+            }
+        };
+        this.native = new NativeSandbox(process.argv[2]);
     }
-  }
-
-  connect() {
-    if (this.connected) {
-      return;
-    }
-
-    this.native.connect();
-    this.connected = true;
-  }
-
-  disconnect() {
-    if (!this.connected) {
-      return;
-    }
-
-    this.native.disconnect();
-    this.connected = false;
-  }
-
-  callback({
-    id,
-    args
-  }) {
-    this.native.callback(id, JSON.stringify(args));
-  }
-
-  exit(message) {
-    this.disconnect();
-    process.off('message', this.handleMessage);
-  }
-
-}
-
-exports.default = Worker;
-const worker = new Worker();
+    Worker.prototype.initialize = function (_a) {
+        var template = _a.template;
+        this.reset(true);
+        this.connect();
+        var code = [
+            RUNTIME,
+            wrapCode(template),
+            'setResult()',
+        ].join('\n');
+        this._execute(code);
+    };
+    Worker.prototype.execute = function (_a) {
+        var code = _a.code, globals = _a.globals;
+        this.reset(false);
+        this.connect();
+        var withGlobals = [
+            "Object.assign(global, ".concat(globals, ");"),
+            code,
+        ].join('\n');
+        this._execute(wrapCode(withGlobals));
+    };
+    Worker.prototype._execute = function (code) {
+        return this.native.execute(code);
+    };
+    Worker.prototype.reset = function (force) {
+        if (force || !this.native.initialized) {
+            this.native.initialize();
+            this.native.initialized = true;
+        }
+    };
+    Worker.prototype.connect = function () {
+        if (this.connected) {
+            return;
+        }
+        this.native.connect();
+        this.connected = true;
+    };
+    Worker.prototype.disconnect = function () {
+        if (!this.connected) {
+            return;
+        }
+        this.native.disconnect();
+        this.connected = false;
+    };
+    Worker.prototype.callback = function (_a) {
+        var id = _a.id, args = _a.args;
+        this.native.callback(id, JSON.stringify(args));
+    };
+    Worker.prototype.exit = function (message) {
+        this.disconnect();
+        process.off('message', this.handleMessage);
+    };
+    return Worker;
+}());
+exports["default"] = Worker;
+var worker = new Worker();
 process.on('message', worker.handleMessage);
 //# sourceMappingURL=worker.js.map
