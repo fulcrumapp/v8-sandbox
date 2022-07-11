@@ -1,1 +1,1 @@
-require('@babel/register')();
+require('ts-node/register');

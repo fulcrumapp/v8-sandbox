@@ -1,7 +1,9 @@
-import Sandbox, { Message } from './sandbox';
-import Timer from './timer';
+// @ts-nocheck
+
 import request from 'request';
 import util from 'util';
+import Sandbox, { Message } from './sandbox';
+import Timer from './timer';
 
 const SYNC_FUNCTIONS = {};
 
@@ -66,20 +68,24 @@ export default class Functions {
 
   defines() {
     return [
-      ...Object.entries(this.syncFunctions).map(([ name ]) => `define('${name}');\n`),
-      ...Object.entries(this.asyncFunctions).map(([ name ]) => `defineAsync('${name}');\n`)
+      ...Object.entries(this.syncFunctions).map(([name]) => `define('${name}');\n`),
+      ...Object.entries(this.asyncFunctions).map(([name]) => `defineAsync('${name}');\n`),
     ];
   }
 
   clearTimers() {
-    for (const [ id, timer ] of Object.entries(this.timers)) {
+    for (const [id, timer] of Object.entries(this.timers)) {
       timer.clear();
       delete this.timers[id];
     }
   }
 
-  dispatch({ name, args }, { message, fail, respond, callback }) {
-    const params: [ any, any ] = [ args, { message, respond, fail, callback, context: message.context } ];
+  dispatch({ name, args }, {
+    message, fail, respond, callback,
+  }) {
+    const params: [ any, any ] = [args, {
+      message, respond, fail, callback, context: message.context,
+    }];
 
     switch (name) {
       case 'setResult': {
@@ -109,19 +115,19 @@ export default class Functions {
         if (fn) {
           fn(...params);
         } else {
-          throw new Error(`${ name } is not a valid method`);
+          throw new Error(`${name} is not a valid method`);
         }
       }
     }
   }
 
-  setResult([ result ], { message, respond }) {
+  setResult([result], { message, respond }) {
     this.sandbox.finish(result);
 
     respond();
   }
 
-  setTimeout([ timeout ], { fail, respond, callback }) {
+  setTimeout([timeout], { fail, respond, callback }) {
     if (!this.timersEnabled) {
       return fail(new Error('setTimeout is disabled'));
     }
@@ -130,14 +136,14 @@ export default class Functions {
 
     timer.start(timeout || 0, callback);
 
-    const id = timer.id;
+    const { id } = timer;
 
     this.timers[id] = timer;
 
     respond(id);
   }
 
-  clearTimeout([ timerID ], { fail, respond }) {
+  clearTimeout([timerID], { fail, respond }) {
     if (!this.timersEnabled) {
       return fail(new Error('clearTimeout is disabled'));
     }
@@ -152,7 +158,7 @@ export default class Functions {
     respond();
   }
 
-  httpRequest([ options ], { respond, fail, callback }) {
+  httpRequest([options], { respond, fail, callback }) {
     if (!this.httpEnabled) {
       return fail(new Error('httpRequest is disabled'));
     }
@@ -180,13 +186,13 @@ export default class Functions {
     }
   }
 
-  log([ args ], { message, respond, callback }) {
+  log([args], { message, respond, callback }) {
     this.write({ message, type: 'log', args });
     console.log(...args);
     respond();
   }
 
-  error([ args ], { message, respond, callback }) {
+  error([args], { message, respond, callback }) {
     this.write({ message, type: 'error', args });
     console.error(...args);
     respond();
@@ -203,7 +209,7 @@ export default class Functions {
 
     respond({
       versions: process.versions,
-      argv: this.sandbox.argv
+      argv: this.sandbox.argv,
     });
   }
 

@@ -1,6 +1,8 @@
-import Sandbox, { Options } from '../server/sandbox';
+// @ts-nocheck
+
 import async from 'async';
 import assert from 'assert';
+import Sandbox, { Options } from '../server/sandbox';
 
 let globalSandbox = null;
 
@@ -70,7 +72,9 @@ class Worker {
     });
   }
 
-  async execute({ code, timeout, globals, context }: Message) {
+  async execute({
+    code, timeout, globals, context,
+  }: Message) {
     assert(this.initialized);
 
     let result;
@@ -80,7 +84,7 @@ class Worker {
         code,
         timeout,
         globals: JSON.parse(globals),
-        context: JSON.parse(context)
+        context: JSON.parse(context),
       });
     } else {
       result = { error: this.error, output: [] };
@@ -92,7 +96,7 @@ class Worker {
         name: result.error.name,
         message: result.error.message,
         stack: result.error.stack,
-        ...result.error
+        ...result.error,
       };
     }
 

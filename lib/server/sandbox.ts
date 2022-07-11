@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import path from 'path';
 import net from 'net';
 import fs from 'fs';
@@ -105,8 +107,10 @@ export default class Sandbox {
 
   socketPath: string;
 
-  constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath }: Options = {}) {
-    this.id = `v8-sandbox-${ process.pid }-${ ++nextID }`;
+  constructor({
+    require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath,
+  }: Options = {}) {
+    this.id = `v8-sandbox-${process.pid}-${++nextID}`;
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
@@ -128,22 +132,24 @@ export default class Sandbox {
   }
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.queue.push({
         type: 'initialize',
-        template: [ this.functions.defines().join('\n'), this.template ].join('\n'),
+        template: [this.functions.defines().join('\n'), this.template].join('\n'),
         timeout,
         output: [],
         callback: (result: Result) => {
           this.initialized = true;
 
           resolve(result);
-        }
+        },
       });
     });
   }
 
-  async execute({ code, timeout, globals, context }: ExecutionOptions) {
+  async execute({
+    code, timeout, globals, context,
+  }: ExecutionOptions) {
     this.start();
 
     const result = await this.initialize({ timeout });
@@ -152,7 +158,7 @@ export default class Sandbox {
       return result;
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.queue.push({
         type: 'execute',
         code,
@@ -164,24 +170,26 @@ export default class Sandbox {
           this.initialized = false;
 
           resolve(res);
-        }
+        },
       });
     });
   }
 
   get socketName() {
     return process.platform === 'win32' ? path.join('\\\\?\\pipe', process.cwd(), this.id)
-      : `${ this.socketPath }/${ this.id }`;
+      : `${this.socketPath}/${this.id}`;
   }
 
   dispatch(invocation, { fail, respond, callback }) {
-    this.functions.dispatch(invocation, { message: this.message, fail, respond, callback });
+    this.functions.dispatch(invocation, {
+      message: this.message, fail, respond, callback,
+    });
   }
 
   fork() {
     this.kill();
 
-    const execArgv = [ ...this.argv ];
+    const execArgv = [...this.argv];
 
     if (this.memory) {
       execArgv.push(`--max-old-space-size=${this.memory}`);
@@ -189,7 +197,7 @@ export default class Sandbox {
 
     const workerPath = path.join(__dirname, '..', 'client', 'worker');
 
-    this.worker = fork(workerPath, [ this.socketName ], { execArgv, uid: this.uid, gid: this.gid });
+    this.worker = fork(workerPath, [this.socketName], { execArgv, uid: this.uid, gid: this.gid });
 
     this.worker.on('error', (error) => {
       this.fork();
@@ -253,7 +261,7 @@ export default class Sandbox {
   }
 
   shutdown() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.running = false;
 
       this.functions.clearTimers();
@@ -287,7 +295,7 @@ export default class Sandbox {
   processMessage = async (message: Message) => {
     this.message = message;
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const { callback } = this.message;
 
       this.message.callback = once((result) => {
@@ -316,7 +324,9 @@ export default class Sandbox {
     this.worker.send({ type: 'initialize', template });
   }
 
-  onExecute({ code, timeout, globals, context }: Message) {
+  onExecute({
+    code, timeout, globals, context,
+  }: Message) {
     this.executeTimeout.start(timeout, this.handleTimeout);
 
     this.worker.send({ type: 'execute', code, globals: JSON.stringify(globals) });

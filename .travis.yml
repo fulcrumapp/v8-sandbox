@@ -22,12 +22,16 @@ matrix:
     env: export NODE_VERSION="12" TARGET_ARCH="x64" RUNTIME="node"
   - os: linux
     env: export NODE_VERSION="14" TARGET_ARCH="x64" RUNTIME="node"
+  - os: linux
+    env: export NODE_VERSION="16" TARGET_ARCH="x64" RUNTIME="node"
   - os: osx
     env: export NODE_VERSION="10" TARGET_ARCH="x64" RUNTIME="node"
   - os: osx
     env: export NODE_VERSION="12" TARGET_ARCH="x64" RUNTIME="node"
   - os: osx
     env: export NODE_VERSION="14" TARGET_ARCH="x64" RUNTIME="node"
+  - os: osx
+    env: export NODE_VERSION="16" TARGET_ARCH="x64" RUNTIME="node"
 
 addons:
   apt:

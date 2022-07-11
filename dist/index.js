@@ -1,22 +1,11 @@
 "use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-Object.defineProperty(exports, "SandboxCluster", {
-  enumerable: true,
-  get: function () {
-    return _cluster.default;
-  }
-});
-exports.default = void 0;
-
-var _sandbox = _interopRequireDefault(require("./server/sandbox"));
-
-var _cluster = _interopRequireDefault(require("./cluster/cluster"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var _default = _sandbox.default;
-exports.default = _default;
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SandboxCluster = void 0;
+const sandbox_1 = __importDefault(require("./server/sandbox"));
+const cluster_1 = __importDefault(require("./cluster/cluster"));
+exports.SandboxCluster = cluster_1.default;
+exports.default = sandbox_1.default;
 //# sourceMappingURL=index.js.map

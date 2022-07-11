@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
@@ -134,20 +136,24 @@ export default class Cluster {
     this.ensureWorkers();
   }
 
-  execute({ code, timeout, globals, context }: ExecutionOptions) {
+  execute({
+    code, timeout, globals, context,
+  }: ExecutionOptions) {
     return new Promise((resolve, reject) => {
       const item = {
         code,
         timeout,
         globals: globals || {},
-        context: context || {}
+        context: context || {},
       };
 
       this.queue.push(item, resolve);
     });
   }
 
-  _execute({ code, timeout, globals, context }, callback) {
+  _execute({
+    code, timeout, globals, context,
+  }, callback) {
     callback = once(callback);
 
     this.popWorker((worker) => {
@@ -185,7 +191,7 @@ export default class Cluster {
       worker.send({
         code,
         globals: JSON.stringify(globals),
-        context: JSON.stringify(context)
+        context: JSON.stringify(context),
       });
     });
   }
