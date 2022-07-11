@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import fs from 'fs';
 import path from 'path';
 
@@ -10,7 +8,7 @@ const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
 export default class Worker {
   native: any;
 
-  connected: boolean;
+  connected: boolean = false;
 
   constructor() {
     this.native = new NativeSandbox(process.argv[2]);

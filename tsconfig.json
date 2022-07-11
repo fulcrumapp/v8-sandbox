@@ -10,7 +10,7 @@
     "module": "commonjs",
     "allowJs": true,
     "esModuleInterop": true,
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "declaration": true
   }
 }
