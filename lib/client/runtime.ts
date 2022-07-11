@@ -1,17 +1,5 @@
 // @ts-nocheck
 
-Error.prepareStackTrace = (err, callsites) => {
-  const parts = [];
-
-  callsites.forEach((callsite) => {
-    const functionName = callsite.getFunctionName() ?? '<anonymous>';
-
-    parts.push(`at ${functionName} (<script>:${callsite.getLineNumber()}:${callsite.getColumnNumber()})`);
-  });
-
-  return parts.join('\n    ');
-};
-
 global._try = (func) => {
   try {
     func();

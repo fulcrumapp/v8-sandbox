@@ -279,9 +279,10 @@ setResult({value: 1});
     const { error } = await run(js);
 
     const stack = `
-at test (<script>:3:15)
-    at <anonymous> (<script>:5:7)
-    at <anonymous> (<script>:6:7)
+Error: yo
+    at test (script:3:15)
+    at script:5:7
+    at script:6:7
     `.trim();
 
     assert.ok(error);
@@ -302,7 +303,7 @@ at test (<script>:3:15)
 
     assert.ok(error);
     assert.equal(error.message, 'Uncaught SyntaxError: Unexpected token \'}\'');
-    assert.equal(error.stack, '');
+    assert.equal(error.stack, 'SyntaxError: Unexpected token \'}\'');
     assert.equal(error.sourceLine, '}');
     assert.equal(error.lineNumber, 1);
     assert.equal(error.startColumn, 0);
