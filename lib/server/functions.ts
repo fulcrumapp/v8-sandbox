@@ -90,22 +90,22 @@ export default class Functions {
         return this.setResult(...params);
       }
       case 'httpRequest': {
-        return this.httpRequest(...params);
+        return (this.asyncFunctions.httpRequest ?? this.httpRequest)(...params);
       }
       case 'setTimeout': {
-        return this.setTimeout(...params);
+        return (this.syncFunctions.setTimeout ?? this.setTimeout)(...params);
       }
       case 'clearTimeout': {
-        return this.clearTimeout(...params);
+        return (this.syncFunctions.clearTimeout ?? this.clearTimeout)(...params);
       }
       case 'log': {
-        return this.log(...params);
+        return (this.syncFunctions.log ?? this.log)(...params);
       }
       case 'error': {
-        return this.error(...params);
+        return (this.syncFunctions.error ?? this.error)(...params);
       }
       case 'info': {
-        return this.info(...params);
+        return (this.syncFunctions.info ?? this.info)(...params);
       }
       default: {
         const fn = this.syncFunctions[name] || this.asyncFunctions[name];
@@ -125,7 +125,7 @@ export default class Functions {
     respond();
   }
 
-  setTimeout([timeout], { fail, respond, callback }) {
+  setTimeout = ([timeout], { fail, respond, callback }) => {
     if (!this.timersEnabled) {
       return fail(new Error('setTimeout is disabled'));
     }
@@ -139,9 +139,9 @@ export default class Functions {
     this.timers[id] = timer;
 
     respond(id);
-  }
+  };
 
-  clearTimeout([timerID], { fail, respond }) {
+  clearTimeout = ([timerID], { fail, respond }) => {
     if (!this.timersEnabled) {
       return fail(new Error('clearTimeout is disabled'));
     }
@@ -154,9 +154,9 @@ export default class Functions {
     }
 
     respond();
-  }
+  };
 
-  httpRequest([options], { respond, fail, callback }) {
+  httpRequest = ([options], { respond, fail, callback }) => {
     if (!this.httpEnabled) {
       return fail(new Error('httpRequest is disabled'));
     }
@@ -186,25 +186,25 @@ export default class Functions {
     if (callback) {
       respond();
     }
-  }
+  };
 
-  log([args], { message, respond, callback }) {
+  log = ([args], { message, respond, callback }) => {
     this.write({ message, type: 'log', args });
     console.log(...args);
     respond();
-  }
-
-  error([args], { message, respond, callback }) {
-    this.write({ message, type: 'error', args });
-    console.error(...args);
-    respond();
-  }
+  };
 
   write({ message, type, args }: { message: Message; type: string; args: [ any, any ]}) {
     message.output.push({ type, time: new Date(), message: util.format(...args) });
   }
 
-  info(args, { message, fail, respond }) {
+  error = ([args], { message, respond, callback }) => {
+    this.write({ message, type: 'error', args });
+    console.error(...args);
+    respond();
+  };
+
+  info = (args, { message, fail, respond }) => {
     if (!this.sandbox.debug) {
       return fail(new Error('info is disabled'));
     }
@@ -213,7 +213,7 @@ export default class Functions {
       versions: process.versions,
       argv: this.sandbox.argv,
     });
-  }
+  };
 
   processHttpRequest(options) {
     return {
