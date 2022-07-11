@@ -71,11 +71,11 @@ export default class Sandbox {
     uid: number;
     gid: number;
     socketPath: string;
-    constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath }?: Options);
+    constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath, }?: Options);
     initialize({ timeout }?: {
         timeout: null;
     }): Promise<Result>;
-    execute({ code, timeout, globals, context }: ExecutionOptions): Promise<unknown>;
+    execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<unknown>;
     get socketName(): string;
     dispatch(invocation: any, { fail, respond, callback }: {
         fail: any;
@@ -91,7 +91,7 @@ export default class Sandbox {
     callback(id: any, args: any): void;
     processMessage: (message: Message) => Promise<unknown>;
     onInitialize({ template, timeout }: Message): void;
-    onExecute({ code, timeout, globals, context }: Message): void;
+    onExecute({ code, timeout, globals, context, }: Message): void;
     finish(result: any): void;
     handleConnection: (socket: any) => void;
     handleError: (error: any) => void;
