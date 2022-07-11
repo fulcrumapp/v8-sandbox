@@ -1,27 +1,27 @@
-import Sandbox, { Options } from '../server/sandbox';
 import async from 'async';
 import assert from 'assert';
+import Sandbox, { Options } from '../server/sandbox';
 
-let globalSandbox = null;
+let globalSandbox: Sandbox | null = null;
 
 interface Message {
   initialize: boolean;
   require?: string;
   template?: string;
-  code?: string;
-  globals?: string;
-  context?: string;
+  code: string;
+  globals: string;
+  context: string;
   timeout: number;
 }
 
 class Worker {
   queue: async.AsyncQueue<Message>;
 
-  sandboxOptions: Options;
+  sandboxOptions?: Options;
 
-  sandbox: Sandbox;
+  sandbox?: Sandbox;
 
-  initialized: boolean;
+  initialized: boolean = false;
 
   error: any;
 
@@ -44,6 +44,10 @@ class Worker {
     assert(!this.initialized);
 
     try {
+      if (!this.sandbox) {
+        throw new Error('sandbox not available');
+      }
+
       const { error } = await this.sandbox.initialize();
 
       if (error) {
@@ -57,7 +61,7 @@ class Worker {
   }
 
   wait() {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, _reject) => {
       const check = () => {
         if (this.initialized) {
           resolve();
@@ -70,8 +74,14 @@ class Worker {
     });
   }
 
-  async execute({ code, timeout, globals, context }: Message) {
+  async execute({
+    code, timeout, globals, context,
+  }: Message) {
     assert(this.initialized);
+
+    if (!this.sandbox) {
+      throw new Error('sandbox not available');
+    }
 
     let result;
 
@@ -80,7 +90,7 @@ class Worker {
         code,
         timeout,
         globals: JSON.parse(globals),
-        context: JSON.parse(context)
+        context: JSON.parse(context),
       });
     } else {
       result = { error: this.error, output: [] };
@@ -92,14 +102,17 @@ class Worker {
         name: result.error.name,
         message: result.error.message,
         stack: result.error.stack,
-        ...result.error
+        ...result.error,
       };
     }
 
-    process.send(result);
+    if (process.send) {
+      process.send(result);
+    }
 
-    // start creating the next sandbox *after* posting the completion message. This operation happens with coordination from
-    // the calling process, but that's OK because we wait for it's initialization.
+    // start creating the next sandbox *after* posting the completion message.
+    // This operation happens with coordination from the calling process, but
+    // that's OK because we wait for it's initialization.
     setImmediate(() => {
       this.create();
     });

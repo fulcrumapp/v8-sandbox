@@ -1,33 +1,35 @@
-global._try = (func) => {
+const environment: any = global;
+
+environment._try = (func) => {
   try {
     func();
-  } catch (ex) {
-    global.setResult({
+  } catch (ex: any) {
+    environment.setResult({
       error: {
         name: ex.name,
         message: ex.message,
-        stack: ex.stack
-      }
+        stack: ex.stack,
+      },
     });
   }
 };
 
-global._execute = () => {
-  global._try(() => {
-    global._result = null;
-    global._result = eval(global._code);
+environment._execute = () => {
+  environment._try(() => {
+    environment._result = null;
+    environment._result = eval(environment._code); // eslint-disable-line no-eval
   });
 };
 
-global.dispatch = (name, args, callback) => {
+environment.dispatch = (name, args, callback) => {
   if (typeof callback !== 'function') {
     callback = null;
   }
 
-  const parameters = [ name, JSON.stringify({ name, args: args || [] }) ];
+  const parameters = [name, JSON.stringify({ name, args: args || [] })];
 
   const wrappedCallback = callback && ((...args) => {
-    global._try(() => {
+    environment._try(() => {
       if (callback) {
         callback.apply(null, JSON.parse(args));
       }
@@ -36,7 +38,7 @@ global.dispatch = (name, args, callback) => {
 
   parameters.push(wrappedCallback);
 
-  const json = global._dispatch.apply(global, parameters);
+  const json = environment._dispatch.apply(global, parameters);
 
   const result = json != null ? JSON.parse(json).result : null;
 
@@ -47,45 +49,29 @@ global.dispatch = (name, args, callback) => {
   return result != null ? result.value : null;
 };
 
-global.httpRequest = (options, callback) => {
-  return dispatch('httpRequest', [ options ], callback);
+environment.httpRequest = (options, callback) => environment.dispatch('httpRequest', [options], callback);
+
+environment.setResult = (result) => environment.dispatch('setResult', result != null ? [result] : null);
+
+environment.setTimeout = (callback, timeout) => environment.dispatch('setTimeout', [timeout], callback);
+
+environment.clearTimeout = (id) => environment.dispatch('clearTimeout', [id]);
+
+environment.info = (id) => environment.dispatch('info', []);
+
+environment.console = {
+  log: (...args) => environment.dispatch('log', [args]),
+  error: (...args) => environment.dispatch('error', [args]),
 };
 
-global.setResult = (result) => {
-  return dispatch('setResult', result != null ? [ result ] : null);
+environment.define = (name) => {
+  global[name] = (...args) => environment.dispatch(name, args);
 };
 
-global.setTimeout = (callback, timeout) => {
-  return dispatch('setTimeout', [ timeout ], callback);
-};
-
-global.clearTimeout = (id) => {
-  return dispatch('clearTimeout', [ id ]);
-};
-
-global.info = (id) => {
-  return dispatch('info', []);
-};
-
-global.console = {
-  log: (...args) => {
-    return dispatch('log', [ args ]);
-  },
-  error: (...args) => {
-    return dispatch('error', [ args ]);
-  }
-};
-
-global.define = (name) => {
-  global[name] = (...args) => {
-    return dispatch(name, args);
-  };
-};
-
-global.defineAsync = (name) => {
+environment.defineAsync = (name) => {
   global[name] = (...args) => {
     const callback = args.pop();
 
-    return dispatch(name, args, callback);
+    return environment.dispatch(name, args, callback);
   };
 };
