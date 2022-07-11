@@ -135,7 +135,7 @@ export default class Sandbox {
     return new Promise((resolve) => {
       this.queue.push({
         type: 'initialize',
-        template: [this.functions.defines().join('\n'), this.template].join('\n'),
+        template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
         timeout,
         output: [],
         callback: (result: Result) => {

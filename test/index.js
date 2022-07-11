@@ -266,12 +266,49 @@ setResult({value: 1});
     assert.equal(value, 1);
   });
 
+  it('should handle simple errors', async () => {
+    const js = `
+    (() => {
+      function test() {
+        throw new Error("yo");
+      }
+      test();
+    })();
+    `.trim();
+
+    const { error } = await run(js);
+
+    const stack = `
+at test (<script>:3:15)
+    at <anonymous> (<script>:5:7)
+    at <anonymous> (<script>:6:7)
+    `.trim();
+
+    assert.ok(error);
+    assert.equal(error.message, 'Uncaught Error: yo');
+    assert.equal(error.stack, stack);
+    assert.equal(error.sourceLine, '        throw new Error("yo");');
+    assert.equal(error.lineNumber, 3);
+    assert.equal(error.startColumn, 8);
+    assert.equal(error.endColumn, 9);
+    assert.equal(error.startPosition, 41);
+    assert.equal(error.endPosition, 42);
+  });
+
   it('should handle syntax errors', async () => {
     const js = '}';
 
     const { error } = await run(js);
 
-    assert.ok(error && error.stack.indexOf('SyntaxError') >= 0);
+    assert.ok(error);
+    assert.equal(error.message, 'Uncaught SyntaxError: Unexpected token \'}\'');
+    assert.equal(error.stack, '');
+    assert.equal(error.sourceLine, '}');
+    assert.equal(error.lineNumber, 1);
+    assert.equal(error.startColumn, 0);
+    assert.equal(error.endColumn, 1);
+    assert.equal(error.startPosition, 0);
+    assert.equal(error.endPosition, 1);
   });
 
   it('should capture logs', async () => {
@@ -417,7 +454,7 @@ setTimeout(() => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'yoyo');
+    assert.equal(error.message, 'Uncaught Error: yoyo');
   });
 
   it('should throw errors from setTimeout callbacks', async () => {
@@ -575,7 +612,14 @@ setTimeout(() => {
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'Unexpected end of input');
+    assert.ok(error);
+    assert.equal(error.message, 'Uncaught SyntaxError: Unexpected end of input');
+    assert.equal(error.sourceLine, template);
+    assert.equal(error.lineNumber, 1);
+    assert.equal(error.startColumn, 1);
+    assert.equal(error.endColumn, 1);
+    assert.equal(error.startPosition, 1);
+    assert.equal(error.endPosition, 1);
 
     sandbox.shutdown();
   });
@@ -611,7 +655,7 @@ setTimeout(() => {
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'name must be a string');
+    assert.equal(error.message, 'Uncaught TypeError: name must be a string');
 
     sandbox.shutdown();
   });
@@ -735,7 +779,7 @@ errorAsync(1, 2);
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'hi');
+    assert.equal(error.message, 'Uncaught Error: hi');
 
     sandbox.shutdown();
   });
@@ -837,13 +881,13 @@ setResult({ value: fetchLargeValue() });
 
     let result = await sandbox.execute({ code, timeout: 8000 });
 
-    assert.equal(result.error.message, 'setTimeout is disabled');
+    assert.equal(result.error.message, 'Uncaught Error: setTimeout is disabled');
 
     code = 'httpRequest({ url: "http://example.com" });';
 
     result = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(result.error.message, 'httpRequest is disabled');
+    assert.equal(result.error.message, 'Uncaught Error: httpRequest is disabled');
 
     sandbox.shutdown();
   });

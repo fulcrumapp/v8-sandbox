@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <v8.h>
+#include <node.h>
 
 // #include <unistd.h>
 // void Debug(const char *msg) {
@@ -197,15 +198,21 @@ void Sandbox::Execute(const char *code) {
 
   Nan::TryCatch tryCatch;
 
+  ScriptOrigin origin(Isolate::GetCurrent(), Nan::New("script").ToLocalChecked());
+
   hasResult_ = false;
 
-  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked());
+  Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
+
+  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked(), &origin);
 
   if (!tryCatch.HasCaught()) {
     (void)script.ToLocalChecked()->Run(context);
   }
 
   MaybeHandleError(tryCatch, context);
+
+  Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
 void Sandbox::Callback(int id, const char *args) {
@@ -265,13 +272,24 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   Nan::Utf8String message(tryCatch.Message()->Get());
   Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
 
+  Nan::Utf8String sourceLine(tryCatch.Message()->GetSourceLine(context).ToLocalChecked());
+
   int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
+  int startColumn = tryCatch.Message()->GetStartColumn(context).FromJust();
+  int endColumn = tryCatch.Message()->GetEndColumn(context).FromJust();
+  int startPosition = tryCatch.Message()->GetStartPosition();
+  int endPosition = tryCatch.Message()->GetEndPosition();
 
   Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
 
   Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
   Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
+  Nan::Set(error, Nan::New("startColumn").ToLocalChecked(), Nan::New(startColumn));
+  Nan::Set(error, Nan::New("endColumn").ToLocalChecked(), Nan::New(endColumn));
+  Nan::Set(error, Nan::New("startPosition").ToLocalChecked(), Nan::New(startPosition));
+  Nan::Set(error, Nan::New("endPosition").ToLocalChecked(), Nan::New(endPosition));
+  Nan::Set(error, Nan::New("sourceLine").ToLocalChecked(), Nan::New(*sourceLine).ToLocalChecked());
 
   SetResult(context, result);
 }

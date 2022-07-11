@@ -7,11 +7,6 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
 const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
 
-const wrapCode = (code) => `
-    global._code = ${JSON.stringify(code)};
-    global._execute();
-  `;
-
 export default class Worker {
   native: any;
 
@@ -26,13 +21,9 @@ export default class Worker {
 
     this.connect();
 
-    const code = [
-      RUNTIME,
-      wrapCode(template),
-      'setResult()',
-    ].join('\n');
-
-    this._execute(code);
+    this._execute(RUNTIME);
+    this._execute(template);
+    this._execute('setResult()');
   }
 
   execute({ code, globals }) {
@@ -40,12 +31,11 @@ export default class Worker {
 
     this.connect();
 
-    const withGlobals = [
-      `Object.assign(global, ${globals});`,
-      code,
-    ].join('\n');
+    if (globals !== '{}') {
+      this._execute(`Object.assign(global, ${globals});`);
+    }
 
-    this._execute(wrapCode(withGlobals));
+    this._execute(code);
   }
 
   _execute(code) {
