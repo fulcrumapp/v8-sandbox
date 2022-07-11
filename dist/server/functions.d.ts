@@ -37,40 +37,40 @@ export default class Functions {
         message: any;
         respond: any;
     }): void;
-    setTimeout([timeout]: [any], { fail, respond, callback }: {
+    setTimeout: ([timeout]: [any], { fail, respond, callback }: {
         fail: any;
         respond: any;
         callback: any;
-    }): any;
-    clearTimeout([timerID]: [any], { fail, respond }: {
+    }) => any;
+    clearTimeout: ([timerID]: [any], { fail, respond }: {
         fail: any;
         respond: any;
-    }): any;
-    httpRequest([options]: [any], { respond, fail, callback }: {
+    }) => any;
+    httpRequest: ([options]: [any], { respond, fail, callback }: {
         respond: any;
         fail: any;
         callback: any;
-    }): any;
-    log([args]: [any], { message, respond, callback }: {
+    }) => any;
+    log: ([args]: [any], { message, respond, callback }: {
         message: any;
         respond: any;
         callback: any;
-    }): void;
-    error([args]: [any], { message, respond, callback }: {
-        message: any;
-        respond: any;
-        callback: any;
-    }): void;
+    }) => void;
     write({ message, type, args }: {
         message: Message;
         type: string;
         args: [any, any];
     }): void;
-    info(args: any, { message, fail, respond }: {
+    error: ([args]: [any], { message, respond, callback }: {
+        message: any;
+        respond: any;
+        callback: any;
+    }) => void;
+    info: (args: any, { message, fail, respond }: {
         message: any;
         fail: any;
         respond: any;
-    }): any;
+    }) => any;
     processHttpRequest(options: any): any;
     processHttpResponse(response: any): {
         body: any;
