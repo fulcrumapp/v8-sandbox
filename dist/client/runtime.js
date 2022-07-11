@@ -1,43 +1,13 @@
 // @ts-nocheck
-Error.prepareStackTrace = (err, callsites) => {
-    const parts = [];
-    callsites.forEach((callsite) => {
-        const functionName = callsite.getFunctionName() ?? '<anonymous>';
-        parts.push(`at ${functionName} (<script>:${callsite.getLineNumber()}:${callsite.getColumnNumber()})`);
-    });
-    return parts.join('\n    ');
-};
-global._try = (func) => {
-    try {
-        func();
-    }
-    catch (ex) {
-        global.setResult({
-            error: {
-                name: ex.name,
-                message: ex.message,
-                stack: ex.stack,
-            },
-        });
-    }
-};
-global._execute = () => {
-    global._try(() => {
-        global._result = null;
-        global._result = eval(global._code);
-    });
-};
 global.dispatch = (name, args, callback) => {
     if (typeof callback !== 'function') {
         callback = null;
     }
     const parameters = [name, JSON.stringify({ name, args: args || [] })];
     const wrappedCallback = callback && ((...args) => {
-        global._try(() => {
-            if (callback) {
-                callback.apply(null, JSON.parse(args));
-            }
-        });
+        if (callback) {
+            callback.apply(null, JSON.parse(args));
+        }
     });
     parameters.push(wrappedCallback);
     const json = global._dispatch.apply(global, parameters);
