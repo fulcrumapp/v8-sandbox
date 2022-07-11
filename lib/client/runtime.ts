@@ -6,8 +6,8 @@ global._try = (func) => {
       error: {
         name: ex.name,
         message: ex.message,
-        stack: ex.stack
-      }
+        stack: ex.stack,
+      },
     });
   }
 };
@@ -24,7 +24,7 @@ global.dispatch = (name, args, callback) => {
     callback = null;
   }
 
-  const parameters = [ name, JSON.stringify({ name, args: args || [] }) ];
+  const parameters = [name, JSON.stringify({ name, args: args || [] })];
 
   const wrappedCallback = callback && ((...args) => {
     global._try(() => {
@@ -47,39 +47,23 @@ global.dispatch = (name, args, callback) => {
   return result != null ? result.value : null;
 };
 
-global.httpRequest = (options, callback) => {
-  return dispatch('httpRequest', [ options ], callback);
-};
+global.httpRequest = (options, callback) => dispatch('httpRequest', [options], callback);
 
-global.setResult = (result) => {
-  return dispatch('setResult', result != null ? [ result ] : null);
-};
+global.setResult = (result) => dispatch('setResult', result != null ? [result] : null);
 
-global.setTimeout = (callback, timeout) => {
-  return dispatch('setTimeout', [ timeout ], callback);
-};
+global.setTimeout = (callback, timeout) => dispatch('setTimeout', [timeout], callback);
 
-global.clearTimeout = (id) => {
-  return dispatch('clearTimeout', [ id ]);
-};
+global.clearTimeout = (id) => dispatch('clearTimeout', [id]);
 
-global.info = (id) => {
-  return dispatch('info', []);
-};
+global.info = (id) => dispatch('info', []);
 
 global.console = {
-  log: (...args) => {
-    return dispatch('log', [ args ]);
-  },
-  error: (...args) => {
-    return dispatch('error', [ args ]);
-  }
+  log: (...args) => dispatch('log', [args]),
+  error: (...args) => dispatch('error', [args]),
 };
 
 global.define = (name) => {
-  global[name] = (...args) => {
-    return dispatch(name, args);
-  };
+  global[name] = (...args) => dispatch(name, args);
 };
 
 global.defineAsync = (name) => {

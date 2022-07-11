@@ -57,7 +57,7 @@ export default class Socket {
       this.message = {
         id: data.readInt32BE(0),
         length: data.readInt32BE(4),
-        json: data.toString('utf8', 8)
+        json: data.toString('utf8', 8),
       };
     } else {
       this.message.json += data.toString('utf8');
@@ -98,8 +98,8 @@ export default class Socket {
           error: {
             name: error.name,
             message: error.message,
-            stack: error.stack
-          }
+            stack: error.stack,
+          },
         });
       };
 
