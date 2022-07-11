@@ -2,9 +2,7 @@ import Sandbox from './dist';
 
 import assert from 'assert';
 
-const run = (code, timeout, callback) => {
-  return new Sandbox().execute({code, timeout}, callback);
-};
+const sandbox = new Sandbox();
 
 const jsAsync = `
 httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'}, (err, res, body) => {
@@ -61,7 +59,7 @@ throw new Error('yo');
 
 const jsTest4 = `
 setTimeout(() => {
-
+  setResult({ value: 1 });
 }, 1000);
 `;
 
@@ -73,11 +71,19 @@ setTimeout(() => {
 // new Sandbox().execute(jsTest, (err, result) => {
 //   console.log('success!', err, result);
 // });
-run(jsTest4, 10000, (err, result) => {
-  if (err && err.isTimeout) {
+
+(async () => {
+  const { error, value } = await sandbox.execute({ code: jsTest4, timeout: 4000 });
+
+  if (error && error.isTimeout) {
     console.log('TIMEOUT!');
   }
 
-  console.log('success!', err, result);
-  // assert.equal(result, 'hi there');
-});
+  if (error) {
+    console.error(error);
+  } else {
+    console.log('success!', value);
+  }
+
+  await sandbox.shutdown();
+})();
