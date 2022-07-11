@@ -38,6 +38,7 @@
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-react": "^7.19.0",
     "mocha": "^7.1.1",
+    "ts-node": "^10.8.2",
     "typescript": "^4.7.4",
     "wtfnode": "^0.8.1"
   },
