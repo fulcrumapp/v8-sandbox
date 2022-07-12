@@ -12,6 +12,26 @@ It's intentionally not possible to expose any nodejs objects or functions direct
 * Timeout support
 * Gracefully handle and recover from OOM errors and hard crashes
 * Expose nodejs (host) functionality selectively using `require` parameter `new Sandbox({ require: 'path-to-file.js' })`. This file will be required by the workers and define both synchronous and asynchronous functions that can be called from the sandbox. See `example.js` and `example-functions.js` for a sample of how to expose native functions to the sandbox. Note that the native functions cannot be directly exposed, all input and output from the native functions is serialized with JSON between native <--> sandbox.
+
+Host functions take the form:
+
+```js
+// called from inside sandbox as `nodeFunctionSync(arg1, arg2, arg3)`
+function nodeFunctionSync([ arg1, arg2, arg3 ], { respond, fail, context }) {
+  respond('return value'); // you must call this to complete this invocation and pass control back to the sandbox
+  fail(new Error('fail')); // or can call fail(), which causes the entire invocation to fail
+}
+
+// called from inside sandbox as `nodeFunctionAsync(arg1, arg2, arg3, (err, result) => {})`
+function nodeFunctionAsync([ arg1, arg2, arg3 ], { respond, fail, callback, context }) {
+  setTimeout(() => {
+    callback(null, 10);
+  }, 100);
+
+  respond(); // you must call this to complete this invocation and pass control back to the sandbox
+}
+```
+
 * Support for a `template` script that gets executed upon initialization of each sandbox instance. This is useful if you have large libraries or setup code before calling the user code. When using this library in a web app, this feature can massively improve performance since a worker will be "pre-warmed" with your setup code by the time you execute the actual user code. For example, if you want to provide some helper functions to all code that's executed in the sandbox. This is mostly intended for use with the cluster feature since the template code is executed on initialization. In a server environment, when the time comes to execute user code in a request, the cluster worker will already be pre-warmed with the template code and only need to execute the user code.
 
 # Installation
@@ -32,13 +52,15 @@ npm install v8-sandbox
 - `timersEnabled`: `boolean` (optional) enable the `setTimeout` and `clearTimeout` functions (default: `true`)
 - `memory`: `number` (optional) set the amount of memory available to the sandbox (default: `null`, nodejs defaults)
 - `argv`: `string[]` (optional) set the flags passed to the nodejs process hosting the sandbox (default: `[]`) example: `[ '--harmony' ]`
+- `uid`: `string` (optional) user id to run the sandbox as (default: `null`, same as running process)
+- `gid`: `string` (optional) group id to run the sandbox as (default: `null`, same as running process)
 
 **`async execute({ code, timeout, globals, context })`**
 
 - `code`: `string` code to execute
-- `timeout`: `number` (optional) script timeout
-- `globals`: `object` (optional) variables to make available to the script
-- `context`: `object` (optional) data to make available to the nodejs host process. This is only necessary if you're using a `require` script. `context` is how you pass data in to make it available to the custom `require` script.
+- `timeout`: `number` (optional) script timeout (default: `null`, no timeout)
+- `globals`: `object` (optional) global variables to make available to the script
+- `context`: `object` (optional) data to make available to the nodejs host process. This is only necessary if you're using a `require` script. `context` is how you pass data in to make it available to the custom `require` script. The context object will be passed in to the host functions.
 
 You *must* use the `setResult({ value, error })` function in the `code` to set the result of the execution. Using this function is required in order to fully support async code and promises within the sandbox.
 
