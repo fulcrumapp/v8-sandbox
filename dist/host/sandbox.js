@@ -188,6 +188,13 @@ class Sandbox {
         });
     }
     callback(id, args) {
+        if (args && args.length > 0 && args[0] instanceof Error) {
+            args[0] = {
+                name: args[0].name,
+                message: args[0].message,
+                stack: args[0].stack,
+            };
+        }
         this.worker.send({ type: 'callback', id, args });
     }
     onInitialize({ template, timeout }) {
