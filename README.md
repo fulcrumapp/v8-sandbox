@@ -12,27 +12,6 @@ It's intentionally not possible to expose any nodejs objects or functions direct
 * Timeout support
 * Gracefully handle and recover from OOM errors and hard crashes
 * Expose nodejs (host) functionality selectively using `require` parameter `new Sandbox({ require: 'path-to-file.js' })`. This file will be required by the workers and define both synchronous and asynchronous functions that can be called from the sandbox. See `example.js` and `example-functions.js` for a sample of how to expose native functions to the sandbox. Note that the native functions cannot be directly exposed, all input and output from the native functions is serialized with JSON between native <--> sandbox.
-
-Host functions take the form:
-
-```js
-// called from inside sandbox as `nodeFunctionSync(arg1, arg2, arg3)`
-function nodeFunctionSync([ arg1, arg2, arg3 ], { respond, fail, context }) {
-  respond('return value'); // you must call this to complete this invocation and pass control back to the sandbox
-  // or
-  fail(new Error('fail')); // or can call fail(), which causes the entire invocation to fail
-}
-
-// called from inside sandbox as `nodeFunctionAsync(arg1, arg2, arg3, (err, result) => {})`
-function nodeFunctionAsync([ arg1, arg2, arg3 ], { respond, fail, callback, context }) {
-  setTimeout(() => {
-    callback(null, 10);
-  }, 100);
-
-  respond(); // you must call this to complete this invocation and pass control back to the sandbox
-}
-```
-
 * Support for a `template` script that gets executed upon initialization of each sandbox instance. This is useful if you have large libraries or setup code before calling the user code. When using this library in a web app, this feature can massively improve performance since a worker will be "pre-warmed" with your setup code by the time you execute the actual user code. For example, if you want to provide some helper functions to all code that's executed in the sandbox. This is mostly intended for use with the cluster feature since the template code is executed on initialization. In a server environment, when the time comes to execute user code in a request, the cluster worker will already be pre-warmed with the template code and only need to execute the user code.
 
 # Installation
@@ -134,4 +113,44 @@ const code = 'while (true) {}';
   console.log(error.isTimeout);
   //=> true
 })();
+```
+
+# Host functions
+
+Host functions can be used to selectively expose nodejs functionality to the sandbox. Because the sandbox happens inside a child process, the machinery for exposing nodejs functionality is somewhat complex and handled using the `require` option when creating a sandbox. The file passed as `require` is executed in the trusted nodejs host and can define functions the sandboxed code can call.
+
+Depending on what functionality is being exposed, host functions can take one of the following forms:
+
+1. Synchronous from the sandbox and synchronous in the nodejs process (use `respond(result)`)
+2. Synchronous from the sandbox but asynchronous in the nodejs process (call async code and some time later call `respond(result)`)
+3. Asynchronous from the sandbox and asynchronous in the nodejs process (start async work and call `respond()` and later call `callback(error, value)`)
+
+You must always call `respond()` or `fail()` to transfer control back to the sandbox. The sandbox execution remains suspended until `respond()` or `fail()` is called.
+
+**`function nodeFunction(args, { respond, fail, callback, context }) {}`**
+
+- `args`: `array` arguments passed to the function from the sandbox
+- `respond`: `function` respond to the sandbox with a return value
+- `fail`: `function` respond to the sandbox with an error
+- `callback`: `function` the callback passed from the sandbox for an async function, signature: `callback(error, value)`
+- `context`: `object` (optional) the context variables passed into this execution
+
+Host functions take the form:
+
+```js
+// called from inside sandbox as `nodeFunctionSync(arg1, arg2, arg3)`
+function nodeFunctionSync([ arg1, arg2, arg3 ], { respond, fail, context }) {
+  respond('return value'); // you must call this to complete this invocation and pass control back to the sandbox
+  // or
+  fail(new Error('fail')); // or can call fail(), which causes the entire invocation to fail
+}
+
+// called from inside sandbox as `nodeFunctionAsync(arg1, arg2, arg3, (err, result) => {})`
+function nodeFunctionAsync([ arg1, arg2, arg3 ], { respond, fail, callback, context }) {
+  setTimeout(() => {
+    callback(null, 10);
+  }, 100);
+
+  respond(); // you must call this to complete this invocation and pass control back to the sandbox
+}
 ```
