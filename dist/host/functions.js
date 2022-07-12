@@ -37,14 +37,14 @@ class Functions {
             }
             respond();
         };
-        this.httpRequest = ([options], { respond, fail, callback }) => {
+        this.httpRequest = ([options], { respond, fail, callback, context, }) => {
             if (!this.httpEnabled) {
                 return fail(new Error('httpRequest is disabled'));
             }
             options = options || {};
-            (0, axios_1.default)(this.processHttpRequest(options))
+            (0, axios_1.default)(this.processHttpRequest(options, context))
                 .then((response) => {
-                const httpResponse = this.processHttpResponse(response);
+                const httpResponse = this.processHttpResponse(response, context);
                 if (!callback) {
                     respond(httpResponse);
                 }
@@ -52,8 +52,8 @@ class Functions {
                     callback(null, httpResponse, httpResponse.body);
                 }
             })
-                .catch((err) => {
-                const httpError = this.processHttpError(err);
+                .catch((error) => {
+                const httpError = this.processHttpError(error, context);
                 if (!callback) {
                     fail(httpError);
                 }
@@ -65,14 +65,14 @@ class Functions {
                 respond();
             }
         };
-        this.log = ([args], { message, respond, callback }) => {
+        this.log = ([args], { message, respond, context, callback, }) => {
             this.write({ message, type: 'log', args });
-            console.log(...args);
+            (global.handleConsoleLog ?? this.handleConsoleLog)({ args, context });
             respond();
         };
-        this.error = ([args], { message, respond, callback }) => {
+        this.error = ([args], { message, respond, context, callback, }) => {
             this.write({ message, type: 'error', args });
-            console.error(...args);
+            (global.handleConsoleError ?? this.handleConsoleError)({ args, context });
             respond();
         };
         this.info = (args, { message, fail, respond }) => {
@@ -84,6 +84,11 @@ class Functions {
                 argv: this.sandbox.argv,
             });
         };
+        this.handleConsoleLog = ({ args, context }) => console.log(...args);
+        this.handleConsoleError = ({ args, context }) => console.error(...args);
+        this.handleHttpRequest = ({ options, rawOptions, context }) => options;
+        this.handleHttpResponse = ({ response, rawResponse, context }) => response;
+        this.handleHttpError = ({ error, rawError, context }) => error;
         this.sandbox = sandbox;
         this.require = require;
         this.httpEnabled = httpEnabled ?? true;
@@ -159,38 +164,43 @@ class Functions {
     write({ message, type, args }) {
         message.output.push({ type, time: new Date(), message: util_1.default.format(...args) });
     }
-    processHttpRequest(options) {
-        return {
-            method: options.method ?? 'GET',
-            url: options.uri ?? options.url,
-            ...(options.proxy ? options.proxy : {}),
-            ...(options.headers ? options.headers : {}),
-            ...(options.params ? options.params : {}),
-            ...(options.data ? options.data : {}),
-            ...(options.auth ? options.auth : {}),
-            ...(options.encoding === null ? { responseType: 'arraybuffer' } : {}),
-            ...(options.responseType ? { responseType: options.responseType } : {}),
-            ...(options.responseEncoding ? { responseEncoding: options.responseEncoding } : {}),
-            ...(options.timeout ? { timeout: options.timeout } : {}),
+    processHttpRequest(rawOptions, context) {
+        const options = {
+            method: rawOptions.method ?? 'GET',
+            url: rawOptions.uri ?? rawOptions.url,
+            ...(rawOptions.proxy ? { proxy: rawOptions.proxy } : {}),
+            ...(rawOptions.headers ? { headers: rawOptions.headers } : {}),
+            ...(rawOptions.params ? { params: rawOptions.params } : {}),
+            ...(rawOptions.form ? { data: rawOptions.form } : {}),
+            ...(rawOptions.data ? { data: rawOptions.data } : {}),
+            ...(rawOptions.auth ? { auth: rawOptions.auth } : {}),
+            ...(rawOptions.encoding === null ? { responseType: 'arraybuffer' } : {}),
+            ...(rawOptions.responseType ? { responseType: rawOptions.responseType } : {}),
+            ...(rawOptions.responseEncoding ? { responseEncoding: rawOptions.responseEncoding } : {}),
+            ...(rawOptions.timeout ? { timeout: rawOptions.timeout } : {}),
         };
+        return (global.handleHttpRequest ?? this.handleHttpRequest)({ options, rawOptions, context });
     }
-    processHttpResponse(response) {
-        if (response && Buffer.isBuffer(response.data)) {
-            response.data = response.data.toString('base64');
+    processHttpResponse(rawResponse, context) {
+        let { data } = rawResponse;
+        if (rawResponse && Buffer.isBuffer(rawResponse.data)) {
+            data = rawResponse.data.toString('base64');
         }
-        return {
-            body: response.data,
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
+        const response = {
+            body: data,
+            statusCode: rawResponse.status,
+            statusText: rawResponse.statusText,
+            headers: rawResponse.headers,
         };
+        return (global.handleHttpResponse ?? this.handleHttpResponse)({ response, rawResponse, context });
     }
-    processHttpError(err) {
-        return {
-            message: err.message,
-            code: err.code,
-            errno: err.errno,
+    processHttpError(rawError, context) {
+        const error = {
+            message: rawError.message,
+            code: rawError.code,
+            errno: rawError.errno,
         };
+        return (global.handleHttpError ?? this.handleHttpError)({ error, rawError, context });
     }
 }
 exports.default = Functions;

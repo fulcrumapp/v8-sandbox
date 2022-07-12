@@ -46,14 +46,16 @@ export default class Functions {
         fail: any;
         respond: any;
     }) => any;
-    httpRequest: ([options]: [any], { respond, fail, callback }: {
+    httpRequest: ([options]: [any], { respond, fail, callback, context, }: {
         respond: any;
         fail: any;
         callback: any;
+        context: any;
     }) => any;
-    log: ([args]: [any], { message, respond, callback }: {
+    log: ([args]: [any], { message, respond, context, callback, }: {
         message: any;
         respond: any;
+        context: any;
         callback: any;
     }) => void;
     write({ message, type, args }: {
@@ -61,9 +63,10 @@ export default class Functions {
         type: string;
         args: [any, any];
     }): void;
-    error: ([args]: [any], { message, respond, callback }: {
+    error: ([args]: [any], { message, respond, context, callback, }: {
         message: any;
         respond: any;
+        context: any;
         callback: any;
     }) => void;
     info: (args: any, { message, fail, respond }: {
@@ -71,17 +74,31 @@ export default class Functions {
         fail: any;
         respond: any;
     }) => any;
-    processHttpRequest(options: any): any;
-    processHttpResponse(response: any): {
-        body: any;
-        status: any;
-        statusText: any;
-        headers: any;
-    };
-    processHttpError(err: any): {
-        message: any;
-        code: any;
-        errno: any;
-    };
+    processHttpRequest(rawOptions: any, context: any): any;
+    processHttpResponse(rawResponse: any, context: any): any;
+    processHttpError(rawError: any, context: any): any;
+    handleConsoleLog: ({ args, context }: {
+        args: any;
+        context: any;
+    }) => void;
+    handleConsoleError: ({ args, context }: {
+        args: any;
+        context: any;
+    }) => void;
+    handleHttpRequest: ({ options, rawOptions, context }: {
+        options: any;
+        rawOptions: any;
+        context: any;
+    }) => any;
+    handleHttpResponse: ({ response, rawResponse, context }: {
+        response: any;
+        rawResponse: any;
+        context: any;
+    }) => any;
+    handleHttpError: ({ error, rawError, context }: {
+        error: any;
+        rawError: any;
+        context: any;
+    }) => any;
 }
 export {};
