@@ -286,6 +286,16 @@ Error: yo
     assert.equal(error.endPosition, 42);
   });
 
+  it('should handle string errors', async () => {
+    const js = 'throw "yo"';
+
+    const { error } = await run(js);
+
+    assert.ok(error);
+    assert.equal(error.message, 'Uncaught yo');
+    assert.equal(error.stack, '');
+  });
+
   it('should handle syntax errors', async () => {
     const js = '}';
 
@@ -771,6 +781,36 @@ errorAsync(1, 2);
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should support calling fail() from async nodejs functions', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE });
+
+    const code = `
+    errorAsyncCallback(1337, (error, value) => {
+      setResult({ value });
+    });
+`;
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error.message, 'Uncaught Error: 1337');
+
+    sandbox.shutdown();
+  });
+
+  it('should support calling fail() from async nodejs functions that call respond()', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE });
+
+    const code = `
+    errorAsyncCallbackWithRespond(1337, (error, value) => {
+      setResult({ error, value });
+    });
+`;
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error.message, '1337');
 
     sandbox.shutdown();
   });

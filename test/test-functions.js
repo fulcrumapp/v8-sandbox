@@ -30,10 +30,20 @@ defineAsync('errorAsync', ({ callback }) => {
   throw new Error('hi');
 });
 
+// this function is async inside the nodejs process but sync in the sandbox
 defineAsync('errorAsyncCallback', ([ param1 ], { fail, callback }) => {
   setTimeout(() => {
-    fail(new Error('hi'));
+    fail(new Error(param1));
   }, 1);
+});
+
+// this function is async inside the nodejs process and async in the sandbox
+defineAsync('errorAsyncCallbackWithRespond', ([ param1 ], { respond, callback }) => {
+  setTimeout(() => {
+    callback(new Error(param1));
+  }, 1);
+
+  respond();
 });
 
 defineAsync('executeWithContext', ([ param1 ], { context, fail, respond }) => {

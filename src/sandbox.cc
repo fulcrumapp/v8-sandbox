@@ -63,7 +63,8 @@ NAN_METHOD(Sandbox::New) {
     obj->socket_ = *socket;
 
     info.GetReturnValue().Set(info.This());
-  } else {
+  }
+  else {
     const int argc = 1;
     v8::Local<v8::Value> argv[argc] = { info[0] };
     v8::Local<v8::Function> cons = Nan::New<v8::Function>(constructor);
@@ -270,8 +271,6 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   auto error = Nan::New<Object>();
 
   Nan::Utf8String message(tryCatch.Message()->Get());
-  Nan::Utf8String stack(tryCatch.StackTrace().ToLocalChecked());
-
   Nan::Utf8String sourceLine(tryCatch.Message()->GetSourceLine(context).ToLocalChecked());
 
   int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
@@ -282,8 +281,14 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
 
   Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
 
+  if (!tryCatch.StackTrace().IsEmpty()) {
+    Nan::Set(error, Nan::New("stack").ToLocalChecked(), tryCatch.StackTrace().ToLocalChecked());
+  }
+  else {
+    Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New("").ToLocalChecked());
+  }
+
   Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
-  Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New(*stack).ToLocalChecked());
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
   Nan::Set(error, Nan::New("startColumn").ToLocalChecked(), Nan::New(startColumn));
   Nan::Set(error, Nan::New("endColumn").ToLocalChecked(), Nan::New(endColumn));
