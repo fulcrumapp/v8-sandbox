@@ -1,7 +1,5 @@
 # v8-sandbox
 
-[![Build Status](https://travis-ci.org/fulcrumapp/v8-sandbox.svg?branch=master)](https://travis-ci.org/fulcrumapp/v8-sandbox)
-
 Safely execute arbitrary untrusted JavaScript from nodejs. This module implements an isolated JavaScript environment that can be used to run any code without being able to escape the sandbox. The V8 context is initialized and executed entirely from C++ so it's impossible for the JS stack frames to lead back to the nodejs environment. It's usable from a nodejs process, but the JS environment is pure V8. The sandboxed V8 context is executed from a separate nodejs process to enable full support for script timeouts.
 
 It's intentionally not possible to expose any nodejs objects or functions directly to the sandbox. This makes it slightly harder to integrate into a project, but has the benefit of guaranteed isolation. There is however a mechanism to invoke host functions from the sandbox using the `require` constructor option of the Sandbox. The host dispatch feature uses JSON serialization over IPC for all parameters and return values so it's not possible to pass any object references between the environments. All communication between the sandbox instance of V8 and the nodejs instance of V8 is done through JSON serialization to completely prevent leaking any references into the sandbox. See `example.js` and `example-functions.js` for a sample of how to expose nodejs functions to the sandbox.
