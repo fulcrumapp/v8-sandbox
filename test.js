@@ -1,6 +1,5 @@
-import Sandbox from './dist';
-
-import assert from 'assert';
+const Sandbox = require('./dist').default;
+const assert = require('assert');
 
 const sandbox = new Sandbox();
 
