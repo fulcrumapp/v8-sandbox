@@ -117,7 +117,7 @@ const code = 'while (true) {}';
 
 # Host functions
 
-Host functions can be used to selectively expose nodejs functionality to the sandbox. Because the sandbox happens inside a child process, the machinery for exposing nodejs functionality is somewhat complex and handled using the `require` option when creating a sandbox. The file passed as `require` is executed in the trusted nodejs host and can define functions the sandboxed code can call.
+Host functions can be used to selectively expose nodejs functionality to the sandbox. Because the sandbox is inside a child process, the machinery for exposing nodejs functionality is somewhat complex. Host functions are setup using the `require` option when creating a sandbox. The file passed as `require` is executed in the trusted nodejs host and can define functions the sandboxed code can call.
 
 Depending on what functionality is being exposed, host functions can take one of the following forms:
 
@@ -127,7 +127,7 @@ Depending on what functionality is being exposed, host functions can take one of
 
 You must always call `respond()` or `fail()` to transfer control back to the sandbox. The sandbox execution remains suspended until `respond()` or `fail()` is called.
 
-**`function nodeFunction(args, { respond, fail, callback, context }) {}`**
+**`function nodeFunction(args, { respond, fail, callback, context })`**
 
 - `args`: `array` arguments passed to the function from the sandbox
 - `respond`: `function` respond to the sandbox with a return value
