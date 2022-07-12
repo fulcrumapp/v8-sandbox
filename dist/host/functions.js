@@ -168,9 +168,10 @@ class Functions {
             ...(options.params ? options.params : {}),
             ...(options.data ? options.data : {}),
             ...(options.auth ? options.auth : {}),
-            ...(options.responseType ? options.responseType : {}),
-            ...(options.responseEncoding ? options.responseEncoding : {}),
-            ...(options.timeout ? options.timeout : {}),
+            ...(options.encoding === null ? { responseType: 'arraybuffer' } : {}),
+            ...(options.responseType ? { responseType: options.responseType } : {}),
+            ...(options.responseEncoding ? { responseEncoding: options.responseEncoding } : {}),
+            ...(options.timeout ? { timeout: options.timeout } : {}),
         };
     }
     processHttpResponse(response) {
