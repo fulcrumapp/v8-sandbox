@@ -13,7 +13,7 @@ function tryParseJSON(value) {
 interface Message {
   id: number;
   length: number;
-  json: string;
+  data: Buffer;
 }
 
 export default class Socket {
@@ -57,14 +57,16 @@ export default class Socket {
       this.message = {
         id: data.readInt32BE(0),
         length: data.readInt32BE(4),
-        json: data.toString('utf8', 8),
+        data: data.subarray(8),
       };
     } else {
-      this.message.json += data.toString('utf8');
+      this.message.data = Buffer.concat([this.message.data, data]);
     }
 
-    if (Buffer.byteLength(this.message.json) === this.message.length) {
-      const { id, json } = this.message;
+    if (this.message.data.length === this.message.length) {
+      const { id, data } = this.message;
+
+      const json = data.toString('utf8');
 
       this.message = null;
 
