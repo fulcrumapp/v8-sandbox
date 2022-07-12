@@ -57,3 +57,42 @@ defineAsync('fetchLargeValue', (args, { fail, respond }) => {
     respond(LARGE_VALUE);
   }, 1);
 });
+
+// Example of a blocking function. It's a synchronous function for the sandbox, but asynchronous to the host
+define('addNumbersBlocking', ([ value1, value2 ], { respond }) => {
+  setTimeout(() => {
+    respond(value1 + value2);
+  }, 1);
+});
+
+global.handleConsoleLog = ({ args, context }) => {
+  if (context.logFile) {
+    fs.appendFileSync(context.logFile, JSON.stringify({ type: 'log', message: args, context }) + '\n');
+  } else {
+    console.log(...args);
+  }
+}
+
+global.handleConsoleError = ({ args, context }) => {
+  if (context.logFile) {
+    fs.appendFileSync(context.logFile, JSON.stringify({ type: 'error', message: args, context }) + '\n');
+  } else {
+    console.log(...args);
+  }
+}
+
+global.handleHttpRequest = ({ options, rawOptions, context }) => {
+  if (rawOptions.invalidOption) {
+    throw new Error('invalid option');
+  }
+
+  return options;
+}
+
+global.handleHttpResponse = ({ response, rawResponse, context }) => {
+  return response;
+}
+
+global.handleHttpError = ({ error, rawError, context }) => {
+  return error;
+}

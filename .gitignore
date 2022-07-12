@@ -4,3 +4,4 @@ npm-debug.log
 test.db
 bench/*.db
 report.*
+output.log

@@ -125,6 +125,52 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     assert.equal(error.message, 'Uncaught Error: yoyo');
   });
 
+  it('should fail when passing an invalid option to httpRequest', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE });
+
+    const code = `
+httpRequest({uri: '${TEST_URL}', invalidOption: true}, (err, res, body) => {
+  setResult({value: body});
+});
+`;
+
+    const { error } = await sandbox.execute({ code, timeout: 1000 });
+
+    assert.equal(error.message, 'Uncaught Error: invalid option');
+
+    await sandbox.shutdown();
+  });
+
+  it('should be able to override the logging behavior', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE });
+
+    const logFile = 'output.log';
+
+    try { fs.unlinkSync(logFile); } catch (ex) {}
+
+    const code = `
+      console.log('hello');
+      console.error('there');
+      setResult({value: 1});
+`;
+
+    const { value } = await sandbox.execute({ code, context: { logFile }, timeout: 1000 });
+
+    const logOutput = fs.readFileSync(logFile).toString();
+
+    const expected = `
+{"type":"log","message":["hello"],"context":{"logFile":"output.log"}}
+{"type":"error","message":["there"],"context":{"logFile":"output.log"}}
+`.trim() + '\n';
+
+    assert.equal(logOutput, expected);
+    assert.equal(value, 1);
+
+    fs.unlinkSync(logFile);
+
+    await sandbox.shutdown();
+  });
+
   it('should handle network errors from httpRequest', async () => {
     const js = `
 httpRequest({uri: 'http://no-way-this-exists-12345.net'}, (error, res, body) => {
