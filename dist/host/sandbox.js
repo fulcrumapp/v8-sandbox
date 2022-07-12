@@ -123,7 +123,7 @@ class Sandbox {
         if (this.memory) {
             execArgv.push(`--max-old-space-size=${this.memory}`);
         }
-        const workerPath = path_1.default.join(__dirname, '..', 'client', 'worker');
+        const workerPath = path_1.default.join(__dirname, '..', 'sandbox', 'worker');
         this.worker = (0, child_process_1.fork)(workerPath, [this.socketName], { execArgv, uid: this.uid, gid: this.gid });
         this.worker.on('error', (error) => {
             this.fork();

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { ChildProcess } from 'child_process';
 import async from 'async';
-import { Options, ExecutionOptions } from '../server/sandbox';
+import { Options, ExecutionOptions } from '../host/sandbox';
 interface ClusterOptions extends Options {
     workers?: number;
 }

@@ -9,7 +9,7 @@ const async_1 = __importDefault(require("async"));
 const os_1 = __importDefault(require("os"));
 const signal_exit_1 = __importDefault(require("signal-exit"));
 const lodash_1 = require("lodash");
-const sandbox_1 = require("../server/sandbox");
+const sandbox_1 = require("../host/sandbox");
 function remove(array, object) {
     const index = array.indexOf(object);
     if (index > -1) {

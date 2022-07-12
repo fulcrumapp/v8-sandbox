@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const async_1 = __importDefault(require("async"));
 const assert_1 = __importDefault(require("assert"));
-const sandbox_1 = __importDefault(require("../server/sandbox"));
+const sandbox_1 = __importDefault(require("../host/sandbox"));
 let globalSandbox = null;
 class Worker {
     constructor() {
