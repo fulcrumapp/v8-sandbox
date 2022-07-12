@@ -23,5 +23,8 @@
   "mochaExplorer.parallel": false,
   "mochaExplorer.require": [
     "ts-node/register"
-  ]
+  ],
+  "files.associations": {
+    "typeinfo": "cpp"
+  }
 }
