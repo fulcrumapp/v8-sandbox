@@ -4,7 +4,7 @@ import async from 'async';
 import os from 'os';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
-import { Options, ExecutionOptions, TimeoutError } from '../server/sandbox';
+import { Options, ExecutionOptions, TimeoutError } from '../host/sandbox';
 
 interface ClusterOptions extends Options {
   workers?: number;

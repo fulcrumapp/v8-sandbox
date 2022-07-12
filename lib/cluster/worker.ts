@@ -1,6 +1,6 @@
 import async from 'async';
 import assert from 'assert';
-import Sandbox, { Options } from '../server/sandbox';
+import Sandbox, { Options } from '../host/sandbox';
 
 let globalSandbox: Sandbox | null = null;
 

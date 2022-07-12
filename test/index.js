@@ -1,12 +1,10 @@
-// import Sandbox from '../dist/server/sandbox';
-import Sandbox from '../dist/cluster/cluster';
-import SimpleSandbox from '../dist/server/sandbox';
-import fs from 'fs';
-import path from 'path';
 
+import path from 'path';
 import assert from 'assert';
 
-const sandbox = new Sandbox();
+import { Sandbox, SandboxCluster } from '../dist';
+
+const sandbox = new SandboxCluster();
 
 const runWithTimeout = async (code, timeout) => {
   return sandbox.execute({ code, timeout });
@@ -24,14 +22,6 @@ describe('sandbox', () => {
   after(() => {
     sandbox.shutdown();
   });
-
-  // it('should execute simple script', async () => {
-  //   const js = '1 + 2';
-
-  //   const { value } = await run(js);
-
-  //   assert.equal(value, 3);
-  // });
 
   it('should execute simple script with setResult', async () => {
     const js = 'setResult({ value: "hi" })';
@@ -589,7 +579,7 @@ setResult({value: ${i}});
 global.testValue = 1;
 `;
 
-    const sandbox = new Sandbox({ template });
+    const sandbox = new SandboxCluster({ template });
 
     const code = `
 setTimeout(() => {
@@ -607,7 +597,7 @@ setTimeout(() => {
   it('should handle syntax errors in template scripts', async () => {
     const template = '{';
 
-    const sandbox = new Sandbox({ template });
+    const sandbox = new SandboxCluster({ template });
 
     const code = 'setResult({value: 1});';
 
@@ -628,7 +618,7 @@ setTimeout(() => {
   it('should handle errors when crossing between nodejs and sandbox', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({ template });
+    const sandbox = new SandboxCluster({ template });
 
     // must use the raw _setTimeout which doesn't wrap in try/catch. Assume everything in the sandbox
     // can be overwritten or called manually. This test exercises the TryCatch in OnTimer from C++.
@@ -650,7 +640,7 @@ setTimeout(() => {
   it('should handle nasty parameter errors when crossing between nodejs and sandbox', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({ template });
+    const sandbox = new SandboxCluster({ template });
 
     const code = '_dispatch(null)';
 
@@ -662,7 +652,7 @@ setTimeout(() => {
   });
 
   it('should allow crossing between nodejs and sandbox with custom sync functions', async () => {
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -680,7 +670,7 @@ setTimeout(() => {
   });
 
   it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -700,7 +690,7 @@ setTimeout(() => {
   it('should allow random crossing between nodejs and sandbox with custom sync functions', async function() {
     this.timeout(10000);
 
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 const randomTimeout = () => Math.floor(Math.random() * 5) + 1;
@@ -722,7 +712,7 @@ for (let i = 0; i < 5000; ++i) {
   it('should allow crossing between nodejs and sandbox with custom async functions', async function() {
     this.timeout(6000);
 
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setTimeout(() => {
@@ -744,7 +734,7 @@ setTimeout(() => {
   it('should handle errors when crossing between nodejs and sandbox with custom functions', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({ template, require: REQUIRE });
+    const sandbox = new SandboxCluster({ template, require: REQUIRE });
 
     // hack the _try method to directly invoke the function. This would only be possible if someone stomped
     // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
@@ -769,7 +759,7 @@ setTimeout(() => {
   it('should handle errors throw from custom nodejs functions', async () => {
     const template = '';
 
-    const sandbox = new Sandbox({ template, require: REQUIRE });
+    const sandbox = new SandboxCluster({ template, require: REQUIRE });
 
     // hack the _try method to directly invoke the function. This would only be possible if someone stomped
     // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
@@ -786,7 +776,7 @@ errorAsync(1, 2);
   });
 
   it('should support global variable for custom nodejs functions', async () => {
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setResult({ value: executeWithContext() });
@@ -804,7 +794,7 @@ setResult({ value: executeWithContext() });
   });
 
   it('should support global variable in the sandbox', async () => {
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setResult({ value: customValue });
@@ -824,7 +814,7 @@ setResult({ value: customValue });
   it('should support large payloads', async function() {
     this.timeout(6000);
 
-    const sandbox = new Sandbox({ require: REQUIRE });
+    const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
 setResult({ value: fetchLargeValue() });
@@ -838,7 +828,7 @@ setResult({ value: fetchLargeValue() });
   });
 
   it('should support multiple initialization and not keep data around across execute calls', async () => {
-    const sandbox = new SimpleSandbox({ require: REQUIRE });
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = 'global.currentValue = 1; setResult({ value: global.currentValue });';
 
@@ -856,7 +846,7 @@ setResult({ value: fetchLargeValue() });
   });
 
   it('should support shutdown and restart', async () => {
-    const sandbox = new SimpleSandbox({ require: REQUIRE });
+    const sandbox = new Sandbox({ require: REQUIRE });
 
     const code = 'setResult({ value: 1 });';
 
@@ -876,7 +866,7 @@ setResult({ value: fetchLargeValue() });
   it('should support disabling networking and timers', async function() {
     this.timeout(10000);
 
-    const sandbox = new SimpleSandbox({ require: REQUIRE, httpEnabled: false, timersEnabled: false });
+    const sandbox = new Sandbox({ require: REQUIRE, httpEnabled: false, timersEnabled: false });
 
     let code = 'setTimeout(() => {}, 1);';
 
@@ -896,7 +886,7 @@ setResult({ value: fetchLargeValue() });
   it('should handle hard memory crash in the sandbox', async function() {
     this.timeout(4000);
 
-    const sandbox = new SimpleSandbox({ require: REQUIRE, memory: 32 });
+    const sandbox = new Sandbox({ require: REQUIRE, memory: 32 });
 
     const code = `
     const value = 'here is a string value';
@@ -922,7 +912,7 @@ setResult({ value: fetchLargeValue() });
   });
 
   it('should handle custom flags', async () => {
-    const sandbox = new SimpleSandbox({ require: REQUIRE, argv: [ '--harmony' ], debug: true });
+    const sandbox = new Sandbox({ require: REQUIRE, argv: [ '--harmony' ], debug: true });
 
     const code = 'setResult({ value: info() });';
 

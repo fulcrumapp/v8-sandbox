@@ -193,7 +193,7 @@ export default class Sandbox {
       execArgv.push(`--max-old-space-size=${this.memory}`);
     }
 
-    const workerPath = path.join(__dirname, '..', 'client', 'worker');
+    const workerPath = path.join(__dirname, '..', 'sandbox', 'worker');
 
     this.worker = fork(workerPath, [this.socketName], { execArgv, uid: this.uid, gid: this.gid });
 
