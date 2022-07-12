@@ -19,6 +19,7 @@ Host functions take the form:
 // called from inside sandbox as `nodeFunctionSync(arg1, arg2, arg3)`
 function nodeFunctionSync([ arg1, arg2, arg3 ], { respond, fail, context }) {
   respond('return value'); // you must call this to complete this invocation and pass control back to the sandbox
+  // or
   fail(new Error('fail')); // or can call fail(), which causes the entire invocation to fail
 }
 
