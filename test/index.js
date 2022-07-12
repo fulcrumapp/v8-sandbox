@@ -1,6 +1,7 @@
 
 import path from 'path';
 import assert from 'assert';
+import fs from 'fs';
 
 import { Sandbox, SandboxCluster } from '../dist';
 
@@ -18,6 +19,7 @@ const REQUIRE = path.join(__dirname, 'test-functions.js');
 
 const TEST_URL = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.txt';
 const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg';
+const BINARY_FILE = fs.readFileSync(path.join('test', 'test.jpg'));
 
 describe('sandbox', () => {
   after(() => {
@@ -60,6 +62,22 @@ setResult({ value: httpRequest({uri: '${TEST_URL}'}).body });
     const { value } = await run(js);
 
     assert.equal(value, 'hi there');
+  });
+
+  it('should execute simple binary httpRequest', async () => {
+    const code = `
+httpRequest({uri: '${TEST_FILE}'}, (err, res, body) => {
+  setResult({value: body});
+});
+`;
+
+    const { value } = await run(code);
+
+    const buffer = Buffer.from(value, 'base64');
+
+    assert.ok(Buffer.compare(buffer, BINARY_FILE) === 0);
+
+    await sandbox.shutdown();
   });
 
   it('should handle errors from httpRequest', async () => {

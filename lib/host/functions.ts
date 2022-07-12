@@ -224,6 +224,7 @@ export default class Functions {
       ...(options.params ? options.params : {}),
       ...(options.data ? options.data : {}),
       ...(options.auth ? options.auth : {}),
+      ...(options.encoding == null ? { responseType: 'arraybuffer' } : {}),
       ...(options.responseType ? options.responseType : {}),
       ...(options.responseEncoding ? options.responseEncoding : {}),
       ...(options.timeout ? options.timeout : {}),
