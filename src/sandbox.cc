@@ -233,6 +233,8 @@ void Sandbox::Callback(int id, const char *args) {
 
   Local<Function> callback = Nan::New(operation->callback->As<Function>());
 
+  Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
+
   if (callback->IsFunction()) {
     v8::Local<v8::Value> argv[] = {
       Nan::New(args).ToLocalChecked()
@@ -244,6 +246,8 @@ void Sandbox::Callback(int id, const char *args) {
   pendingOperations_.erase(id);
 
   MaybeHandleError(tryCatch, context);
+
+  Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {

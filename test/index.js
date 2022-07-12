@@ -761,7 +761,14 @@ setTimeout(() => {
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
+    const stack = `
+Error: uh oh: 3
+    at script:6:11
+    at wrappedCallback (script:9:13)
+    `.trim();
+
     assert.equal(error.message, 'Uncaught Error: uh oh: 3');
+    assert.equal(error.stack, stack);
 
     sandbox.shutdown();
   });
@@ -771,9 +778,6 @@ setTimeout(() => {
 
     const sandbox = new SandboxCluster({ template, require: REQUIRE });
 
-    // hack the _try method to directly invoke the function. This would only be possible if someone stomped
-    // on the global functions inside the sandbox. We have to assume everything can be stomped on. This
-    // test exercises the TryCatch on the OnEndNodeInvocation from C++
     const code = `
 errorAsync(1, 2);
 `;
@@ -808,6 +812,7 @@ errorAsync(1, 2);
       setResult({ error, value });
     });
 `;
+
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, '1337');
