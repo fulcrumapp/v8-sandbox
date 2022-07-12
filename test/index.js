@@ -7,12 +7,12 @@ import { Sandbox, SandboxCluster } from '../dist';
 
 const sandbox = new SandboxCluster();
 
-const runWithTimeout = async (code, timeout) => {
-  return sandbox.execute({ code, timeout });
+const runWithTimeout = async (code, timeout, globals, context) => {
+  return sandbox.execute({ code, timeout, globals, context });
 };
 
-const run = (code) => {
-  return runWithTimeout(code, 4000);
+const run = (code, globals, context) => {
+  return runWithTimeout(code, 4000, globals, context);
 };
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
@@ -42,6 +42,18 @@ describe('sandbox', () => {
     assert.equal(value, 'hi');
   });
 
+  it('should handle binary data', async () => {
+    const code = `
+    setResult({value: bufferToBase64(base64ToBuffer(binaryData))});
+`;
+
+    const { value } = await run(code, { binaryData: BINARY_FILE.toString('base64') });
+
+    const buffer = Buffer.from(value, 'base64');
+
+    assert.ok(Buffer.compare(buffer, BINARY_FILE) === 0);
+  });
+
   it('should execute simple httpRequest', async () => {
     const js = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
@@ -66,6 +78,30 @@ setResult({ value: httpRequest({uri: '${TEST_URL}'}).body });
 
   it('should execute simple binary httpRequest', async () => {
     const code = `
+httpRequest({uri: '${TEST_FILE}', responseType: 'arraybuffer'}, (err, res, body) => {
+  setResult({
+    value: {
+      body,
+      parsed: bufferToBase64(base64ToBuffer(body)),
+      buffer: base64ToBuffer(body)
+    }
+  });
+});
+`;
+
+    const { value } = await run(code);
+
+    const buffer = Buffer.from(value.body, 'base64');
+
+    assert.ok(Buffer.compare(buffer, BINARY_FILE) === 0);
+
+    const parsedBuffer = Buffer.from(value.parsed, 'base64');
+
+    assert.ok(Buffer.compare(parsedBuffer, BINARY_FILE) === 0);
+  });
+
+  it('should execute simple binary httpRequest as text', async () => {
+    const code = `
 httpRequest({uri: '${TEST_FILE}'}, (err, res, body) => {
   setResult({value: body});
 });
@@ -73,11 +109,8 @@ httpRequest({uri: '${TEST_FILE}'}, (err, res, body) => {
 
     const { value } = await run(code);
 
-    const buffer = Buffer.from(value, 'base64');
-
-    assert.ok(Buffer.compare(buffer, BINARY_FILE) === 0);
-
-    await sandbox.shutdown();
+    assert.equal(value.length, 22376);
+    assert.equal(Buffer.byteLength(value), 36038);
   });
 
   it('should handle errors from httpRequest', async () => {
