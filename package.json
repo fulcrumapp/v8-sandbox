@@ -11,8 +11,7 @@
     "rebuild": "node-gyp configure rebuild",
     "test": "TS_NODE_IGNORE='node_modules,dist' mocha -r ts-node/register test/index.js",
     "clean": "rm -rf dist build",
-    "lint": "eslint 'lib/**/*.js'",
-    "install": "node-pre-gyp install --fallback-to-build"
+    "lint": "eslint 'lib/**/*.js'"
   },
   "author": "Zac McCormick <zac.mccormick@gmail.com> (http://github.com/zhm)",
   "license": "BSD",
@@ -45,13 +44,7 @@
     "lodash": "^4.17.21",
     "nan": "^2.14.0",
     "node-gyp": "^9.0.0",
-    "node-pre-gyp": "^0.17.0",
     "signal-exit": "^3.0.2"
-  },
-  "binary": {
-    "module_name": "sandbox",
-    "module_path": "./build/Release/",
-    "host": "https://zhm.s3.amazonaws.com/v8-sandbox/"
   },
   "keywords": [
     "sandbox",
