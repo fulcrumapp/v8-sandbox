@@ -17,7 +17,7 @@ const run = (code) => {
 const REQUIRE = path.join(__dirname, 'test-functions.js');
 
 const TEST_URL = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.txt';
-const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg'
+const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg';
 
 describe('sandbox', () => {
   after(() => {
