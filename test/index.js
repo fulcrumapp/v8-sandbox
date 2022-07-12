@@ -16,7 +16,8 @@ const run = (code) => {
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
 
-const TEST_URL = 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt';
+const TEST_URL = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.txt';
+const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg'
 
 describe('sandbox', () => {
   after(() => {
