@@ -19,9 +19,6 @@
     "type": "git",
     "url": "git://github.com/fulcrumapp/v8-sandbox.git"
   },
-  "eslintConfig": {
-    "extends": "fulcrum"
-  },
   "devDependencies": {
     "@types/async": "^3.0.8",
     "@types/lodash": "^4.14.149",
