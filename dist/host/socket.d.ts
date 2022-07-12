@@ -1,12 +1,13 @@
 /// <reference types="node" />
 /// <reference types="node" />
+/// <reference types="node" />
 import net from 'net';
 import { ChildProcess } from 'child_process';
 import Sandbox from './sandbox';
 interface Message {
     id: number;
     length: number;
-    json: string;
+    data: Buffer;
 }
 export default class Socket {
     sandbox: Sandbox;
