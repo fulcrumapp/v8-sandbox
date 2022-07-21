@@ -31,9 +31,9 @@ private:
 
   static NAN_METHOD(Execute);
 
-  static NAN_METHOD(Cancel);
-
   static NAN_METHOD(Callback);
+
+  static NAN_METHOD(Cancel);
 
   static NAN_METHOD(Dispatch);
 
@@ -47,9 +47,9 @@ private:
 
   void Execute(const char *code);
 
-  void Cancel(int id);
-
   void Callback(int id, const char *args);
+
+  void Cancel(int id);
 
   std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
 

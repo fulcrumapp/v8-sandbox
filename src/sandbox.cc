@@ -5,8 +5,8 @@
 #include <memory>
 #include <v8.h>
 #include <node.h>
-
 #include <unistd.h>
+
 void Debug(const char *msg) {
   std::cout << getpid() << " : " << msg << std::endl;
 }
@@ -42,11 +42,11 @@ void Sandbox::Init(v8::Local<v8::Object> exports) {
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   Nan::SetPrototypeMethod(tpl, "initialize", Initialize);
+  Nan::SetPrototypeMethod(tpl, "connect", Connect);
+  Nan::SetPrototypeMethod(tpl, "disconnect", Disconnect);
   Nan::SetPrototypeMethod(tpl, "execute", Execute);
   Nan::SetPrototypeMethod(tpl, "callback", Callback);
   Nan::SetPrototypeMethod(tpl, "cancel", Cancel);
-  Nan::SetPrototypeMethod(tpl, "connect", Connect);
-  Nan::SetPrototypeMethod(tpl, "disconnect", Disconnect);
   Nan::SetPrototypeMethod(tpl, "finish", Finish);
 
   auto function = Nan::GetFunction(tpl).ToLocalChecked();
@@ -77,6 +77,14 @@ NAN_METHOD(Sandbox::New) {
   }
 }
 
+NAN_METHOD(Sandbox::Initialize) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Initialize();
+
+  info.GetReturnValue().Set(info.This());
+}
+
 NAN_METHOD(Sandbox::Connect) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
@@ -87,14 +95,6 @@ NAN_METHOD(Sandbox::Disconnect) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
   sandbox->Disconnect();
-}
-
-NAN_METHOD(Sandbox::Initialize) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
-
-  sandbox->Initialize();
-
-  info.GetReturnValue().Set(info.This());
 }
 
 NAN_METHOD(Sandbox::Execute) {
@@ -109,14 +109,6 @@ NAN_METHOD(Sandbox::Execute) {
   info.GetReturnValue().Set(info.This());
 }
 
-NAN_METHOD(Sandbox::Cancel) {
-  NODE_ARG_INTEGER(0, "id");
-
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
-
-  sandbox->Cancel(Nan::To<uint32_t>(info[0]).FromJust());
-}
-
 NAN_METHOD(Sandbox::Callback) {
   NODE_ARG_INTEGER(0, "id");
   NODE_ARG_STRING(1, "args");
@@ -126,6 +118,14 @@ NAN_METHOD(Sandbox::Callback) {
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
   sandbox->Callback(Nan::To<uint32_t>(info[0]).FromJust(), *args);
+}
+
+NAN_METHOD(Sandbox::Cancel) {
+  NODE_ARG_INTEGER(0, "id");
+
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Cancel(Nan::To<uint32_t>(info[0]).FromJust());
 }
 
 NAN_METHOD(Sandbox::Dispatch) {
@@ -158,6 +158,20 @@ NAN_METHOD(Sandbox::Finish) {
   sandbox->Finish();
 
   info.GetReturnValue().Set(info.This());
+}
+
+void Sandbox::Initialize() {
+  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
+
+  auto context = Nan::New(sandboxContext_);
+
+  Context::Scope context_scope(context);
+
+  auto global = context->Global();
+
+  Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
+  Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
+  Nan::SetMethod(global, "_dispatch", Dispatch);
 }
 
 void Sandbox::Connect() {
@@ -198,21 +212,6 @@ void Sandbox::Disconnect() {
   pipe_ = nullptr;
 }
 
-
-void Sandbox::Initialize() {
-  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
-
-  auto context = Nan::New(sandboxContext_);
-
-  Context::Scope context_scope(context);
-
-  auto global = context->Global();
-
-  Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
-  Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(global, "_dispatch", Dispatch);
-}
-
 void Sandbox::Execute(const char *code) {
   auto context = Nan::New(sandboxContext_);
 
@@ -233,13 +232,6 @@ void Sandbox::Execute(const char *code) {
   MaybeHandleError(tryCatch, context);
 
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
-}
-
-void Sandbox::Cancel(int id) {
-  assert(id > 0);
-  assert(pendingOperations_[id]);
-
-  pendingOperations_.erase(id);
 }
 
 void Sandbox::Callback(int id, const char *args) {
@@ -274,6 +266,48 @@ void Sandbox::Callback(int id, const char *args) {
   MaybeHandleError(tryCatch, context);
 
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
+}
+
+void Sandbox::Cancel(int id) {
+  assert(id > 0);
+  assert(pendingOperations_[id]);
+
+  pendingOperations_.erase(id);
+}
+
+std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Function> *callback) {
+  int id = 0;
+
+  if (callback) {
+    auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
+    auto operation = std::make_shared<AsyncOperation>(this, cb);
+
+    id = operation->id;
+
+    pendingOperations_[operation->id] = operation;
+  }
+
+  bytesRead_ = -1;
+  bytesExpected_ = -1;
+
+  buffers_.clear();
+  result_.clear();
+
+  std::string message(arguments);
+
+  WriteData((uv_stream_t *)pipe_, id, message);
+
+  uv_run(loop_, UV_RUN_DEFAULT);
+
+  return result_;
+}
+
+void Sandbox::Finish() {
+  if (pendingOperations_.size() > 0) {
+    return;
+  }
+
+  Dispatch("finish", "{\"name\":\"finish\",\"args\":[]}", nullptr);
 }
 
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
@@ -334,15 +368,6 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   SetResult(context, result);
 }
 
-
-void Sandbox::Finish() {
-  if (pendingOperations_.size() > 0) {
-    return;
-  }
-
-  Dispatch("finish", "{\"name\":\"finish\",\"args\":[]}", nullptr);
-}
-
 Sandbox *Sandbox::GetSandboxFromContext() {
   auto context = Isolate::GetCurrent()->GetCurrentContext();
 
@@ -357,33 +382,6 @@ Sandbox *Sandbox::GetSandboxFromContext() {
   Sandbox *sandbox = (Sandbox *)field->Value();
 
   return sandbox;
-}
-
-std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Function> *callback) {
-  int id = 0;
-
-  if (callback) {
-    auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
-    auto operation = std::make_shared<AsyncOperation>(this, cb);
-
-    id = operation->id;
-
-    pendingOperations_[operation->id] = operation;
-  }
-
-  bytesRead_ = -1;
-  bytesExpected_ = -1;
-
-  buffers_.clear();
-  result_.clear();
-
-  std::string message(arguments);
-
-  WriteData((uv_stream_t *)pipe_, id, message);
-
-  uv_run(loop_, UV_RUN_DEFAULT);
-
-  return result_;
 }
 
 void Sandbox::AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer) {
