@@ -3,7 +3,7 @@ environment.dispatch = (name, args, callback) => {
     if (typeof callback !== 'function') {
         callback = null;
     }
-    const parameters = [name, JSON.stringify({ name, args: args || [] })];
+    const parameters = [name, JSON.stringify({ name, args: args ?? [] })];
     const wrappedCallback = callback && ((jsonArguments) => {
         if (callback) {
             callback(...JSON.parse(jsonArguments));

@@ -363,8 +363,6 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   Nan::Set(error, Nan::New("endPosition").ToLocalChecked(), Nan::New(endPosition));
   Nan::Set(error, Nan::New("sourceLine").ToLocalChecked(), Nan::New(*sourceLine).ToLocalChecked());
 
-  pendingOperations_.clear();
-
   SetResult(context, result);
 }
 

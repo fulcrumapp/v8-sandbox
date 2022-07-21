@@ -624,15 +624,18 @@ setTimeout(() => {
         invoke(() => _setTimeout(7, 7)),
         invoke(() => _clearTimeout()),
         invoke(() => _clearTimeout(null)),
-        invoke(() => _dispatchSync()),
-        invoke(() => _dispatchSync(null)),
-        invoke(() => _dispatchSync('setResult', null)),
-        invoke(() => _dispatchSync('test')),
-        invoke(() => _dispatchSync(() => {}, () => {})),
-        invoke(() => _dispatchSync(new Promise(() => {}))),
-        invoke(() => _dispatchAsync()),
-        invoke(() => _dispatchAsync(null)),
-        invoke(() => _dispatchAsync('test')),
+        invoke(() => _dispatch()),
+        invoke(() => _dispatch(null)),
+        invoke(() => _dispatch('setResult', null)),
+        invoke(() => _dispatch('setResult', [], true)),
+        invoke(() => JSON.parse(_dispatch('setTimeout', '{"name":"setTimeout","args":[------]}', () => {}))).result.error.message,
+        invoke(() => _dispatch('setTimeout', '{"name":"setTimeout","args":[2]}', true)),
+        invoke(() => _dispatch('test')),
+        invoke(() => _dispatch(() => {}, () => {})),
+        invoke(() => _dispatch(new Promise(() => {}))),
+        invoke(() => _dispatch()),
+        invoke(() => _dispatch(null)),
+        invoke(() => _dispatch('test')),
         invoke(() => _httpRequest(8)),
         invoke(() => _httpRequest('test', 7)),
         invoke(() => _log()),
@@ -642,7 +645,29 @@ setTimeout(() => {
 
     const { value, error } = await run(js);
 
-    assert.equal(value.length, 18);
+    assert.deepEqual(value, [
+      '_setTimeout is not defined',
+      '_setTimeout is not defined',
+      '_setTimeout is not defined',
+      '_clearTimeout is not defined',
+      '_clearTimeout is not defined',
+      'name must be given',
+      'name must be a string',
+      'parameters must be a string',
+      'parameters must be a string',
+      'invalid dispatch',
+      'callback must be a function',
+      'parameters must be given',
+      'name must be a string',
+      'name must be a string',
+      'name must be given',
+      'name must be a string',
+      'parameters must be given',
+      '_httpRequest is not defined',
+      '_httpRequest is not defined',
+      '_log is not defined',
+      '_error is not defined'
+    ]);
   });
 
   it('should handle stress', async () => {

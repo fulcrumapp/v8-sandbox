@@ -5,7 +5,7 @@ environment.dispatch = (name, args, callback) => {
     callback = null;
   }
 
-  const parameters = [name, JSON.stringify({ name, args: args || [] })];
+  const parameters = [name, JSON.stringify({ name, args: args ?? [] })];
 
   const wrappedCallback = callback && ((jsonArguments) => {
     if (callback) {

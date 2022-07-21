@@ -38,7 +38,7 @@ class Socket {
                     }
                 })) : null;
                 const write = (0, lodash_1.once)((result) => {
-                    const string = JSON.stringify({ id, result: result || { value: undefined } });
+                    const string = JSON.stringify({ result: result ?? { value: undefined } });
                     const length = Buffer.byteLength(string, 'utf8');
                     const buffer = Buffer.alloc(length + 4);
                     buffer.writeInt32BE(length);
@@ -51,6 +51,9 @@ class Socket {
                     write({ value });
                 };
                 const fail = (0, lodash_1.once)((error) => {
+                    if (cancel) {
+                        cancel();
+                    }
                     write({
                         error: {
                             name: error.name,

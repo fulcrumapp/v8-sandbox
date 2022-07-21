@@ -86,7 +86,7 @@ export default class Socket {
       })) : null;
 
       const write = once((result) => {
-        const string = JSON.stringify({ id, result: result || { value: undefined } });
+        const string = JSON.stringify({ result: result ?? { value: undefined } });
         const length = Buffer.byteLength(string, 'utf8');
         const buffer = Buffer.alloc(length + 4);
 
@@ -103,6 +103,10 @@ export default class Socket {
       };
 
       const fail = once((error) => {
+        if (cancel) {
+          cancel();
+        }
+
         write({
           error: {
             name: error.name,
