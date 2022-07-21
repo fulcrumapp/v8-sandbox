@@ -11,13 +11,21 @@ export interface Log {
     time: Date;
     message: string;
 }
+export interface ExecutionError {
+    name: string;
+    message: string;
+    stack: string;
+    exception: any;
+    lineNumber: number;
+    startColumn: number;
+    endColumn: number;
+    startPosition: number;
+    endPosition: number;
+    sourceLine: string;
+}
 export interface Result {
     value?: any;
-    error?: {
-        name: string;
-        message: string;
-        stack: string;
-    };
+    error?: ExecutionError;
     output?: Log[];
 }
 export interface Message {
@@ -71,16 +79,18 @@ export default class Sandbox {
     uid: number | null;
     gid: number | null;
     socketPath: string;
+    result: Result;
     constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath, }?: Options);
     initialize({ timeout }?: {
         timeout: any;
     }): Promise<Result>;
     execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<Result>;
     get socketName(): string;
-    dispatch(invocation: any, { fail, respond, callback }: {
+    dispatch(invocation: any, { fail, respond, callback, cancel, }: {
         fail: any;
         respond: any;
         callback: any;
+        cancel: any;
     }): void;
     fork(): void;
     kill(): void;
@@ -89,9 +99,11 @@ export default class Sandbox {
     shutdown(): Promise<unknown>;
     handleTimeout: () => void;
     callback(id: any, args: any): void;
+    cancel(id: any): void;
     processMessage: (message: Message) => Promise<void>;
     onInitialize({ template, timeout }: Message): void;
     onExecute({ code, timeout, globals, context, }: Message): void;
+    setResult(result: any): void;
     finish(result: any): void;
     handleConnection: (socket: any) => void;
     handleError: (error: any) => void;

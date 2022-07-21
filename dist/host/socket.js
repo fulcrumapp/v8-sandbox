@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const lodash_1 = require("lodash");
 function tryParseJSON(value) {
     try {
         return JSON.parse(value);
@@ -26,12 +27,17 @@ class Socket {
                 const json = data.toString('utf8');
                 this.message = null;
                 const message = tryParseJSON(json);
-                const callback = id > 0 && ((...args) => {
+                const callback = id > 0 ? (0, lodash_1.once)(((...args) => {
                     if (this.isConnected) {
                         this.sandbox.callback(id, args);
                     }
-                });
-                const write = (result) => {
+                })) : null;
+                const cancel = id > 0 ? (0, lodash_1.once)((() => {
+                    if (this.isConnected) {
+                        this.sandbox.cancel(id);
+                    }
+                })) : null;
+                const write = (0, lodash_1.once)((result) => {
                     const string = JSON.stringify({ id, result: result || { value: undefined } });
                     const length = Buffer.byteLength(string, 'utf8');
                     const buffer = Buffer.alloc(length + 4);
@@ -40,11 +46,11 @@ class Socket {
                     if (this.isConnected) {
                         this.socket.write(buffer);
                     }
-                };
+                });
                 const respond = (value) => {
                     write({ value });
                 };
-                const fail = (error) => {
+                const fail = (0, lodash_1.once)((error) => {
                     write({
                         error: {
                             name: error.name,
@@ -52,12 +58,14 @@ class Socket {
                             stack: error.stack,
                         },
                     });
-                };
+                });
                 try {
                     if (message == null) {
                         throw new Error('invalid dispatch');
                     }
-                    this.sandbox.dispatch(message, { fail, respond, callback });
+                    this.sandbox.dispatch(message, {
+                        fail, respond, callback, cancel,
+                    });
                 }
                 catch (ex) {
                     fail(ex);

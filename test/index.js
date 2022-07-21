@@ -36,16 +36,47 @@ describe('sandbox', () => {
   it('should execute simple script with multiple setResult calls', async () => {
     const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
 
+    const { error, value } = await run(js);
+
+    assert.equal(value, 'hello');
+  });
+
+  it('should fail after setResult', async () => {
+    const js = 'setResult({ value: "hi" }); throw new Error("hi");';
+
+    const { error } = await run(js);
+
+    assert.equal(error.message, 'Uncaught Error: hi');
+  });
+
+  it('should timeout when script keeps running after setResult', async () => {
+    const js = 'setResult({ value: "hi" }); while(true) {}';
+
+    const { error } = await runWithTimeout(js, 200);
+
+    assert.ok(error.isTimeout);
+  });
+
+  it('should timeout when script keeps running in a setTimeout after setResult', async () => {
+    const js = 'setResult({ value: "hi" }); setTimeout(() => { while(true) {}; }, 20);';
+
+    const { error } = await runWithTimeout(js, 200);
+
+    assert.ok(error.isTimeout);
+  });
+
+  it('should timeout when script keeps running in a setTimeout after setResult', async () => {
+    const js = 'setResult({ value: "hi" }); setTimeout(() => { setResult({ value: "world" }); }, 20);';
+
     const { value } = await run(js);
 
-    assert.equal(value, 'hi');
+    assert.equal(value, 'world');
   });
 
   it('should handle binary data', async () => {
     const code = `
     setResult({value: bufferToBase64(base64ToBuffer(binaryData))});
 `;
-
     const { value } = await run(code, { binaryData: BINARY_FILE.toString('base64') });
 
     const buffer = Buffer.from(value, 'base64');
@@ -201,7 +232,7 @@ setTimeout(() => {
 11;
 `;
 
-    const { value } = await run(js);
+    const { value, error } = await run(js);
 
     assert.equal(value, 'hi there');
   });
@@ -268,9 +299,9 @@ new Promise((resolve) => {
   })();
   `;
 
-    const { error } = await runWithTimeout(js, 300);
+    const { value, error } = await runWithTimeout(js, 300);
 
-    assert.equal(error.isTimeout, true);
+    assert.equal(value, undefined);
   });
 
   it('should handle multiple async functions', async () => {
@@ -290,6 +321,7 @@ new Promise((resolve) => {
 
   await new Promise((resolve) => {
     setTimeout(() => {
+      setResult({value: 2});
       resolve();
     }, 20);
   });
@@ -298,7 +330,7 @@ new Promise((resolve) => {
 })();
 `;
 
-    const { value } = await run(js);
+    const { value, error } = await run(js);
 
     assert.equal(value, 1);
   });
@@ -794,6 +826,50 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
+  it('should not fail when respond() is called multiple times', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE });
+
+    const code = `
+    setResult({value: callRespondTwice(1, 2)})
+`;
+
+    const { value, error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 3);
+
+    sandbox.shutdown();
+  });
+
+  it('should not fail when callback is called multiple times', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE });
+
+    const code = `
+    let returnValue = callCallbackTwice(1, (err, res) => {
+      setResult({value: res + returnValue})
+    });
+`;
+
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 5);
+
+    sandbox.shutdown();
+  });
+
+  it('should not fail when respond() and fail() are both called', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE });
+
+    const code = `
+    setResult({value: callRespondAndFail()})
+`;
+
+    const { value, error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(value, 3);
+
+    sandbox.shutdown();
+  });
+
   it('should allow random crossing between nodejs and sandbox with custom sync functions', async function() {
     this.timeout(10000);
 
@@ -876,12 +952,28 @@ Error: uh oh: 3
     const sandbox = new SandboxCluster({ template, require: REQUIRE });
 
     const code = `
-errorAsync(1, 2);
+errorSync(1, 2);
 `;
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error.message, 'Uncaught Error: hi');
+
+    sandbox.shutdown();
+  });
+
+  it('should handle errors throw from custom async nodejs functions', async () => {
+    const template = '';
+
+    const sandbox = new SandboxCluster({ template, require: REQUIRE });
+
+    const code = `
+errorAsync(1, 2);
+`;
+
+    const { error } = await sandbox.execute({ code, timeout: 10000 });
+
+    assert.equal(error.message, 'worker disconnected');
 
     sandbox.shutdown();
   });

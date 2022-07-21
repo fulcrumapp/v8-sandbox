@@ -26,8 +26,21 @@ defineAsync('addNumbersAsync', ([ value1, value2 ], { respond, callback }) => {
   respond();
 });
 
-defineAsync('errorAsync', ({ callback }) => {
+defineAsync('errorSync', ({ callback }) => {
   throw new Error('hi');
+});
+
+defineAsync('errorAsync', ([ param1 ], { fail, callback }) => {
+  setTimeout(() => {
+    throw new Error('hi');
+  }, 1);
+});
+
+defineAsync('errorAsyncWithResponse', ([ param1 ], { fail, respond, callback }) => {
+  setTimeout(() => {
+    throw new Error('hi');
+  }, 1);
+  respond();
 });
 
 // this function is async inside the nodejs process but sync in the sandbox
@@ -42,6 +55,15 @@ defineAsync('errorAsyncCallbackWithRespond', ([ param1 ], { respond, callback })
   setTimeout(() => {
     callback(new Error(param1));
   }, 1);
+
+  respond();
+});
+
+defineAsync('errorAsyncCallbackWithMultipleCallbacks', ([ value1, value2 ], { respond, callback }) => {
+  setTimeout(() => {
+    callback(null, value1 + value2);
+    callback(null, value1 + value2);
+  }, 10);
 
   respond();
 });
@@ -63,6 +85,25 @@ define('addNumbersBlocking', ([ value1, value2 ], { respond }) => {
   setTimeout(() => {
     respond(value1 + value2);
   }, 1);
+});
+
+define('callRespondTwice', ([ value1, value2 ], { respond }) => {
+  respond(value1 + value2);
+  respond(value1 - value2);
+});
+
+define('callRespondAndFail', ([], { respond }) => {
+  respond(3);
+  fail(1);
+});
+
+defineAsync('callCallbackTwice', ([param1], { respond, callback }) => {
+  respond(param1 + 1);
+
+  setTimeout(() => {
+    callback(null, param1 + 2);
+    callback(null, param1 + 3);
+  }, 20);
 });
 
 global.handleConsoleLog = ({ args, context }) => {

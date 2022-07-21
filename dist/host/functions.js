@@ -16,12 +16,12 @@ class Functions {
         this.defineAsync = (name, fn) => {
             this.asyncFunctions[name] = fn;
         };
-        this.setTimeout = ([timeout], { fail, respond, callback }) => {
+        this.setTimeout = ([timeout], { fail, respond, callback, cancel, }) => {
             if (!this.timersEnabled) {
                 return fail(new Error('setTimeout is disabled'));
             }
             const timer = new timer_1.default();
-            timer.start(timeout || 0, callback);
+            timer.start(timeout || 0, callback, cancel);
             const { id } = timer;
             this.timers[id] = timer;
             respond(id);
@@ -120,11 +120,14 @@ class Functions {
             delete this.timers[id];
         }
     }
-    dispatch({ name, args }, { message, fail, respond, callback, }) {
+    dispatch({ name, args }, { message, fail, respond, callback, cancel, }) {
         const params = [args, {
-                message, respond, fail, callback, context: message.context,
+                message, respond, fail, cancel, callback, context: message.context, functions: this,
             }];
         switch (name) {
+            case 'finish': {
+                return this.finish(...params);
+            }
             case 'setResult': {
                 return this.setResult(...params);
             }
@@ -157,8 +160,12 @@ class Functions {
             }
         }
     }
+    finish([], { message, respond }) {
+        this.sandbox.finish(null);
+        respond();
+    }
     setResult([result], { message, respond }) {
-        this.sandbox.finish(result);
+        this.sandbox.setResult(result);
         respond();
     }
     write({ message, type, args }) {

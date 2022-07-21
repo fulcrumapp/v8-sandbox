@@ -13,16 +13,34 @@ class Worker {
         this.handleMessage = (message) => {
             switch (message.type) {
                 case 'initialize':
-                    return this.initialize(message);
+                    this.initialize(message);
+                    break;
                 case 'execute':
-                    return this.execute(message);
+                    this.execute(message);
+                    break;
                 case 'callback':
-                    return this.callback(message);
+                    this.callback(message);
+                    break;
+                case 'cancel':
+                    this.cancel(message);
+                    break;
                 case 'exit':
-                    return this.exit(message);
+                    this.exit(message);
+                    break;
                 default:
                     throw new Error('invalid message');
             }
+            this.unref();
+        };
+        this.beforeExit = (code) => {
+            this.finish();
+            this.ref();
+        };
+        this.ref = () => {
+            process.channel.ref();
+        };
+        this.unref = () => {
+            process.channel.unref();
         };
         this.native = new NativeSandbox(process.argv[2]);
     }
@@ -31,7 +49,6 @@ class Worker {
         this.connect();
         this._execute(RUNTIME);
         this._execute(template);
-        this._execute('setResult()');
     }
     execute({ code, globals }) {
         this.reset(false);
@@ -64,6 +81,12 @@ class Worker {
         this.native.disconnect();
         this.connected = false;
     }
+    finish() {
+        this.native.finish();
+    }
+    cancel({ id }) {
+        this.native.cancel(id);
+    }
     callback({ id, args }) {
         this.native.callback(id, JSON.stringify(args));
     }
@@ -74,5 +97,6 @@ class Worker {
 }
 exports.default = Worker;
 const worker = new Worker();
+process.on('beforeExit', worker.beforeExit);
 process.on('message', worker.handleMessage);
 //# sourceMappingURL=worker.js.map

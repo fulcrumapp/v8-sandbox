@@ -1,4 +1,5 @@
 import net from 'net';
+import { once } from 'lodash';
 import { ChildProcess } from 'child_process';
 import Sandbox from './sandbox';
 
@@ -72,13 +73,19 @@ export default class Socket {
 
       const message = tryParseJSON(json);
 
-      const callback = id > 0 && ((...args) => {
+      const callback = id > 0 ? once(((...args) => {
         if (this.isConnected) {
           this.sandbox.callback(id, args);
         }
-      });
+      })) : null;
 
-      const write = (result) => {
+      const cancel = id > 0 ? once((() => {
+        if (this.isConnected) {
+          this.sandbox.cancel(id);
+        }
+      })) : null;
+
+      const write = once((result) => {
         const string = JSON.stringify({ id, result: result || { value: undefined } });
         const length = Buffer.byteLength(string, 'utf8');
         const buffer = Buffer.alloc(length + 4);
@@ -89,13 +96,13 @@ export default class Socket {
         if (this.isConnected) {
           this.socket.write(buffer);
         }
-      };
+      });
 
       const respond = (value) => {
         write({ value });
       };
 
-      const fail = (error) => {
+      const fail = once((error) => {
         write({
           error: {
             name: error.name,
@@ -103,14 +110,16 @@ export default class Socket {
             stack: error.stack,
           },
         });
-      };
+      });
 
       try {
         if (message == null) {
           throw new Error('invalid dispatch');
         }
 
-        this.sandbox.dispatch(message, { fail, respond, callback });
+        this.sandbox.dispatch(message, {
+          fail, respond, callback, cancel,
+        });
       } catch (ex) {
         fail(ex);
       }

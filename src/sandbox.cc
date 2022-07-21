@@ -6,18 +6,21 @@
 #include <v8.h>
 #include <node.h>
 
-// #include <unistd.h>
-// void Debug(const char *msg) {
-//  std::cout << getpid() << " : " << msg << std::endl;
-// }
+#include <unistd.h>
+void Debug(const char *msg) {
+  std::cout << getpid() << " : " << msg << std::endl;
+}
+
+void Debug(std::string message) {
+  Debug(message.c_str());
+}
 
 using namespace v8;
 
 Nan::Persistent<v8::Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
-  : hasResult_(false),
-    result_(""),
+  : result_(""),
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
@@ -41,8 +44,10 @@ void Sandbox::Init(v8::Local<v8::Object> exports) {
   Nan::SetPrototypeMethod(tpl, "initialize", Initialize);
   Nan::SetPrototypeMethod(tpl, "execute", Execute);
   Nan::SetPrototypeMethod(tpl, "callback", Callback);
+  Nan::SetPrototypeMethod(tpl, "cancel", Cancel);
   Nan::SetPrototypeMethod(tpl, "connect", Connect);
   Nan::SetPrototypeMethod(tpl, "disconnect", Disconnect);
+  Nan::SetPrototypeMethod(tpl, "finish", Finish);
 
   auto function = Nan::GetFunction(tpl).ToLocalChecked();
 
@@ -104,6 +109,14 @@ NAN_METHOD(Sandbox::Execute) {
   info.GetReturnValue().Set(info.This());
 }
 
+NAN_METHOD(Sandbox::Cancel) {
+  NODE_ARG_INTEGER(0, "id");
+
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Cancel(Nan::To<uint32_t>(info[0]).FromJust());
+}
+
 NAN_METHOD(Sandbox::Callback) {
   NODE_ARG_INTEGER(0, "id");
   NODE_ARG_STRING(1, "args");
@@ -137,6 +150,14 @@ NAN_METHOD(Sandbox::Dispatch) {
   }
 
   info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+}
+
+NAN_METHOD(Sandbox::Finish) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+
+  sandbox->Finish();
+
+  info.GetReturnValue().Set(info.This());
 }
 
 void Sandbox::Connect() {
@@ -201,8 +222,6 @@ void Sandbox::Execute(const char *code) {
 
   ScriptOrigin origin(Isolate::GetCurrent(), Nan::New("script").ToLocalChecked());
 
-  hasResult_ = false;
-
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
 
   MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked(), &origin);
@@ -214,6 +233,13 @@ void Sandbox::Execute(const char *code) {
   MaybeHandleError(tryCatch, context);
 
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
+}
+
+void Sandbox::Cancel(int id) {
+  assert(id > 0);
+  assert(pendingOperations_[id]);
+
+  pendingOperations_.erase(id);
 }
 
 void Sandbox::Callback(int id, const char *args) {
@@ -274,6 +300,8 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   auto result = Nan::New<Object>();
   auto error = Nan::New<Object>();
 
+  auto exception = tryCatch.Exception();
+
   Nan::Utf8String message(tryCatch.Message()->Get());
   Nan::Utf8String sourceLine(tryCatch.Message()->GetSourceLine(context).ToLocalChecked());
 
@@ -292,6 +320,7 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
     Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New("").ToLocalChecked());
   }
 
+  Nan::Set(error, Nan::New("exception").ToLocalChecked(), exception);
   Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
   Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
   Nan::Set(error, Nan::New("startColumn").ToLocalChecked(), Nan::New(startColumn));
@@ -300,7 +329,18 @@ void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context)
   Nan::Set(error, Nan::New("endPosition").ToLocalChecked(), Nan::New(endPosition));
   Nan::Set(error, Nan::New("sourceLine").ToLocalChecked(), Nan::New(*sourceLine).ToLocalChecked());
 
+  pendingOperations_.clear();
+
   SetResult(context, result);
+}
+
+
+void Sandbox::Finish() {
+  if (pendingOperations_.size() > 0) {
+    return;
+  }
+
+  Dispatch("finish", "{\"name\":\"finish\",\"args\":[]}", nullptr);
 }
 
 Sandbox *Sandbox::GetSandboxFromContext() {
@@ -336,10 +376,6 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
 
   buffers_.clear();
   result_.clear();
-
-  if (std::string(name) == "setResult") {
-    hasResult_ = true;
-  }
 
   std::string message(arguments);
 

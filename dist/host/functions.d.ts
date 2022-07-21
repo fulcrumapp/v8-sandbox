@@ -27,20 +27,26 @@ export default class Functions {
     dispatch({ name, args }: {
         name: any;
         args: any;
-    }, { message, fail, respond, callback, }: {
+    }, { message, fail, respond, callback, cancel, }: {
         message: any;
         fail: any;
         respond: any;
         callback: any;
+        cancel: any;
     }): any;
+    finish([]: Iterable<any>, { message, respond }: {
+        message: any;
+        respond: any;
+    }): void;
     setResult([result]: [any], { message, respond }: {
         message: any;
         respond: any;
     }): void;
-    setTimeout: ([timeout]: [any], { fail, respond, callback }: {
+    setTimeout: ([timeout]: [any], { fail, respond, callback, cancel, }: {
         fail: any;
         respond: any;
         callback: any;
+        cancel: any;
     }) => any;
     clearTimeout: ([timerID]: [any], { fail, respond }: {
         fail: any;

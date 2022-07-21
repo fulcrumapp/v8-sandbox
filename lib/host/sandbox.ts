@@ -15,13 +15,22 @@ export interface Log {
   message: string;
 }
 
+export interface ExecutionError {
+  name: string;
+  message: string;
+  stack: string;
+  exception: any;
+  lineNumber: number;
+  startColumn: number;
+  endColumn: number;
+  startPosition: number;
+  endPosition: number;
+  sourceLine: string;
+}
+
 export interface Result {
   value?: any;
-  error?: {
-    name: string;
-    message: string;
-    stack: string;
-  };
+  error?: ExecutionError;
   output?: Log[];
 }
 
@@ -105,6 +114,8 @@ export default class Sandbox {
 
   socketPath: string;
 
+  result: Result;
+
   constructor({
     require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath,
   }: Options = {}) {
@@ -130,6 +141,8 @@ export default class Sandbox {
   }
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
+    this.setResult(null);
+
     return new Promise<Result>((resolve) => {
       this.queue.push({
         type: 'initialize',
@@ -178,9 +191,11 @@ export default class Sandbox {
       : `${this.socketPath}/${this.id}`;
   }
 
-  dispatch(invocation, { fail, respond, callback }) {
+  dispatch(invocation, {
+    fail, respond, callback, cancel,
+  }) {
     this.functions.dispatch(invocation, {
-      message: this.message, fail, respond, callback,
+      message: this.message, fail, respond, callback, cancel,
     });
   }
 
@@ -298,6 +313,10 @@ export default class Sandbox {
     this.worker.send({ type: 'callback', id, args });
   }
 
+  cancel(id) {
+    this.worker.send({ type: 'cancel', id });
+  }
+
   processMessage = async (message: Message) => {
     this.message = message;
 
@@ -335,10 +354,18 @@ export default class Sandbox {
   }: Message) {
     this.executeTimeout.start(timeout, this.handleTimeout);
 
-    this.worker.send({ type: 'execute', code, globals: JSON.stringify(globals) });
+    this.worker.send({
+      type: 'execute', code, globals: JSON.stringify(globals),
+    });
+  }
+
+  setResult(result) {
+    this.result = result;
   }
 
   finish(result) {
+    result = result ?? this.result;
+
     this.functions.clearTimers();
 
     if (this.message) {

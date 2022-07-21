@@ -8,14 +8,18 @@ class Timer {
     }
     clear() {
         if (this.id) {
+            if (this.onCancel) {
+                this.onCancel(this);
+            }
             clearTimeout(TIMERS[this.id]);
             delete TIMERS[this.id];
             this.id = null;
         }
     }
-    start(timeout, callback) {
+    start(timeout, callback, cancel = null) {
         this.clear();
         this.id = ++nextID;
+        this.onCancel = cancel;
         TIMERS[this.id] = setTimeout(() => {
             delete TIMERS[this.id];
             this.id = null;

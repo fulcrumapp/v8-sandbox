@@ -30,7 +30,7 @@ export default class Cluster {
   sandboxOptions: Options;
 
   constructor({ workers, ...options }: ClusterOptions = {}) {
-    this.workerCount = workers || Math.max(os.cpus().length, 4);
+    this.workerCount = workers ?? 1;
     this.sandboxOptions = options;
     this.start();
   }

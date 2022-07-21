@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
 const async_1 = __importDefault(require("async"));
-const os_1 = __importDefault(require("os"));
 const signal_exit_1 = __importDefault(require("signal-exit"));
 const lodash_1 = require("lodash");
 const sandbox_1 = require("../host/sandbox");
@@ -23,7 +22,7 @@ class Cluster {
         this.worker = (task, callback) => {
             this._execute(task, callback);
         };
-        this.workerCount = workers || Math.max(os_1.default.cpus().length, 4);
+        this.workerCount = workers ?? 1;
         this.sandboxOptions = options;
         this.start();
     }

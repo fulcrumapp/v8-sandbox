@@ -79,13 +79,16 @@ export default class Functions {
   }
 
   dispatch({ name, args }, {
-    message, fail, respond, callback,
+    message, fail, respond, callback, cancel,
   }) {
     const params: [ any, any ] = [args, {
-      message, respond, fail, callback, context: message.context,
+      message, respond, fail, cancel, callback, context: message.context, functions: this,
     }];
 
     switch (name) {
+      case 'finish': {
+        return this.finish(...params);
+      }
       case 'setResult': {
         return this.setResult(...params);
       }
@@ -119,20 +122,28 @@ export default class Functions {
     }
   }
 
-  setResult([result], { message, respond }) {
-    this.sandbox.finish(result);
+  finish([], { message, respond }) {
+    this.sandbox.finish(null);
 
     respond();
   }
 
-  setTimeout = ([timeout], { fail, respond, callback }) => {
+  setResult([result], { message, respond }) {
+    this.sandbox.setResult(result);
+
+    respond();
+  }
+
+  setTimeout = ([timeout], {
+    fail, respond, callback, cancel,
+  }) => {
     if (!this.timersEnabled) {
       return fail(new Error('setTimeout is disabled'));
     }
 
     const timer = new Timer();
 
-    timer.start(timeout || 0, callback);
+    timer.start(timeout || 0, callback, cancel);
 
     const { id } = timer;
 

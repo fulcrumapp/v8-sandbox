@@ -20,7 +20,9 @@ environment.dispatch = (name, args, callback) => {
   const result = json != null ? JSON.parse(json).result : null;
 
   if (result && result.error) {
-    throw new Error(result.error.message);
+    const error = new Error(result.error.message);
+
+    throw Object.assign(error, result.error);
   }
 
   return result != null ? result.value : null;

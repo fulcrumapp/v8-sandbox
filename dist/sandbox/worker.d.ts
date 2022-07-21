@@ -13,10 +13,17 @@ export default class Worker {
     reset(force: any): void;
     connect(): void;
     disconnect(): void;
+    finish(): void;
+    cancel({ id }: {
+        id: any;
+    }): void;
     callback({ id, args }: {
         id: any;
         args: any;
     }): void;
     exit(message: any): void;
     handleMessage: (message: any) => void;
+    beforeExit: (code: any) => void;
+    ref: () => void;
+    unref: () => void;
 }

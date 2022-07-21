@@ -23,39 +23,45 @@ private:
 
   static NAN_METHOD(New);
 
+  static NAN_METHOD(Initialize);
+
   static NAN_METHOD(Connect);
 
   static NAN_METHOD(Disconnect);
 
-  static NAN_METHOD(Initialize);
-
   static NAN_METHOD(Execute);
+
+  static NAN_METHOD(Cancel);
 
   static NAN_METHOD(Callback);
 
   static NAN_METHOD(Dispatch);
 
+  static NAN_METHOD(Finish);
+
   void Initialize();
-
-  void Execute(const char *code);
-
-  void Callback(int id, const char *args);
 
   void Connect();
 
   void Disconnect();
 
-  void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
+  void Execute(const char *code);
+
+  void Cancel(int id);
+
+  void Callback(int id, const char *args);
+
+  std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
+
+  void Finish();
 
   void SetResult(Local<Context> &context, Local<Object> result);
 
-  std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
+  void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
 
   static Sandbox *GetSandboxFromContext();
 
   Nan::Global<Context> sandboxContext_;
-
-  bool hasResult_;
 
   std::string result_;
 

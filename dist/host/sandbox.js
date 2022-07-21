@@ -74,6 +74,7 @@ class Sandbox {
         });
     }
     initialize({ timeout } = { timeout: null }) {
+        this.setResult(null);
         return new Promise((resolve) => {
             this.queue.push({
                 type: 'initialize',
@@ -112,9 +113,9 @@ class Sandbox {
         return process.platform === 'win32' ? path_1.default.join('\\\\?\\pipe', process.cwd(), this.id)
             : `${this.socketPath}/${this.id}`;
     }
-    dispatch(invocation, { fail, respond, callback }) {
+    dispatch(invocation, { fail, respond, callback, cancel, }) {
         this.functions.dispatch(invocation, {
-            message: this.message, fail, respond, callback,
+            message: this.message, fail, respond, callback, cancel,
         });
     }
     fork() {
@@ -197,6 +198,9 @@ class Sandbox {
         }
         this.worker.send({ type: 'callback', id, args });
     }
+    cancel(id) {
+        this.worker.send({ type: 'cancel', id });
+    }
     onInitialize({ template, timeout }) {
         if (this.initialized) {
             return this.finish({});
@@ -206,9 +210,15 @@ class Sandbox {
     }
     onExecute({ code, timeout, globals, context, }) {
         this.executeTimeout.start(timeout, this.handleTimeout);
-        this.worker.send({ type: 'execute', code, globals: JSON.stringify(globals) });
+        this.worker.send({
+            type: 'execute', code, globals: JSON.stringify(globals),
+        });
+    }
+    setResult(result) {
+        this.result = result;
     }
     finish(result) {
+        result = result ?? this.result;
         this.functions.clearTimers();
         if (this.message) {
             this.message.callback({ ...result, output: this.message.output });

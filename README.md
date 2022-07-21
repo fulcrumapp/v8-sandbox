@@ -133,6 +133,7 @@ You must always call `respond()` or `fail()` to transfer control back to the san
 - `respond`: `function` respond to the sandbox with a return value
 - `fail`: `function` respond to the sandbox with an error
 - `callback`: `function` the callback passed from the sandbox for an async function, signature: `callback(error, value)`
+- `cancel`: `function` if you never plan to invoke `callback` because something was cancelled, call this to cancel the pending operation in the sandbox. e.g. The sandbox `clearTimeout()` implementation uses this because the callback passed to the original setTimeout() will never be called, so the sandbox would otherwise infinitely wait for the host dispatch to finish.
 - `context`: `object` (optional) the context variables passed into this execution
 
 Host functions take the form:

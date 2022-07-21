@@ -16,17 +16,14 @@ export default class Worker {
 
   initialize({ template }) {
     this.reset(true);
-
     this.connect();
 
     this._execute(RUNTIME);
     this._execute(template);
-    this._execute('setResult()');
   }
 
   execute({ code, globals }) {
     this.reset(false);
-
     this.connect();
 
     if (globals !== '{}') {
@@ -65,6 +62,14 @@ export default class Worker {
     this.connected = false;
   }
 
+  finish() {
+    this.native.finish();
+  }
+
+  cancel({ id }) {
+    this.native.cancel(id);
+  }
+
   callback({ id, args }) {
     this.native.callback(id, JSON.stringify(args));
   }
@@ -77,19 +82,42 @@ export default class Worker {
   handleMessage = (message) => {
     switch (message.type) {
       case 'initialize':
-        return this.initialize(message);
+        this.initialize(message);
+        break;
       case 'execute':
-        return this.execute(message);
+        this.execute(message);
+        break;
       case 'callback':
-        return this.callback(message);
+        this.callback(message);
+        break;
+      case 'cancel':
+        this.cancel(message);
+        break;
       case 'exit':
-        return this.exit(message);
+        this.exit(message);
+        break;
       default:
         throw new Error('invalid message');
     }
+
+    this.unref();
+  };
+
+  beforeExit = (code) => {
+    this.finish();
+    this.ref();
+  };
+
+  ref = () => {
+    (process as any).channel.ref();
+  };
+
+  unref = () => {
+    (process as any).channel.unref();
   };
 }
 
 const worker = new Worker();
 
+process.on('beforeExit', worker.beforeExit);
 process.on('message', worker.handleMessage);
