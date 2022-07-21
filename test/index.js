@@ -4,10 +4,17 @@ import fs from 'fs';
 
 import { Sandbox, SandboxCluster } from '../dist';
 
-const sandbox = new SandboxCluster();
+let globalSandbox = null;;
+
+function getGlobalSandbox() {
+  if (!globalSandbox) {
+    globalSandbox = new SandboxCluster();
+  }
+  return globalSandbox;
+}
 
 const runWithTimeout = async (code, timeout, globals, context) => {
-  return sandbox.execute({ code, timeout, globals, context });
+  return getGlobalSandbox().execute({ code, timeout, globals, context });
 };
 
 const run = (code, globals, context) => {
@@ -21,8 +28,10 @@ const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.j
 const BINARY_FILE = fs.readFileSync(path.join('test', 'test.jpg'));
 
 describe('sandbox', () => {
-  after(() => {
-    sandbox.shutdown();
+  after(async () => {
+    if (globalSandbox) {
+      await globalSandbox.shutdown();
+    }
   });
 
   it('should execute simple script with setResult', async () => {
