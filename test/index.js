@@ -698,9 +698,7 @@ setTimeout(() => {
       assert.deepEqual(result.value, [
         i, 'invalid call to finish', 'invalid call to finish'
       ]);
-
     }
-
 
     await sandbox.shutdown();
   });
