@@ -44,22 +44,24 @@ class Worker {
         };
         this.native = new NativeSandbox(process.argv[2]);
     }
-    initialize({ template }) {
+    initialize({ messageId, template }) {
         this.reset(true);
         this.connect();
+        this.messageId = messageId;
         this._execute(RUNTIME);
         this._execute(template);
     }
-    execute({ code, globals }) {
+    execute({ messageId, code, globals }) {
         this.reset(false);
         this.connect();
+        this.messageId = messageId;
         if (globals !== '{}') {
             this._execute(`Object.assign(global, ${globals});`);
         }
         this._execute(code);
     }
     _execute(code) {
-        return this.native.execute(code);
+        return this.native.execute(this.messageId, code);
     }
     reset(force) {
         if (force || !this.native.initialized) {
@@ -80,15 +82,16 @@ class Worker {
         }
         this.native.disconnect();
         this.connected = false;
+        this.messageId = null;
     }
     finish() {
         this.native.finish();
     }
-    cancel({ id }) {
-        this.native.cancel(id);
+    cancel({ messageId, callbackId }) {
+        this.native.cancel(messageId, callbackId);
     }
-    callback({ id, args }) {
-        this.native.callback(id, JSON.stringify(args));
+    callback({ messageId, callbackId, args }) {
+        this.native.callback(messageId, callbackId, JSON.stringify(args));
     }
     exit(message) {
         this.disconnect();

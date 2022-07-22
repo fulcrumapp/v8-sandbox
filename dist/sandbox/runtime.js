@@ -22,7 +22,7 @@ environment.httpRequest = (options, callback) => environment.dispatch('httpReque
 environment.setResult = (result) => environment.dispatch('setResult', result != null ? [result] : null);
 environment.setTimeout = (callback, timeout) => environment.dispatch('setTimeout', [timeout], callback);
 environment.clearTimeout = (id) => environment.dispatch('clearTimeout', [id]);
-environment.info = (id) => environment.dispatch('info', []);
+environment.info = () => environment.dispatch('info', []);
 environment.console = {
     log: (...args) => environment.dispatch('log', [args]),
     error: (...args) => environment.dispatch('error', [args]),

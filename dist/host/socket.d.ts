@@ -5,7 +5,8 @@ import net from 'net';
 import { ChildProcess } from 'child_process';
 import Sandbox from './sandbox';
 interface Message {
-    id: number;
+    messageId: number;
+    callbackId: number;
     length: number;
     data: Buffer;
 }

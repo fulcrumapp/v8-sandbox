@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-let nextID = 0;
+let nextId = 0;
 const TIMERS = {};
 class Timer {
     constructor() {
@@ -18,7 +18,7 @@ class Timer {
     }
     start(timeout, callback, cancel = null) {
         this.clear();
-        this.id = ++nextID;
+        this.id = ++nextId;
         this.onCancel = cancel;
         TIMERS[this.id] = setTimeout(() => {
             delete TIMERS[this.id];

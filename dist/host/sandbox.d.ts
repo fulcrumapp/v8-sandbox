@@ -29,6 +29,7 @@ export interface Result {
     output?: Log[];
 }
 export interface Message {
+    id: number;
     type: 'initialize' | 'execute';
     template?: string;
     code?: string;
@@ -86,7 +87,7 @@ export default class Sandbox {
     }): Promise<Result>;
     execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<Result>;
     get socketName(): string;
-    dispatch(invocation: any, { fail, respond, callback, cancel, }: {
+    dispatch(messageId: any, invocation: any, { fail, respond, callback, cancel, }: {
         fail: any;
         respond: any;
         callback: any;
@@ -98,11 +99,11 @@ export default class Sandbox {
     start(): void;
     shutdown(): Promise<unknown>;
     handleTimeout: () => void;
-    callback(id: any, args: any): void;
-    cancel(id: any): void;
+    callback(messageId: any, callbackId: any, args: any): void;
+    cancel(messageId: any, callbackId: any): void;
     processMessage: (message: Message) => Promise<void>;
-    onInitialize({ template, timeout }: Message): void;
-    onExecute({ code, timeout, globals, context, }: Message): void;
+    onInitialize({ id, template, timeout }: Message): void;
+    onExecute({ id, code, timeout, globals, context, }: Message): void;
     setResult(result: any): void;
     finish(result: any): void;
     handleConnection: (socket: any) => void;

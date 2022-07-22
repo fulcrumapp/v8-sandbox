@@ -11,6 +11,7 @@ const child_process_1 = require("child_process");
 const async_1 = __importDefault(require("async"));
 const lodash_1 = require("lodash");
 const signal_exit_1 = __importDefault(require("signal-exit"));
+const crypto_1 = require("crypto");
 const timer_1 = __importDefault(require("./timer"));
 const socket_1 = __importDefault(require("./socket"));
 const functions_1 = __importDefault(require("./functions"));
@@ -23,7 +24,9 @@ class TimeoutError extends Error {
     }
 }
 exports.TimeoutError = TimeoutError;
-let nextID = 0;
+let nextId = 0;
+const nextSandboxId = () => `v8-sandbox-${process.pid}-${++nextId}`;
+const nextMessageId = () => (0, crypto_1.randomInt)(2 ** 30);
 class Sandbox {
     constructor({ require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath, } = {}) {
         this.initialized = false;
@@ -57,7 +60,7 @@ class Sandbox {
         this.handleError = (error) => {
             console.error('server error', error);
         };
-        this.id = `v8-sandbox-${process.pid}-${++nextID}`;
+        this.id = nextSandboxId();
         this.initializeTimeout = new timer_1.default();
         this.executeTimeout = new timer_1.default();
         this.memory = memory ?? null;
@@ -77,6 +80,7 @@ class Sandbox {
         this.setResult(null);
         return new Promise((resolve) => {
             this.queue.push({
+                id: nextMessageId(),
                 type: 'initialize',
                 template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
                 timeout,
@@ -96,6 +100,7 @@ class Sandbox {
         }
         return new Promise((resolve) => {
             this.queue.push({
+                id: nextMessageId(),
                 type: 'execute',
                 code,
                 timeout,
@@ -113,7 +118,10 @@ class Sandbox {
         return process.platform === 'win32' ? path_1.default.join('\\\\?\\pipe', process.cwd(), this.id)
             : `${this.socketPath}/${this.id}`;
     }
-    dispatch(invocation, { fail, respond, callback, cancel, }) {
+    dispatch(messageId, invocation, { fail, respond, callback, cancel, }) {
+        if (messageId !== this.message.id) {
+            throw new Error('invalid dispatch');
+        }
         this.functions.dispatch(invocation, {
             message: this.message, fail, respond, callback, cancel,
         });
@@ -188,7 +196,7 @@ class Sandbox {
             }
         });
     }
-    callback(id, args) {
+    callback(messageId, callbackId, args) {
         if (args && args.length > 0 && args[0] instanceof Error) {
             args[0] = {
                 name: args[0].name,
@@ -196,29 +204,31 @@ class Sandbox {
                 stack: args[0].stack,
             };
         }
-        this.worker.send({ type: 'callback', id, args });
+        this.worker.send({
+            messageId, type: 'callback', callbackId, args,
+        });
     }
-    cancel(id) {
-        this.worker.send({ type: 'cancel', id });
+    cancel(messageId, callbackId) {
+        this.worker.send({ messageId, type: 'cancel', callbackId });
     }
-    onInitialize({ template, timeout }) {
+    onInitialize({ id, template, timeout }) {
         if (this.initialized) {
             return this.finish({});
         }
         this.initializeTimeout.start(timeout, this.handleTimeout);
-        this.worker.send({ type: 'initialize', template });
+        this.worker.send({ messageId: id, type: 'initialize', template });
     }
-    onExecute({ code, timeout, globals, context, }) {
+    onExecute({ id, code, timeout, globals, context, }) {
         this.executeTimeout.start(timeout, this.handleTimeout);
         this.worker.send({
-            type: 'execute', code, globals: JSON.stringify(globals),
+            messageId: id, type: 'execute', code, globals: JSON.stringify(globals),
         });
     }
     setResult(result) {
         this.result = result;
     }
     finish(result) {
-        result = result ?? this.result;
+        result ?? (result = this.result);
         this.functions.clearTimers();
         if (this.message) {
             this.message.callback({ ...result, output: this.message.output });

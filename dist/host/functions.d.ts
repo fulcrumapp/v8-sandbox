@@ -34,7 +34,7 @@ export default class Functions {
         callback: any;
         cancel: any;
     }): any;
-    finish([]: Iterable<any>, { message, respond }: {
+    finish([messageId]: [any], { message, respond }: {
         message: any;
         respond: any;
     }): void;
@@ -48,7 +48,7 @@ export default class Functions {
         callback: any;
         cancel: any;
     }) => any;
-    clearTimeout: ([timerID]: [any], { fail, respond }: {
+    clearTimeout: ([timerId]: [any], { fail, respond }: {
         fail: any;
         respond: any;
     }) => any;

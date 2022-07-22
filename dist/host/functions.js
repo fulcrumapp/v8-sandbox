@@ -26,14 +26,14 @@ class Functions {
             this.timers[id] = timer;
             respond(id);
         };
-        this.clearTimeout = ([timerID], { fail, respond }) => {
+        this.clearTimeout = ([timerId], { fail, respond }) => {
             if (!this.timersEnabled) {
                 return fail(new Error('clearTimeout is disabled'));
             }
-            const timer = this.timers[+timerID];
+            const timer = this.timers[+timerId];
             if (timer) {
                 timer.clear();
-                delete this.timers[+timerID];
+                delete this.timers[+timerId];
             }
             respond();
         };
@@ -160,7 +160,10 @@ class Functions {
             }
         }
     }
-    finish([], { message, respond }) {
+    finish([messageId], { message, respond }) {
+        if (this.sandbox.message.id !== messageId) {
+            throw new Error('invalid call to finish');
+        }
         this.sandbox.finish(null);
         respond();
     }
