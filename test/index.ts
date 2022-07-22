@@ -2,7 +2,7 @@ import path from 'path';
 import assert from 'assert';
 import fs from 'fs';
 
-import { Sandbox, SandboxCluster } from '../dist';
+import { Sandbox, SandboxCluster, Result } from '../dist';
 
 let globalSandbox: SandboxCluster | null = null;
 
@@ -55,7 +55,7 @@ describe('sandbox', () => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'Uncaught Error: hi');
+    assert.equal(error?.message, 'Uncaught Error: hi');
   });
 
   it('should timeout when script keeps running after setResult', async () => {
@@ -63,7 +63,7 @@ describe('sandbox', () => {
 
     const { error } = await runWithTimeout(js, 200);
 
-    assert.ok(error.isTimeout);
+    assert.ok(error?.isTimeout);
   });
 
   it('should timeout when script keeps running in a setTimeout after setResult', async () => {
@@ -71,7 +71,7 @@ describe('sandbox', () => {
 
     const { error } = await runWithTimeout(js, 200);
 
-    assert.ok(error.isTimeout);
+    assert.ok(error?.isTimeout);
   });
 
   it('should timeout when script keeps running in a setTimeout after setResult', async () => {
@@ -161,7 +161,7 @@ httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'Uncaught Error: yoyo');
+    assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
 
   it('should fail when passing an invalid option to httpRequest', async () => {
@@ -175,7 +175,7 @@ httpRequest({uri: '${TEST_URL}', invalidOption: true}, (err, res, body) => {
 
     const { error } = await sandbox.execute({ code, timeout: 1000 });
 
-    assert.equal(error.message, 'Uncaught Error: invalid option');
+    assert.equal(error?.message, 'Uncaught Error: invalid option');
 
     await sandbox.shutdown();
   });
@@ -219,7 +219,7 @@ httpRequest({uri: 'http://no-way-this-exists-12345.net'}, (error, res, body) => 
 
     const { error } = await run(js);
 
-    assert.equal(error.code, 'ENOTFOUND');
+    assert.equal(error?.code, 'ENOTFOUND');
   });
 
   it('should execute httpRequest within a timeout and async function', async () => {
@@ -455,7 +455,7 @@ Error: yo
 
     const { output } = await runWithTimeout(js, 30);
 
-    assert.deepStrictEqual(output.map(o => o.message), [ 'hi', 'there', 'yo' ]);
+    assert.deepStrictEqual(output?.map(o => o.message), [ 'hi', 'there', 'yo' ]);
   });
 
   it('should run simple script', async () => {
@@ -557,7 +557,7 @@ setTimeout(() => {
 
     const { error } = await runWithTimeout(js, 30);
 
-    assert.equal(error.isTimeout, true);
+    assert.equal(error?.isTimeout, true);
   });
 
   it('should timeout when idling in the run loop', async () => {
@@ -565,7 +565,7 @@ setTimeout(() => {
 
     const { error } = await runWithTimeout(js, 30);
 
-    assert.equal(error.isTimeout, true);
+    assert.equal(error?.isTimeout, true);
   });
 
   it('should timeout many times', async () => {
@@ -573,7 +573,7 @@ setTimeout(() => {
 
     const count = 20;
 
-    const operations = [];
+    const operations: Promise<Result>[] = [];
 
     for (let i = count; i > 0; --i) {
       operations.push(runWithTimeout(js, 30));
@@ -582,7 +582,7 @@ setTimeout(() => {
     const results = await Promise.all(operations);
 
     for (const { error } of results) {
-      assert.equal(error.isTimeout, true);
+      assert.equal(error?.isTimeout, true);
     }
 
     assert.equal(results.length, 20);
@@ -593,7 +593,7 @@ setTimeout(() => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'Uncaught Error: yoyo');
+    assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
 
   it('should throw errors from setTimeout callbacks', async () => {
@@ -605,7 +605,7 @@ setTimeout(() => {
 
     const { error } = await run(js);
 
-    assert.equal(error.message, 'Uncaught Error: yoyo');
+    assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
 
   it('should not crash when calling native functions with invalid arguments', async () => {
@@ -643,7 +643,7 @@ setTimeout(() => {
       ]});
 `;
 
-    const { value, error } = await run(js);
+    const { value } = await run(js);
 
     assert.deepEqual(value, [
       '_setTimeout is not defined',
@@ -673,7 +673,7 @@ setTimeout(() => {
   it('should handle calling finish() multiple times', async () => {
     const sandbox = new Sandbox();
 
-    let result = null;
+    let result: Result | null = null;
 
     for (let i = 0; i < 5; ++i) {
       const code = `
@@ -685,17 +685,17 @@ setTimeout(() => {
       `;
 
       result = await sandbox.execute({code});
-      assert.deepEqual(result.value, [
+      assert.deepEqual(result?.value, [
         i, 'invalid call to finish', 'invalid call to finish'
       ]);
 
       result = await sandbox.execute({code});
-      assert.deepEqual(result.value, [
+      assert.deepEqual(result?.value, [
         i, 'invalid call to finish', 'invalid call to finish'
       ]);
 
       result = await sandbox.execute({code});
-      assert.deepEqual(result.value, [
+      assert.deepEqual(result?.value, [
         i, 'invalid call to finish', 'invalid call to finish'
       ]);
     }
@@ -707,7 +707,7 @@ setTimeout(() => {
     const iterations = 500;
 
     const count = 0;
-    const operations = [];
+    const operations: Promise<Result>[] = [];
 
     for (let i = 0; i < iterations; ++i) {
       const js = `
@@ -730,8 +730,6 @@ setTimeout(() => {
     const iterations = 500;
 
     let count = 0;
-
-    const operations = [];
 
     return new Promise((resolve) => {
       for (let i = 0; i < iterations; ++i) {
@@ -838,7 +836,7 @@ setTimeout(() => {
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'Uncaught Error: hi');
+    assert.equal(error?.message, 'Uncaught Error: hi');
 
     sandbox.shutdown();
   });
@@ -852,7 +850,7 @@ setTimeout(() => {
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'Uncaught TypeError: name must be a string');
+    assert.equal(error?.message, 'Uncaught TypeError: name must be a string');
 
     sandbox.shutdown();
   });
@@ -930,7 +928,7 @@ setTimeout(() => {
     setResult({value: callRespondAndFail()})
 `;
 
-    const { value, error } = await sandbox.execute({ code, timeout: 3000 });
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(value, 3);
 
@@ -1007,8 +1005,8 @@ Error: uh oh: 3
     at wrappedCallback (script:9:13)
     `.trim();
 
-    assert.equal(error.message, 'Uncaught Error: uh oh: 3');
-    assert.equal(error.stack, stack);
+    assert.equal(error?.message, 'Uncaught Error: uh oh: 3');
+    assert.equal(error?.stack, stack);
 
     sandbox.shutdown();
   });
@@ -1024,7 +1022,7 @@ errorSync(1, 2);
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'Uncaught Error: hi');
+    assert.equal(error?.message, 'Uncaught Error: hi');
 
     sandbox.shutdown();
   });
@@ -1040,7 +1038,7 @@ errorAsync(1, 2);
 
     const { error } = await sandbox.execute({ code, timeout: 10000 });
 
-    assert.equal(error.message, 'worker disconnected');
+    assert.equal(error?.message, 'worker disconnected');
 
     sandbox.shutdown();
   });
@@ -1055,7 +1053,7 @@ errorAsync(1, 2);
 `;
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, 'Uncaught Error: 1337');
+    assert.equal(error?.message, 'Uncaught Error: 1337');
 
     sandbox.shutdown();
   });
@@ -1071,7 +1069,7 @@ errorAsync(1, 2);
 
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error.message, '1337');
+    assert.equal(error?.message, '1337');
 
     sandbox.shutdown();
   });
@@ -1173,13 +1171,13 @@ setResult({ value: fetchLargeValue() });
 
     let result = await sandbox.execute({ code, timeout: 8000 });
 
-    assert.equal(result.error.message, 'Uncaught Error: setTimeout is disabled');
+    assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
 
     code = 'httpRequest({ url: "http://example.com" });';
 
     result = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(result.error.message, 'Uncaught Error: httpRequest is disabled');
+    assert.equal(result?.error?.message, 'Uncaught Error: httpRequest is disabled');
 
     sandbox.shutdown();
   });
@@ -1203,7 +1201,7 @@ setResult({ value: fetchLargeValue() });
     console.log(' ☝️  This crash is supposed to happen. It\'s part of the test.');
     console.log('=============================================================');
 
-    assert.equal(error.message, 'worker exited');
+    assert.equal(error?.message, 'worker exited');
 
     const { value } = await sandbox.execute({ code: 'setResult({ value: 1 });', timeout: 3000 });
 

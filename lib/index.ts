@@ -1,5 +1,5 @@
-import Sandbox from './host/sandbox';
+import Sandbox, { Result } from './host/sandbox';
 import SandboxCluster from './cluster/cluster';
 
 export default Sandbox;
-export { Sandbox, SandboxCluster };
+export { Sandbox, SandboxCluster, Result };
