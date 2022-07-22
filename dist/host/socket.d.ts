@@ -4,7 +4,7 @@
 import net from 'net';
 import { ChildProcess } from 'child_process';
 import Sandbox from './sandbox';
-interface Message {
+interface Packet {
     messageId: number;
     callbackId: number;
     length: number;
@@ -15,11 +15,11 @@ export default class Socket {
     worker: ChildProcess;
     socket: net.Socket;
     closed: boolean;
-    message: Message;
+    packet: Packet;
     constructor(socket: any, sandbox: any);
     shutdown(): void;
     get isConnected(): boolean;
-    handleData: (data: any) => void;
+    handleData: (rawData: any) => void;
     handleError: (error: any) => void;
     handleDrain: () => void;
     handleClose: () => void;

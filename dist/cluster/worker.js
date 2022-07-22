@@ -86,8 +86,9 @@ class Worker {
             };
         }
         process.send(result);
-        // start creating the next sandbox *after* posting the completion message. This operation happens with coordination from
-        // the calling process, but that's OK because we wait for it's initialization.
+        // start creating the next sandbox *after* posting the completion message. This operation
+        // happens with coordination from the calling process, but that's OK because we wait for
+        // it's initialization.
         setImmediate(() => {
             this.create();
         });
@@ -101,7 +102,7 @@ setInterval(() => {
     if (!process.connected) {
         process.exit();
     }
-}, 5000);
+}, 1000);
 process.on('message', (message) => {
     worker.queue.push(message);
 });

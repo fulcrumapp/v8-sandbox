@@ -38,13 +38,13 @@ class Cluster {
     shutdown() {
         for (const worker of this.inactiveWorkers) {
             this.clearWorkerTimeout(worker);
-            worker.removeAllListeners();
-            worker.kill();
+            worker.childProcess.removeAllListeners();
+            worker.childProcess.kill();
         }
         for (const worker of this.activeWorkers) {
             this.clearWorkerTimeout(worker);
-            worker.removeAllListeners();
-            worker.kill();
+            worker.childProcess.removeAllListeners();
+            worker.childProcess.kill();
         }
         this.inactiveWorkers = [];
         this.activeWorkers = [];
@@ -56,9 +56,9 @@ class Cluster {
     ensureWorkers() {
         const total = this.inactiveWorkers.length + this.activeWorkers.length;
         for (let i = 0; i < this.workerCount - total; ++i) {
-            const worker = this.forkWorker();
-            worker.send({ initialize: true, ...this.sandboxOptions });
-            this.inactiveWorkers.push(worker);
+            const childProcess = this.forkWorker();
+            childProcess.send({ initialize: true, ...this.sandboxOptions });
+            this.inactiveWorkers.push({ childProcess });
         }
     }
     forkWorker() {
@@ -95,8 +95,8 @@ class Cluster {
     }
     removeWorker(worker) {
         this.clearWorkerTimeout(worker);
-        worker.kill();
-        worker.removeAllListeners();
+        worker.childProcess.kill();
+        worker.childProcess.removeAllListeners();
         remove(this.activeWorkers, worker);
         remove(this.inactiveWorkers, worker);
         this.ensureWorkers();
@@ -115,23 +115,23 @@ class Cluster {
             this.queue.push(item, resolve);
         });
     }
-    _execute({ code, timeout, globals, context, }, callback) {
-        callback = (0, lodash_1.once)(callback);
+    _execute({ code, timeout, globals, context, }, cb) {
+        const callback = (0, lodash_1.once)(cb);
         this.popWorker((worker) => {
-            worker.removeAllListeners();
-            worker.on('message', (message) => {
+            worker.childProcess.removeAllListeners();
+            worker.childProcess.on('message', (message) => {
                 this.finishWorker(worker);
                 callback(message);
             });
-            worker.on('error', (message) => {
+            worker.childProcess.on('error', (message) => {
                 this.removeWorker(worker);
                 callback({ error: new Error('worker error') });
             });
-            worker.on('disconnect', () => {
+            worker.childProcess.on('disconnect', () => {
                 this.removeWorker(worker);
                 callback({ error: new Error('worker disconnected') });
             });
-            worker.on('exit', (message) => {
+            worker.childProcess.on('exit', (message) => {
                 this.removeWorker(worker);
             });
             if (timeout > 0) {
@@ -140,7 +140,7 @@ class Cluster {
                     callback({ error: new sandbox_1.TimeoutError(timeout) });
                 }, timeout);
             }
-            worker.send({
+            worker.childProcess.send({
                 code,
                 globals: JSON.stringify(globals),
                 context: JSON.stringify(context),

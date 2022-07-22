@@ -1,14 +1,19 @@
 /// <reference types="node" />
+/// <reference types="node" />
 import { ChildProcess } from 'child_process';
 import async from 'async';
 import { Options, ExecutionOptions } from '../host/sandbox';
 interface ClusterOptions extends Options {
     workers?: number;
 }
+interface ClusterWorker {
+    childProcess: ChildProcess;
+    executionTimeout?: NodeJS.Timeout;
+}
 export default class Cluster {
     workerCount: number;
-    inactiveWorkers: ChildProcess[];
-    activeWorkers: ChildProcess[];
+    inactiveWorkers: ClusterWorker[];
+    activeWorkers: ClusterWorker[];
     queue?: async.QueueObject<ExecutionOptions>;
     sandboxOptions: Options;
     constructor({ workers, ...options }?: ClusterOptions);
@@ -17,16 +22,16 @@ export default class Cluster {
     worker: (task: any, callback: any) => void;
     ensureWorkers(): void;
     forkWorker(): ChildProcess;
-    popWorker(callback: any): void;
-    clearWorkerTimeout(worker: any): void;
-    finishWorker(worker: any): void;
-    removeWorker(worker: any): void;
+    popWorker(callback: (worker: ClusterWorker) => void): void;
+    clearWorkerTimeout(worker: ClusterWorker): void;
+    finishWorker(worker: ClusterWorker): void;
+    removeWorker(worker: ClusterWorker): void;
     execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<unknown>;
     _execute({ code, timeout, globals, context, }: {
         code: any;
         timeout: any;
         globals: any;
         context: any;
-    }, callback: any): void;
+    }, cb: any): void;
 }
 export {};

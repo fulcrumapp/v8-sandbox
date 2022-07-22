@@ -33,7 +33,7 @@ export default class Functions {
         respond: any;
         callback: any;
         cancel: any;
-    }): any;
+    }): void;
     finish([messageId]: [any], { message, respond }: {
         message: any;
         respond: any;
@@ -47,39 +47,37 @@ export default class Functions {
         respond: any;
         callback: any;
         cancel: any;
-    }) => any;
+    }) => void;
     clearTimeout: ([timerId]: [any], { fail, respond }: {
         fail: any;
         respond: any;
-    }) => any;
+    }) => void;
     httpRequest: ([options]: [any], { respond, fail, callback, context, }: {
         respond: any;
         fail: any;
         callback: any;
         context: any;
-    }) => any;
-    log: ([args]: [any], { message, respond, context, callback, }: {
+    }) => void;
+    log: ([args]: [any], { message, respond, context, }: {
         message: any;
         respond: any;
         context: any;
-        callback: any;
     }) => void;
     write({ message, type, args }: {
         message: Message;
         type: string;
         args: [any, any];
     }): void;
-    error: ([args]: [any], { message, respond, context, callback, }: {
+    error: ([args]: [any], { message, respond, context, }: {
         message: any;
         respond: any;
         context: any;
-        callback: any;
     }) => void;
     info: (args: any, { message, fail, respond }: {
         message: any;
         fail: any;
         respond: any;
-    }) => any;
+    }) => void;
     processHttpRequest(rawOptions: any, context: any): any;
     processHttpResponse(rawResponse: any, context: any): any;
     processHttpError(rawError: any, context: any): any;

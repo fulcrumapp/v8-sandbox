@@ -8,10 +8,10 @@ const path_1 = __importDefault(require("path"));
 const net_1 = __importDefault(require("net"));
 const fs_1 = __importDefault(require("fs"));
 const child_process_1 = require("child_process");
+const crypto_1 = require("crypto");
 const async_1 = __importDefault(require("async"));
 const lodash_1 = require("lodash");
 const signal_exit_1 = __importDefault(require("signal-exit"));
-const crypto_1 = require("crypto");
 const timer_1 = __importDefault(require("./timer"));
 const socket_1 = __importDefault(require("./socket"));
 const functions_1 = __importDefault(require("./functions"));
@@ -46,9 +46,11 @@ class Sandbox {
                 });
                 switch (message.type) {
                     case 'initialize':
-                        return this.onInitialize(message);
+                        this.onInitialize(message);
+                        break;
                     case 'execute':
-                        return this.onExecute(message);
+                        this.onExecute(message);
+                        break;
                     default:
                         this.finish({ error: new Error('invalid message') });
                 }
@@ -213,7 +215,8 @@ class Sandbox {
     }
     onInitialize({ id, template, timeout }) {
         if (this.initialized) {
-            return this.finish({});
+            this.finish({});
+            return;
         }
         this.initializeTimeout.start(timeout, this.handleTimeout);
         this.worker.send({ messageId: id, type: 'initialize', template });
@@ -228,10 +231,10 @@ class Sandbox {
         this.result = result;
     }
     finish(result) {
-        result ?? (result = this.result);
+        const finishResult = result ?? this.result;
         this.functions.clearTimers();
         if (this.message) {
-            this.message.callback({ ...result, output: this.message.output });
+            this.message.callback({ ...finishResult, output: this.message.output });
         }
     }
 }

@@ -18,7 +18,8 @@ class Functions {
         };
         this.setTimeout = ([timeout], { fail, respond, callback, cancel, }) => {
             if (!this.timersEnabled) {
-                return fail(new Error('setTimeout is disabled'));
+                fail(new Error('setTimeout is disabled'));
+                return;
             }
             const timer = new timer_1.default();
             timer.start(timeout || 0, callback, cancel);
@@ -28,7 +29,8 @@ class Functions {
         };
         this.clearTimeout = ([timerId], { fail, respond }) => {
             if (!this.timersEnabled) {
-                return fail(new Error('clearTimeout is disabled'));
+                fail(new Error('clearTimeout is disabled'));
+                return;
             }
             const timer = this.timers[+timerId];
             if (timer) {
@@ -39,10 +41,10 @@ class Functions {
         };
         this.httpRequest = ([options], { respond, fail, callback, context, }) => {
             if (!this.httpEnabled) {
-                return fail(new Error('httpRequest is disabled'));
+                fail(new Error('httpRequest is disabled'));
+                return;
             }
-            options = options || {};
-            (0, axios_1.default)(this.processHttpRequest(options, context))
+            (0, axios_1.default)(this.processHttpRequest(options ?? {}, context))
                 .then((response) => {
                 const httpResponse = this.processHttpResponse(response, context);
                 if (!callback) {
@@ -65,19 +67,20 @@ class Functions {
                 respond();
             }
         };
-        this.log = ([args], { message, respond, context, callback, }) => {
+        this.log = ([args], { message, respond, context, }) => {
             this.write({ message, type: 'log', args });
             (global.handleConsoleLog ?? this.handleConsoleLog)({ args, context });
             respond();
         };
-        this.error = ([args], { message, respond, context, callback, }) => {
+        this.error = ([args], { message, respond, context, }) => {
             this.write({ message, type: 'error', args });
             (global.handleConsoleError ?? this.handleConsoleError)({ args, context });
             respond();
         };
         this.info = (args, { message, fail, respond }) => {
             if (!this.sandbox.debug) {
-                return fail(new Error('info is disabled'));
+                fail(new Error('info is disabled'));
+                return;
             }
             respond({
                 versions: process.versions,
@@ -97,13 +100,16 @@ class Functions {
         this.setup();
     }
     setup() {
+        var _a, _b;
         global.define = this.define;
         global.defineAsync = this.defineAsync;
         this.syncFunctions = {};
         this.asyncFunctions = {};
         if (this.require) {
-            this.syncFunctions = SYNC_FUNCTIONS[this.require] = SYNC_FUNCTIONS[this.require] || {};
-            this.asyncFunctions = ASYNC_FUNCTIONS[this.require] = ASYNC_FUNCTIONS[this.require] || {};
+            SYNC_FUNCTIONS[_a = this.require] ?? (SYNC_FUNCTIONS[_a] = {});
+            ASYNC_FUNCTIONS[_b = this.require] ?? (ASYNC_FUNCTIONS[_b] = {});
+            this.syncFunctions = SYNC_FUNCTIONS[this.require];
+            this.asyncFunctions = ASYNC_FUNCTIONS[this.require];
             // eslint-disable-next-line global-require
             require(this.require);
         }
@@ -126,31 +132,39 @@ class Functions {
             }];
         switch (name) {
             case 'finish': {
-                return this.finish(...params);
+                this.finish(...params);
+                break;
             }
             case 'setResult': {
-                return this.setResult(...params);
+                this.setResult(...params);
+                break;
             }
             case 'httpRequest': {
-                return (this.asyncFunctions.httpRequest ?? this.httpRequest)(...params);
+                (this.asyncFunctions.httpRequest ?? this.httpRequest)(...params);
+                break;
             }
             case 'setTimeout': {
-                return (this.syncFunctions.setTimeout ?? this.setTimeout)(...params);
+                (this.syncFunctions.setTimeout ?? this.setTimeout)(...params);
+                break;
             }
             case 'clearTimeout': {
-                return (this.syncFunctions.clearTimeout ?? this.clearTimeout)(...params);
+                (this.syncFunctions.clearTimeout ?? this.clearTimeout)(...params);
+                break;
             }
             case 'log': {
-                return (this.syncFunctions.log ?? this.log)(...params);
+                (this.syncFunctions.log ?? this.log)(...params);
+                break;
             }
             case 'error': {
-                return (this.syncFunctions.error ?? this.error)(...params);
+                (this.syncFunctions.error ?? this.error)(...params);
+                break;
             }
             case 'info': {
-                return (this.syncFunctions.info ?? this.info)(...params);
+                (this.syncFunctions.info ?? this.info)(...params);
+                break;
             }
             default: {
-                const fn = this.syncFunctions[name] || this.asyncFunctions[name];
+                const fn = this.syncFunctions[name] ?? this.asyncFunctions[name];
                 if (fn) {
                     fn(...params);
                 }
@@ -202,7 +216,8 @@ class Functions {
             statusText: rawResponse.statusText,
             headers: rawResponse.headers,
         };
-        return (global.handleHttpResponse ?? this.handleHttpResponse)({ response, rawResponse, context });
+        const handleHttpResponse = global.handleHttpResponse ?? this.handleHttpResponse;
+        return handleHttpResponse({ response, rawResponse, context });
     }
     processHttpError(rawError, context) {
         const error = {

@@ -15,10 +15,16 @@
     "sourceType": "module",
     "project": "./tsconfig.json"
   },
+  "globals": {
+    "NodeJS": true
+  },
   "rules": {
     "import/extensions": 0,
     "import/no-dynamic-require": 0,
     "import/no-unresolved": 0,
+    "no-plusplus": 0,
+    "no-bitwise": 0,
+    "no-param-reassign": 0,
     "no-unused-vars": 0,
     "no-underscore-dangle": 0,
     "no-restricted-syntax": 0,
