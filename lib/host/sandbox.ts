@@ -301,7 +301,7 @@ export default class Sandbox {
     this.finish({ error: new TimeoutError(this.message.timeout) });
   };
 
-  callback(id, args) {
+  callback(callbackId, args) {
     if (args && args.length > 0 && args[0] instanceof Error) {
       args[0] = {
         name: args[0].name,
@@ -310,11 +310,11 @@ export default class Sandbox {
       };
     }
 
-    this.worker.send({ type: 'callback', id, args });
+    this.worker.send({ type: 'callback', callbackId, args });
   }
 
-  cancel(id) {
-    this.worker.send({ type: 'cancel', id });
+  cancel(callbackId) {
+    this.worker.send({ type: 'cancel', callbackId });
   }
 
   processMessage = async (message: Message) => {
@@ -364,7 +364,7 @@ export default class Sandbox {
   }
 
   finish(result) {
-    result = result ?? this.result;
+    result ??= this.result;
 
     this.functions.clearTimers();
 

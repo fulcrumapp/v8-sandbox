@@ -5,6 +5,15 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
 const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
 
+export interface WorkerMessage {
+  type: 'initialize' | 'execute' | 'callback' | 'cancel' | 'exit';
+  template: string;
+  code: string;
+  globals: string;
+  callbackId: string;
+  args: string;
+}
+
 export default class Worker {
   native: any;
 
@@ -14,7 +23,7 @@ export default class Worker {
     this.native = new NativeSandbox(process.argv[2]);
   }
 
-  initialize({ template }) {
+  initialize({ template }: WorkerMessage) {
     this.reset(true);
     this.connect();
 
@@ -22,7 +31,7 @@ export default class Worker {
     this._execute(template);
   }
 
-  execute({ code, globals }) {
+  execute({ code, globals }: WorkerMessage) {
     this.reset(false);
     this.connect();
 
@@ -66,20 +75,20 @@ export default class Worker {
     this.native.finish();
   }
 
-  cancel({ id }) {
-    this.native.cancel(id);
+  cancel({ callbackId }: WorkerMessage) {
+    this.native.cancel(callbackId);
   }
 
-  callback({ id, args }) {
-    this.native.callback(id, JSON.stringify(args));
+  callback({ callbackId, args }: WorkerMessage) {
+    this.native.callback(callbackId, JSON.stringify(args));
   }
 
-  exit(message) {
+  exit(message: WorkerMessage) {
     this.disconnect();
     process.off('message', this.handleMessage);
   }
 
-  handleMessage = (message) => {
+  handleMessage = (message: WorkerMessage) => {
     switch (message.type) {
       case 'initialize':
         this.initialize(message);

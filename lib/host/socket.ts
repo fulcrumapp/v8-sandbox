@@ -12,7 +12,7 @@ function tryParseJSON(value) {
 }
 
 interface Message {
-  id: number;
+  callbackId: number;
   length: number;
   data: Buffer;
 }
@@ -56,7 +56,7 @@ export default class Socket {
   handleData = (data) => {
     if (!this.message) {
       this.message = {
-        id: data.readInt32BE(0),
+        callbackId: data.readInt32BE(0),
         length: data.readInt32BE(4),
         data: data.subarray(8),
       };
@@ -65,7 +65,7 @@ export default class Socket {
     }
 
     if (this.message.data.length === this.message.length) {
-      const { id, data } = this.message;
+      const { callbackId, data } = this.message;
 
       const json = data.toString('utf8');
 
@@ -73,15 +73,15 @@ export default class Socket {
 
       const message = tryParseJSON(json);
 
-      const callback = id > 0 ? once(((...args) => {
+      const callback = callbackId > 0 ? once(((...args) => {
         if (this.isConnected) {
-          this.sandbox.callback(id, args);
+          this.sandbox.callback(callbackId, args);
         }
       })) : null;
 
-      const cancel = id > 0 ? once((() => {
+      const cancel = callbackId > 0 ? once((() => {
         if (this.isConnected) {
-          this.sandbox.cancel(id);
+          this.sandbox.cancel(callbackId);
         }
       })) : null;
 

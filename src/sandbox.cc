@@ -110,7 +110,7 @@ NAN_METHOD(Sandbox::Execute) {
 }
 
 NAN_METHOD(Sandbox::Callback) {
-  NODE_ARG_INTEGER(0, "id");
+  NODE_ARG_INTEGER(0, "callbackId");
   NODE_ARG_STRING(1, "args");
 
   Nan::Utf8String args(info[1]);
@@ -121,7 +121,7 @@ NAN_METHOD(Sandbox::Callback) {
 }
 
 NAN_METHOD(Sandbox::Cancel) {
-  NODE_ARG_INTEGER(0, "id");
+  NODE_ARG_INTEGER(0, "callbackId");
 
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
@@ -234,10 +234,10 @@ void Sandbox::Execute(const char *code) {
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
-void Sandbox::Callback(int id, const char *args) {
-  assert(id > 0);
+void Sandbox::Callback(int callbackId, const char *args) {
+  assert(callbackId > 0);
 
-  auto operation = pendingOperations_[id];
+  auto operation = pendingOperations_[callbackId];
 
   assert(operation);
 
@@ -261,28 +261,28 @@ void Sandbox::Callback(int id, const char *args) {
     Nan::Call(callback, global, 1, argv);
   }
 
-  pendingOperations_.erase(id);
+  pendingOperations_.erase(callbackId);
 
   MaybeHandleError(tryCatch, context);
 
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
-void Sandbox::Cancel(int id) {
-  assert(id > 0);
-  assert(pendingOperations_[id]);
+void Sandbox::Cancel(int callbackId) {
+  assert(callbackId > 0);
+  assert(pendingOperations_[callbackId]);
 
-  pendingOperations_.erase(id);
+  pendingOperations_.erase(callbackId);
 }
 
 std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Function> *callback) {
-  int id = 0;
+  int callbackId = 0;
 
   if (callback) {
     auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
     auto operation = std::make_shared<AsyncOperation>(this, cb);
 
-    id = operation->id;
+    callbackId = operation->id;
 
     pendingOperations_[operation->id] = operation;
   }
@@ -295,7 +295,7 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
 
   std::string message(arguments);
 
-  WriteData((uv_stream_t *)pipe_, id, message);
+  WriteData((uv_stream_t *)pipe_, callbackId, message);
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
@@ -437,7 +437,7 @@ void Sandbox::OnClose(uv_handle_t *pipe) {
   free(pipe);
 }
 
-void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
+void Sandbox::WriteData(uv_stream_t *pipe, int callbackId, std::string &message) {
   uv_write_t *write = (uv_write_t *)malloc(sizeof(uv_write_t));
 
   size_t messageLength = message.length();
@@ -448,7 +448,7 @@ void Sandbox::WriteData(uv_stream_t *pipe, int id, std::string &message) {
 
   uint32_t *base = (uint32_t *)data;
 
-  base[0] = htonl(id);
+  base[0] = htonl(callbackId);
   base[1] = htonl(messageLength);
 
   memcpy(&base[2], message.c_str(), messageLength);

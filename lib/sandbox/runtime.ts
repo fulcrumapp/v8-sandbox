@@ -36,7 +36,7 @@ environment.setTimeout = (callback, timeout) => environment.dispatch('setTimeout
 
 environment.clearTimeout = (id) => environment.dispatch('clearTimeout', [id]);
 
-environment.info = (id) => environment.dispatch('info', []);
+environment.info = () => environment.dispatch('info', []);
 
 environment.console = {
   log: (...args) => environment.dispatch('log', [args]),
