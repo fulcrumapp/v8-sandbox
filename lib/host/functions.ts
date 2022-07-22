@@ -152,16 +152,16 @@ export default class Functions {
     respond(id);
   };
 
-  clearTimeout = ([timerID], { fail, respond }) => {
+  clearTimeout = ([timerId], { fail, respond }) => {
     if (!this.timersEnabled) {
       return fail(new Error('clearTimeout is disabled'));
     }
 
-    const timer = this.timers[+timerID];
+    const timer = this.timers[+timerId];
 
     if (timer) {
       timer.clear();
-      delete this.timers[+timerID];
+      delete this.timers[+timerId];
     }
 
     respond();

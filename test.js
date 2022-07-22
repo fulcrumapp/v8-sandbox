@@ -11,14 +11,14 @@ httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f
 
 const js = `
 const [err, res, body] = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de5e103126561da5f60e0fe0ce2/raw/46c1114c9f78a75d67dc4100d7e5e4d63ea5c583/gistfile1.txt'});
-const timerID = setTimeout(() => {
+const timerId = setTimeout(() => {
   console.log('FINISHED!!!!!');
   setResult(body);
 }, 3000);
 
-console.log('timerid', timerID);
-clearTimeout(timerID);
-clearTimeout(timerID);
+console.log('timerid', timerId);
+clearTimeout(timerId);
+clearTimeout(timerId);
 //while(true){};
 `;
 
