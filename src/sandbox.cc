@@ -224,6 +224,8 @@ void Sandbox::Disconnect() {
 }
 
 void Sandbox::Execute(int messageId, const char *code) {
+  assert(messageId_ == 0 || messageId_ == messageId);
+
   messageId_ = messageId;
 
   auto context = Nan::New(sandboxContext_);
@@ -248,13 +250,13 @@ void Sandbox::Execute(int messageId, const char *code) {
 }
 
 void Sandbox::Callback(int messageId, int callbackId, const char *args) {
+  assert(messageId_ == 0 || messageId_ == messageId);
+  assert(callbackId > 0);
+  assert(pendingOperations_[callbackId]);
+
   messageId_ = messageId;
 
-  assert(callbackId > 0);
-
   auto operation = pendingOperations_[callbackId];
-
-  assert(operation);
 
   auto context = Nan::New(sandboxContext_);
 
@@ -284,10 +286,11 @@ void Sandbox::Callback(int messageId, int callbackId, const char *args) {
 }
 
 void Sandbox::Cancel(int messageId, int callbackId) {
-  messageId_ = messageId;
-
+  assert(messageId_ == 0 || messageId_ == messageId);
   assert(callbackId > 0);
   assert(pendingOperations_[callbackId]);
+
+  messageId_ = messageId;
 
   pendingOperations_.erase(callbackId);
 }
@@ -329,6 +332,8 @@ void Sandbox::Finish() {
   );
 
   Dispatch("finish", invocation.c_str(), nullptr);
+
+  messageId_ = 0;
 }
 
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {

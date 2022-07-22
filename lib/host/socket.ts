@@ -11,7 +11,7 @@ function tryParseJSON(value) {
   }
 }
 
-interface Message {
+interface Packet {
   messageId: number;
   callbackId: number;
   length: number;
@@ -27,7 +27,7 @@ export default class Socket {
 
   closed: boolean;
 
-  message: Message;
+  packet: Packet;
 
   constructor(socket, sandbox) {
     this.sandbox = sandbox;
@@ -54,24 +54,24 @@ export default class Socket {
     return !this.closed && this.worker === this.sandbox.worker;
   }
 
-  handleData = (data) => {
-    if (!this.message) {
-      this.message = {
-        messageId: data.readInt32BE(0),
-        callbackId: data.readInt32BE(4),
-        length: data.readInt32BE(8),
-        data: data.subarray(12),
+  handleData = (rawData) => {
+    if (!this.packet) {
+      this.packet = {
+        messageId: rawData.readInt32BE(0),
+        callbackId: rawData.readInt32BE(4),
+        length: rawData.readInt32BE(8),
+        data: rawData.subarray(12),
       };
     } else {
-      this.message.data = Buffer.concat([this.message.data, data]);
+      this.packet.data = Buffer.concat([this.packet.data, rawData]);
     }
 
-    if (this.message.data.length === this.message.length) {
-      const { messageId, callbackId, data } = this.message;
+    if (this.packet.data.length === this.packet.length) {
+      const { messageId, callbackId, data } = this.packet;
 
       const json = data.toString('utf8');
 
-      this.message = null;
+      this.packet = null;
 
       const invocation = tryParseJSON(json);
 
