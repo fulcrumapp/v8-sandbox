@@ -8,7 +8,7 @@ interface ClusterOptions extends Options {
 }
 interface ClusterWorker {
     childProcess: ChildProcess;
-    executionTimeout?: NodeJS.Timeout;
+    executionTimeout?: NodeJS.Timeout | null;
 }
 export default class Cluster {
     workerCount: number;

@@ -21,7 +21,7 @@ function remove(array, object) {
 
 interface ClusterWorker {
   childProcess: ChildProcess;
-  executionTimeout?: NodeJS.Timeout;
+  executionTimeout?: NodeJS.Timeout | null;
 }
 
 export default class Cluster {
@@ -44,7 +44,7 @@ export default class Cluster {
   execute({
     code, timeout, globals, context,
   }: ExecutionOptions): Promise<Result> {
-    return new Promise((resolve, reject) => {
+    return new Promise<Result>((resolve, reject) => {
       const item = {
         code,
         timeout,
@@ -143,7 +143,10 @@ export default class Cluster {
   }
 
   clearWorkerTimeout(worker: ClusterWorker) {
-    clearTimeout(worker.executionTimeout);
+    if (worker.executionTimeout) {
+      clearTimeout(worker.executionTimeout);
+    }
+
     worker.executionTimeout = null;
   }
 

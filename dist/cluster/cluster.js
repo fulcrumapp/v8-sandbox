@@ -99,7 +99,9 @@ class Cluster {
         callback(worker);
     }
     clearWorkerTimeout(worker) {
-        clearTimeout(worker.executionTimeout);
+        if (worker.executionTimeout) {
+            clearTimeout(worker.executionTimeout);
+        }
         worker.executionTimeout = null;
     }
     finishWorker(worker) {
