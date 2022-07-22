@@ -2,10 +2,11 @@ import path from 'path';
 import net from 'net';
 import fs from 'fs';
 import { fork, ChildProcess } from 'child_process';
+import { randomInt } from 'crypto';
 import async from 'async';
 import { once } from 'lodash';
 import onExit from 'signal-exit';
-import { randomInt } from 'crypto';
+
 import Timer from './timer';
 import Socket from './socket';
 import Functions from './functions';
@@ -344,9 +345,11 @@ export default class Sandbox {
 
       switch (message.type) {
         case 'initialize':
-          return this.onInitialize(message);
+          this.onInitialize(message);
+          break;
         case 'execute':
-          return this.onExecute(message);
+          this.onExecute(message);
+          break;
         default:
           this.finish({ error: new Error('invalid message') });
       }
@@ -355,7 +358,8 @@ export default class Sandbox {
 
   onInitialize({ id, template, timeout }: Message) {
     if (this.initialized) {
-      return this.finish({});
+      this.finish({});
+      return;
     }
 
     this.initializeTimeout.start(timeout, this.handleTimeout);
@@ -378,12 +382,12 @@ export default class Sandbox {
   }
 
   finish(result) {
-    result ??= this.result;
+    const finishResult = result ?? this.result;
 
     this.functions.clearTimers();
 
     if (this.message) {
-      this.message.callback({ ...result, output: this.message.output });
+      this.message.callback({ ...finishResult, output: this.message.output });
     }
   }
 

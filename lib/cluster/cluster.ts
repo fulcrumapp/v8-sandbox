@@ -1,7 +1,6 @@
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
-import os from 'os';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
 import { Options, ExecutionOptions, TimeoutError } from '../host/sandbox';
@@ -18,12 +17,17 @@ function remove(array, object) {
   }
 }
 
+interface ClusterWorker {
+  childProcess: ChildProcess;
+  executionTimeout?: NodeJS.Timeout;
+}
+
 export default class Cluster {
   workerCount: number;
 
-  inactiveWorkers: ChildProcess[] = [];
+  inactiveWorkers: ClusterWorker[] = [];
 
-  activeWorkers: ChildProcess[] = [];
+  activeWorkers: ClusterWorker[] = [];
 
   queue?: async.QueueObject<ExecutionOptions>;
 
@@ -49,14 +53,14 @@ export default class Cluster {
   shutdown() {
     for (const worker of this.inactiveWorkers) {
       this.clearWorkerTimeout(worker);
-      worker.removeAllListeners();
-      worker.kill();
+      worker.childProcess.removeAllListeners();
+      worker.childProcess.kill();
     }
 
     for (const worker of this.activeWorkers) {
       this.clearWorkerTimeout(worker);
-      worker.removeAllListeners();
-      worker.kill();
+      worker.childProcess.removeAllListeners();
+      worker.childProcess.kill();
     }
 
     this.inactiveWorkers = [];
@@ -77,11 +81,11 @@ export default class Cluster {
     const total = this.inactiveWorkers.length + this.activeWorkers.length;
 
     for (let i = 0; i < this.workerCount - total; ++i) {
-      const worker = this.forkWorker();
+      const childProcess = this.forkWorker();
 
-      worker.send({ initialize: true, ...this.sandboxOptions });
+      childProcess.send({ initialize: true, ...this.sandboxOptions });
 
-      this.inactiveWorkers.push(worker);
+      this.inactiveWorkers.push({ childProcess });
     }
   }
 
@@ -91,7 +95,7 @@ export default class Cluster {
     });
   }
 
-  popWorker(callback) {
+  popWorker(callback: (worker: ClusterWorker) => void) {
     this.ensureWorkers();
 
     if (this.inactiveWorkers.length === 0) {
@@ -117,22 +121,22 @@ export default class Cluster {
     callback(worker);
   }
 
-  clearWorkerTimeout(worker) {
+  clearWorkerTimeout(worker: ClusterWorker) {
     clearTimeout(worker.executionTimeout);
     worker.executionTimeout = null;
   }
 
-  finishWorker(worker) {
+  finishWorker(worker: ClusterWorker) {
     this.clearWorkerTimeout(worker);
     remove(this.activeWorkers, worker);
     this.inactiveWorkers.push(worker);
   }
 
-  removeWorker(worker) {
+  removeWorker(worker: ClusterWorker) {
     this.clearWorkerTimeout(worker);
 
-    worker.kill();
-    worker.removeAllListeners();
+    worker.childProcess.kill();
+    worker.childProcess.removeAllListeners();
 
     remove(this.activeWorkers, worker);
     remove(this.inactiveWorkers, worker);
@@ -161,31 +165,31 @@ export default class Cluster {
 
   _execute({
     code, timeout, globals, context,
-  }, callback) {
-    callback = once(callback);
+  }, cb) {
+    const callback = once(cb);
 
-    this.popWorker((worker) => {
-      worker.removeAllListeners();
+    this.popWorker((worker: ClusterWorker) => {
+      worker.childProcess.removeAllListeners();
 
-      worker.on('message', (message) => {
+      worker.childProcess.on('message', (message) => {
         this.finishWorker(worker);
 
         callback(message);
       });
 
-      worker.on('error', (message) => {
+      worker.childProcess.on('error', (message) => {
         this.removeWorker(worker);
 
         callback({ error: new Error('worker error') });
       });
 
-      worker.on('disconnect', () => {
+      worker.childProcess.on('disconnect', () => {
         this.removeWorker(worker);
 
         callback({ error: new Error('worker disconnected') });
       });
 
-      worker.on('exit', (message) => {
+      worker.childProcess.on('exit', (message) => {
         this.removeWorker(worker);
       });
 
@@ -196,7 +200,7 @@ export default class Cluster {
         }, timeout);
       }
 
-      worker.send({
+      worker.childProcess.send({
         code,
         globals: JSON.stringify(globals),
         context: JSON.stringify(context),
