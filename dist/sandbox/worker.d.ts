@@ -1,5 +1,5 @@
 export interface WorkerMessage {
-    messageId: string;
+    messageId: number;
     type: 'initialize' | 'execute' | 'callback' | 'cancel' | 'exit';
     template: string;
     code: string;
@@ -10,7 +10,7 @@ export interface WorkerMessage {
 export default class Worker {
     native: any;
     connected: boolean;
-    messageId: string;
+    messageId: number;
     constructor();
     initialize({ messageId, template }: WorkerMessage): void;
     execute({ messageId, code, globals }: WorkerMessage): void;
@@ -23,7 +23,7 @@ export default class Worker {
     callback({ messageId, callbackId, args }: WorkerMessage): void;
     exit(message: WorkerMessage): void;
     handleMessage: (message: WorkerMessage) => void;
-    beforeExit: (code: any) => void;
+    beforeExit: () => void;
     ref: () => void;
     unref: () => void;
 }

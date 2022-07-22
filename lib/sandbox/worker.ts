@@ -6,7 +6,7 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
 
 export interface WorkerMessage {
-  messageId: string;
+  messageId: number;
   type: 'initialize' | 'execute' | 'callback' | 'cancel' | 'exit';
   template: string;
   code: string;
@@ -16,11 +16,11 @@ export interface WorkerMessage {
 }
 
 export default class Worker {
-  native: any;
+  native: any = null;
 
   connected: boolean = false;
 
-  messageId: string;
+  messageId: number = null;
 
   constructor() {
     this.native = new NativeSandbox(process.argv[2]);
@@ -120,7 +120,7 @@ export default class Worker {
     this.unref();
   };
 
-  beforeExit = (code) => {
+  beforeExit = () => {
     this.finish();
     this.ref();
   };

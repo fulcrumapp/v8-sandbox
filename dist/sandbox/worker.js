@@ -9,7 +9,9 @@ const NativeSandbox = require('bindings')('sandbox').Sandbox;
 const RUNTIME = fs_1.default.readFileSync(path_1.default.join(__dirname, 'runtime.js')).toString();
 class Worker {
     constructor() {
+        this.native = null;
         this.connected = false;
+        this.messageId = null;
         this.handleMessage = (message) => {
             switch (message.type) {
                 case 'initialize':
@@ -32,7 +34,7 @@ class Worker {
             }
             this.unref();
         };
-        this.beforeExit = (code) => {
+        this.beforeExit = () => {
             this.finish();
             this.ref();
         };
