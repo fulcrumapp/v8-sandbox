@@ -2,7 +2,7 @@
 /// <reference types="node" />
 import { ChildProcess } from 'child_process';
 import async from 'async';
-import { Options, ExecutionOptions } from '../host/sandbox';
+import { Result, Options, ExecutionOptions } from '../host/sandbox';
 interface ClusterOptions extends Options {
     workers?: number;
 }
@@ -17,8 +17,9 @@ export default class Cluster {
     queue?: async.QueueObject<ExecutionOptions>;
     sandboxOptions: Options;
     constructor({ workers, ...options }?: ClusterOptions);
-    start(): void;
+    execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<Result>;
     shutdown(): void;
+    start(): void;
     worker: (task: any, callback: any) => void;
     ensureWorkers(): void;
     forkWorker(): ChildProcess;
@@ -26,7 +27,6 @@ export default class Cluster {
     clearWorkerTimeout(worker: ClusterWorker): void;
     finishWorker(worker: ClusterWorker): void;
     removeWorker(worker: ClusterWorker): void;
-    execute({ code, timeout, globals, context, }: ExecutionOptions): Promise<unknown>;
     _execute({ code, timeout, globals, context, }: {
         code: any;
         timeout: any;

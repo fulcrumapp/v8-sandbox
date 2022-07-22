@@ -26,13 +26,18 @@ class Cluster {
         this.sandboxOptions = options;
         this.start();
     }
-    start() {
-        this.inactiveWorkers = [];
-        this.activeWorkers = [];
-        this.queue = async_1.default.queue(this.worker, this.workerCount);
-        this.ensureWorkers();
-        (0, signal_exit_1.default)((code, signal) => {
-            this.shutdown();
+    execute({ code, timeout, globals, context, }) {
+        return new Promise((resolve, reject) => {
+            const item = {
+                code,
+                timeout,
+                globals: globals || {},
+                context: context || {},
+            };
+            if (!this.queue) {
+                throw new Error('invalid queue');
+            }
+            this.queue.push(item, resolve);
         });
     }
     shutdown() {
@@ -52,6 +57,15 @@ class Cluster {
             this.queue.kill();
         }
         this.queue = async_1.default.queue(this.worker, this.workerCount);
+    }
+    start() {
+        this.inactiveWorkers = [];
+        this.activeWorkers = [];
+        this.queue = async_1.default.queue(this.worker, this.workerCount);
+        this.ensureWorkers();
+        (0, signal_exit_1.default)((code, signal) => {
+            this.shutdown();
+        });
     }
     ensureWorkers() {
         const total = this.inactiveWorkers.length + this.activeWorkers.length;
@@ -100,20 +114,6 @@ class Cluster {
         remove(this.activeWorkers, worker);
         remove(this.inactiveWorkers, worker);
         this.ensureWorkers();
-    }
-    execute({ code, timeout, globals, context, }) {
-        return new Promise((resolve, reject) => {
-            const item = {
-                code,
-                timeout,
-                globals: globals || {},
-                context: context || {},
-            };
-            if (!this.queue) {
-                throw new Error('invalid queue');
-            }
-            this.queue.push(item, resolve);
-        });
     }
     _execute({ code, timeout, globals, context, }, cb) {
         const callback = (0, lodash_1.once)(cb);

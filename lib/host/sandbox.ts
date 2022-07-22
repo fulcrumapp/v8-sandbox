@@ -28,6 +28,8 @@ export interface ExecutionError {
   startPosition: number;
   endPosition: number;
   sourceLine: string;
+  isTimeout?: boolean;
+  code?: string;
 }
 
 export interface Result {

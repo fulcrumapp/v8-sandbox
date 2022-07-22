@@ -4,7 +4,7 @@ import fs from 'fs';
 
 import { Sandbox, SandboxCluster } from '../dist';
 
-let globalSandbox = null;;
+let globalSandbox: SandboxCluster | null = null;
 
 function getGlobalSandbox() {
   if (!globalSandbox) {
@@ -13,11 +13,11 @@ function getGlobalSandbox() {
   return globalSandbox;
 }
 
-const runWithTimeout = async (code, timeout, globals, context) => {
+const runWithTimeout = async (code, timeout?, globals?, context?) => {
   return getGlobalSandbox().execute({ code, timeout, globals, context });
 };
 
-const run = (code, globals, context) => {
+const run = (code, globals?, context?) => {
   return runWithTimeout(code, 4000, globals, context);
 };
 

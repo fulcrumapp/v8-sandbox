@@ -3,7 +3,9 @@ import path from 'path';
 import async from 'async';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
-import { Options, ExecutionOptions, TimeoutError } from '../host/sandbox';
+import {
+  Result, Options, ExecutionOptions, TimeoutError,
+} from '../host/sandbox';
 
 interface ClusterOptions extends Options {
   workers?: number;
@@ -39,14 +41,22 @@ export default class Cluster {
     this.start();
   }
 
-  start() {
-    this.inactiveWorkers = [];
-    this.activeWorkers = [];
-    this.queue = async.queue(this.worker, this.workerCount);
-    this.ensureWorkers();
+  execute({
+    code, timeout, globals, context,
+  }: ExecutionOptions): Promise<Result> {
+    return new Promise((resolve, reject) => {
+      const item = {
+        code,
+        timeout,
+        globals: globals || {},
+        context: context || {},
+      };
 
-    onExit((code, signal) => {
-      this.shutdown();
+      if (!this.queue) {
+        throw new Error('invalid queue');
+      }
+
+      this.queue.push(item, resolve);
     });
   }
 
@@ -71,6 +81,17 @@ export default class Cluster {
     }
 
     this.queue = async.queue(this.worker, this.workerCount);
+  }
+
+  start() {
+    this.inactiveWorkers = [];
+    this.activeWorkers = [];
+    this.queue = async.queue(this.worker, this.workerCount);
+    this.ensureWorkers();
+
+    onExit((code, signal) => {
+      this.shutdown();
+    });
   }
 
   worker = (task, callback) => {
@@ -142,25 +163,6 @@ export default class Cluster {
     remove(this.inactiveWorkers, worker);
 
     this.ensureWorkers();
-  }
-
-  execute({
-    code, timeout, globals, context,
-  }: ExecutionOptions) {
-    return new Promise((resolve, reject) => {
-      const item = {
-        code,
-        timeout,
-        globals: globals || {},
-        context: context || {},
-      };
-
-      if (!this.queue) {
-        throw new Error('invalid queue');
-      }
-
-      this.queue.push(item, resolve);
-    });
   }
 
   _execute({
