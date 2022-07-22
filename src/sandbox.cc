@@ -20,7 +20,8 @@ using namespace v8;
 Nan::Persistent<v8::Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
-  : result_(""),
+  : messageId_(0),
+    result_(""),
     buffers_(),
     bytesRead_(-1),
     bytesExpected_(-1),
@@ -98,34 +99,44 @@ NAN_METHOD(Sandbox::Disconnect) {
 }
 
 NAN_METHOD(Sandbox::Execute) {
-  NODE_ARG_STRING(0, "code");
+  NODE_ARG_INTEGER(0, "messageId");
+  NODE_ARG_STRING(1, "code");
 
-  Nan::Utf8String code(info[0]);
+  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
+  Nan::Utf8String code(info[1]);
 
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  sandbox->Execute(*code);
+  sandbox->Execute(messageId, *code);
 
   info.GetReturnValue().Set(info.This());
 }
 
 NAN_METHOD(Sandbox::Callback) {
-  NODE_ARG_INTEGER(0, "callbackId");
-  NODE_ARG_STRING(1, "args");
+  NODE_ARG_INTEGER(0, "messageId");
+  NODE_ARG_INTEGER(1, "callbackId");
+  NODE_ARG_STRING(2, "args");
 
-  Nan::Utf8String args(info[1]);
+  Nan::Utf8String args(info[2]);
 
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  sandbox->Callback(Nan::To<uint32_t>(info[0]).FromJust(), *args);
+  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
+  int callbackId = Nan::To<uint32_t>(info[1]).FromJust();
+
+  sandbox->Callback(messageId, callbackId, *args);
 }
 
 NAN_METHOD(Sandbox::Cancel) {
-  NODE_ARG_INTEGER(0, "callbackId");
+  NODE_ARG_INTEGER(0, "messageId");
+  NODE_ARG_INTEGER(1, "callbackId");
+
+  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
+  int callbackId = Nan::To<uint32_t>(info[1]).FromJust();
 
   Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
 
-  sandbox->Cancel(Nan::To<uint32_t>(info[0]).FromJust());
+  sandbox->Cancel(messageId, callbackId);
 }
 
 NAN_METHOD(Sandbox::Dispatch) {
@@ -212,7 +223,9 @@ void Sandbox::Disconnect() {
   pipe_ = nullptr;
 }
 
-void Sandbox::Execute(const char *code) {
+void Sandbox::Execute(int messageId, const char *code) {
+  messageId_ = messageId;
+
   auto context = Nan::New(sandboxContext_);
 
   Context::Scope context_scope(context);
@@ -234,7 +247,9 @@ void Sandbox::Execute(const char *code) {
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
-void Sandbox::Callback(int callbackId, const char *args) {
+void Sandbox::Callback(int messageId, int callbackId, const char *args) {
+  messageId_ = messageId;
+
   assert(callbackId > 0);
 
   auto operation = pendingOperations_[callbackId];
@@ -268,7 +283,9 @@ void Sandbox::Callback(int callbackId, const char *args) {
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
-void Sandbox::Cancel(int callbackId) {
+void Sandbox::Cancel(int messageId, int callbackId) {
+  messageId_ = messageId;
+
   assert(callbackId > 0);
   assert(pendingOperations_[callbackId]);
 
@@ -295,7 +312,7 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
 
   std::string message(arguments);
 
-  WriteData((uv_stream_t *)pipe_, callbackId, message);
+  WriteData((uv_stream_t *)pipe_, messageId_, callbackId, message);
 
   uv_run(loop_, UV_RUN_DEFAULT);
 
@@ -307,7 +324,11 @@ void Sandbox::Finish() {
     return;
   }
 
-  Dispatch("finish", "{\"name\":\"finish\",\"args\":[]}", nullptr);
+  std::string invocation(
+    std::string("{\"name\":\"finish\",\"args\":[") + std::to_string(messageId_) + std::string("]}")
+  );
+
+  Dispatch("finish", invocation.c_str(), nullptr);
 }
 
 void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
@@ -437,21 +458,22 @@ void Sandbox::OnClose(uv_handle_t *pipe) {
   free(pipe);
 }
 
-void Sandbox::WriteData(uv_stream_t *pipe, int callbackId, std::string &message) {
+void Sandbox::WriteData(uv_stream_t *pipe, int messageId, int callbackId, std::string &message) {
   uv_write_t *write = (uv_write_t *)malloc(sizeof(uv_write_t));
 
   size_t messageLength = message.length();
 
-  size_t bufferLength = sizeof(int32_t) + sizeof(int32_t) + messageLength;
+  size_t bufferLength = sizeof(int32_t) + sizeof(int32_t) + sizeof(int32_t) + messageLength;
 
   char *data = (char *)malloc(bufferLength);
 
   uint32_t *base = (uint32_t *)data;
 
-  base[0] = htonl(callbackId);
-  base[1] = htonl(messageLength);
+  base[0] = htonl(messageId);
+  base[1] = htonl(callbackId);
+  base[2] = htonl(messageLength);
 
-  memcpy(&base[2], message.c_str(), messageLength);
+  memcpy(&base[3], message.c_str(), messageLength);
 
   uv_buf_t buffers[] = {
     { .base = data, .len = bufferLength }

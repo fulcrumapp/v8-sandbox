@@ -5,6 +5,7 @@ import { fork, ChildProcess } from 'child_process';
 import async from 'async';
 import { once } from 'lodash';
 import onExit from 'signal-exit';
+import { randomInt } from 'crypto';
 import Timer from './timer';
 import Socket from './socket';
 import Functions from './functions';
@@ -35,6 +36,7 @@ export interface Result {
 }
 
 export interface Message {
+  id: number;
   type: 'initialize' | 'execute';
   template?: string;
   code?: string;
@@ -75,7 +77,11 @@ export class TimeoutError extends Error {
   }
 }
 
-let nextID = 0;
+let nextId = 0;
+
+const nextSandboxId = () => `v8-sandbox-${process.pid}-${++nextId}`;
+
+const nextMessageId = () => randomInt(2 ** 30);
 
 export default class Sandbox {
   id: string;
@@ -119,7 +125,7 @@ export default class Sandbox {
   constructor({
     require, template, httpEnabled, timersEnabled, memory, argv, uid, gid, debug, socketPath,
   }: Options = {}) {
-    this.id = `v8-sandbox-${process.pid}-${++nextID}`;
+    this.id = nextSandboxId();
 
     this.initializeTimeout = new Timer();
     this.executeTimeout = new Timer();
@@ -145,6 +151,7 @@ export default class Sandbox {
 
     return new Promise<Result>((resolve) => {
       this.queue.push({
+        id: nextMessageId(),
         type: 'initialize',
         template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
         timeout,
@@ -171,6 +178,7 @@ export default class Sandbox {
 
     return new Promise<Result>((resolve) => {
       this.queue.push({
+        id: nextMessageId(),
         type: 'execute',
         code,
         timeout,
@@ -191,9 +199,13 @@ export default class Sandbox {
       : `${this.socketPath}/${this.id}`;
   }
 
-  dispatch(invocation, {
+  dispatch(messageId, invocation, {
     fail, respond, callback, cancel,
   }) {
+    if (messageId !== this.message.id) {
+      throw new Error('invalid dispatch');
+    }
+
     this.functions.dispatch(invocation, {
       message: this.message, fail, respond, callback, cancel,
     });
@@ -301,7 +313,7 @@ export default class Sandbox {
     this.finish({ error: new TimeoutError(this.message.timeout) });
   };
 
-  callback(callbackId, args) {
+  callback(messageId, callbackId, args) {
     if (args && args.length > 0 && args[0] instanceof Error) {
       args[0] = {
         name: args[0].name,
@@ -310,11 +322,13 @@ export default class Sandbox {
       };
     }
 
-    this.worker.send({ type: 'callback', callbackId, args });
+    this.worker.send({
+      messageId, type: 'callback', callbackId, args,
+    });
   }
 
-  cancel(callbackId) {
-    this.worker.send({ type: 'cancel', callbackId });
+  cancel(messageId, callbackId) {
+    this.worker.send({ messageId, type: 'cancel', callbackId });
   }
 
   processMessage = async (message: Message) => {
@@ -339,23 +353,23 @@ export default class Sandbox {
     });
   };
 
-  onInitialize({ template, timeout }: Message) {
+  onInitialize({ id, template, timeout }: Message) {
     if (this.initialized) {
       return this.finish({});
     }
 
     this.initializeTimeout.start(timeout, this.handleTimeout);
 
-    this.worker.send({ type: 'initialize', template });
+    this.worker.send({ messageId: id, type: 'initialize', template });
   }
 
   onExecute({
-    code, timeout, globals, context,
+    id, code, timeout, globals, context,
   }: Message) {
     this.executeTimeout.start(timeout, this.handleTimeout);
 
     this.worker.send({
-      type: 'execute', code, globals: JSON.stringify(globals),
+      messageId: id, type: 'execute', code, globals: JSON.stringify(globals),
     });
   }
 

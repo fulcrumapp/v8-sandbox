@@ -122,7 +122,11 @@ export default class Functions {
     }
   }
 
-  finish([], { message, respond }) {
+  finish([messageId], { message, respond }) {
+    if (this.sandbox.message.id !== messageId) {
+      throw new Error('invalid call to finish');
+    }
+
     this.sandbox.finish(null);
 
     respond();

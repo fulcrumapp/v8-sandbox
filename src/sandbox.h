@@ -45,11 +45,11 @@ private:
 
   void Disconnect();
 
-  void Execute(const char *code);
+  void Execute(int messageId, const char *code);
 
-  void Callback(int callbackId, const char *args);
+  void Callback(int messageId, int callbackId, const char *args);
 
-  void Cancel(int callbackId);
+  void Cancel(int messageId, int callbackId);
 
   std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
 
@@ -62,6 +62,8 @@ private:
   static Sandbox *GetSandboxFromContext();
 
   Nan::Global<Context> sandboxContext_;
+
+  int messageId_;
 
   std::string result_;
 
@@ -89,7 +91,7 @@ private:
 
   static void OnClose(uv_handle_t *pipe);
 
-  static void WriteData(uv_stream_t *pipe, int callbackId, std::string &message);
+  static void WriteData(uv_stream_t *pipe, int messageId, int callbackId, std::string &message);
 
   static void OnWriteComplete(uv_write_t *request, int status);
 };

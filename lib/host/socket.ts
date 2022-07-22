@@ -12,6 +12,7 @@ function tryParseJSON(value) {
 }
 
 interface Message {
+  messageId: number;
   callbackId: number;
   length: number;
   data: Buffer;
@@ -56,32 +57,33 @@ export default class Socket {
   handleData = (data) => {
     if (!this.message) {
       this.message = {
-        callbackId: data.readInt32BE(0),
-        length: data.readInt32BE(4),
-        data: data.subarray(8),
+        messageId: data.readInt32BE(0),
+        callbackId: data.readInt32BE(4),
+        length: data.readInt32BE(8),
+        data: data.subarray(12),
       };
     } else {
       this.message.data = Buffer.concat([this.message.data, data]);
     }
 
     if (this.message.data.length === this.message.length) {
-      const { callbackId, data } = this.message;
+      const { messageId, callbackId, data } = this.message;
 
       const json = data.toString('utf8');
 
       this.message = null;
 
-      const message = tryParseJSON(json);
+      const invocation = tryParseJSON(json);
 
       const callback = callbackId > 0 ? once(((...args) => {
         if (this.isConnected) {
-          this.sandbox.callback(callbackId, args);
+          this.sandbox.callback(messageId, callbackId, args);
         }
       })) : null;
 
       const cancel = callbackId > 0 ? once((() => {
         if (this.isConnected) {
-          this.sandbox.cancel(callbackId);
+          this.sandbox.cancel(messageId, callbackId);
         }
       })) : null;
 
@@ -117,11 +119,11 @@ export default class Socket {
       });
 
       try {
-        if (message == null) {
+        if (invocation == null) {
           throw new Error('invalid dispatch');
         }
 
-        this.sandbox.dispatch(message, {
+        this.sandbox.dispatch(messageId, invocation, {
           fail, respond, callback, cancel,
         });
       } catch (ex) {

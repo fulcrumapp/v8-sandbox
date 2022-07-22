@@ -670,6 +670,41 @@ setTimeout(() => {
     ]);
   });
 
+  it('should handle calling finish() multiple times', async () => {
+    const sandbox = new Sandbox();
+
+    let result = null;
+
+    for (let i = 0; i < 5; ++i) {
+      const code = `
+      setResult({value: [
+        ${i},
+        JSON.parse(_dispatch('finish', '{"name":"finish","args":[]}', () => {})).result.error.message,
+        JSON.parse(_dispatch('finish', '{"name":"finish","args":[]}', () => {})).result.error.message,
+      ]});
+      `;
+
+      result = await sandbox.execute({code});
+      assert.deepEqual(result.value, [
+        i, 'invalid call to finish', 'invalid call to finish'
+      ]);
+
+      result = await sandbox.execute({code});
+      assert.deepEqual(result.value, [
+        i, 'invalid call to finish', 'invalid call to finish'
+      ]);
+
+      result = await sandbox.execute({code});
+      assert.deepEqual(result.value, [
+        i, 'invalid call to finish', 'invalid call to finish'
+      ]);
+
+    }
+
+
+    await sandbox.shutdown();
+  });
+
   it('should handle stress', async () => {
     const iterations = 500;
 
