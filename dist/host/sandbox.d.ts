@@ -23,6 +23,7 @@ export interface ExecutionError {
     endPosition: number;
     sourceLine: string;
     isTimeout?: boolean;
+    isHost?: boolean;
     code?: string;
 }
 export interface Result {
@@ -59,7 +60,10 @@ export interface ExecutionOptions {
     globals?: object;
     context?: object;
 }
-export declare class TimeoutError extends Error {
+export declare class HostError extends Error {
+    get isHost(): boolean;
+}
+export declare class TimeoutError extends HostError {
     constructor(timeout: number);
     get isTimeout(): boolean;
 }

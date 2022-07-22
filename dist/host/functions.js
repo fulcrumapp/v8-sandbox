@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = __importDefault(require("axios"));
 const util_1 = __importDefault(require("util"));
+const sandbox_1 = require("./sandbox");
 const timer_1 = __importDefault(require("./timer"));
 const SYNC_FUNCTIONS = {};
 const ASYNC_FUNCTIONS = {};
@@ -18,7 +19,7 @@ class Functions {
         };
         this.setTimeout = ([timeout], { fail, respond, callback, cancel, }) => {
             if (!this.timersEnabled) {
-                fail(new Error('setTimeout is disabled'));
+                fail(new sandbox_1.HostError('setTimeout is disabled'));
                 return;
             }
             const timer = new timer_1.default();
@@ -29,7 +30,7 @@ class Functions {
         };
         this.clearTimeout = ([timerId], { fail, respond }) => {
             if (!this.timersEnabled) {
-                fail(new Error('clearTimeout is disabled'));
+                fail(new sandbox_1.HostError('clearTimeout is disabled'));
                 return;
             }
             const timer = this.timers[+timerId];
@@ -41,7 +42,7 @@ class Functions {
         };
         this.httpRequest = ([options], { respond, fail, callback, context, }) => {
             if (!this.httpEnabled) {
-                fail(new Error('httpRequest is disabled'));
+                fail(new sandbox_1.HostError('httpRequest is disabled'));
                 return;
             }
             (0, axios_1.default)(this.processHttpRequest(options ?? {}, context))
@@ -79,7 +80,7 @@ class Functions {
         };
         this.info = (args, { message, fail, respond }) => {
             if (!this.sandbox.debug) {
-                fail(new Error('info is disabled'));
+                fail(new sandbox_1.HostError('info is disabled'));
                 return;
             }
             respond({
@@ -169,14 +170,14 @@ class Functions {
                     fn(...params);
                 }
                 else {
-                    throw new Error(`${name} is not a valid method`);
+                    throw new sandbox_1.HostError(`${name} is not a valid method`);
                 }
             }
         }
     }
     finish([messageId], { message, respond }) {
         if (this.sandbox.message.id !== messageId) {
-            throw new Error('invalid call to finish');
+            throw new sandbox_1.HostError('invalid call to finish');
         }
         this.sandbox.finish(null);
         respond();

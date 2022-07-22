@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const lodash_1 = require("lodash");
+const sandbox_1 = require("./sandbox");
 function tryParseJSON(value) {
     try {
         return JSON.parse(value);
@@ -57,15 +58,17 @@ class Socket {
                     }
                     write({
                         error: {
+                            ...error,
+                            isHost: true,
                             name: error.name,
                             message: error.message,
-                            stack: error.stack,
+                            ...(this.sandbox.debug ? { stack: error.stack } : {}),
                         },
                     });
                 });
                 try {
                     if (invocation == null) {
-                        throw new Error('invalid dispatch');
+                        throw new sandbox_1.HostError('invalid dispatch');
                     }
                     this.sandbox.dispatch(messageId, invocation, {
                         fail, respond, callback, cancel,

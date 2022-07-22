@@ -35,7 +35,7 @@ class Cluster {
                 context: context || {},
             };
             if (!this.queue) {
-                throw new Error('invalid queue');
+                throw new sandbox_1.HostError('invalid queue');
             }
             this.queue.push(item, resolve);
         });
@@ -90,11 +90,11 @@ class Cluster {
         }
         const worker = this.inactiveWorkers.shift();
         if (worker == null) {
-            throw new Error('no inactive worker');
+            throw new sandbox_1.HostError('no inactive worker');
         }
         this.activeWorkers.push(worker);
         if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
-            throw new Error('invalid worker count');
+            throw new sandbox_1.HostError('invalid worker count');
         }
         callback(worker);
     }
@@ -127,11 +127,11 @@ class Cluster {
             });
             worker.childProcess.on('error', (message) => {
                 this.removeWorker(worker);
-                callback({ error: new Error('worker error') });
+                callback({ error: new sandbox_1.HostError('worker error') });
             });
             worker.childProcess.on('disconnect', () => {
                 this.removeWorker(worker);
-                callback({ error: new Error('worker disconnected') });
+                callback({ error: new sandbox_1.HostError('worker disconnected') });
             });
             worker.childProcess.on('exit', (message) => {
                 this.removeWorker(worker);

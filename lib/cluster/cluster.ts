@@ -4,7 +4,7 @@ import async from 'async';
 import onExit from 'signal-exit';
 import { once } from 'lodash';
 import {
-  Result, Options, ExecutionOptions, TimeoutError,
+  Result, Options, ExecutionOptions, TimeoutError, HostError,
 } from '../host/sandbox';
 
 interface ClusterOptions extends Options {
@@ -53,7 +53,7 @@ export default class Cluster {
       };
 
       if (!this.queue) {
-        throw new Error('invalid queue');
+        throw new HostError('invalid queue');
       }
 
       this.queue.push(item, resolve);
@@ -130,13 +130,13 @@ export default class Cluster {
     const worker = this.inactiveWorkers.shift();
 
     if (worker == null) {
-      throw new Error('no inactive worker');
+      throw new HostError('no inactive worker');
     }
 
     this.activeWorkers.push(worker);
 
     if (this.activeWorkers.length + this.inactiveWorkers.length !== this.workerCount) {
-      throw new Error('invalid worker count');
+      throw new HostError('invalid worker count');
     }
 
     callback(worker);
@@ -185,13 +185,13 @@ export default class Cluster {
       worker.childProcess.on('error', (message) => {
         this.removeWorker(worker);
 
-        callback({ error: new Error('worker error') });
+        callback({ error: new HostError('worker error') });
       });
 
       worker.childProcess.on('disconnect', () => {
         this.removeWorker(worker);
 
-        callback({ error: new Error('worker disconnected') });
+        callback({ error: new HostError('worker disconnected') });
       });
 
       worker.childProcess.on('exit', (message) => {

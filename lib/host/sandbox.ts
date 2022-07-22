@@ -29,6 +29,7 @@ export interface ExecutionError {
   endPosition: number;
   sourceLine: string;
   isTimeout?: boolean;
+  isHost?: boolean;
   code?: string;
 }
 
@@ -70,7 +71,13 @@ export interface ExecutionOptions {
   context?: object;
 }
 
-export class TimeoutError extends Error {
+export class HostError extends Error {
+  get isHost() {
+    return true;
+  }
+}
+
+export class TimeoutError extends HostError {
   constructor(timeout: number) {
     super(`timeout: ${timeout}ms`);
   }
@@ -206,7 +213,7 @@ export default class Sandbox {
     fail, respond, callback, cancel,
   }) {
     if (messageId !== this.message.id) {
-      throw new Error('invalid dispatch');
+      throw new HostError('invalid dispatch');
     }
 
     this.functions.dispatch(invocation, {
@@ -237,7 +244,7 @@ export default class Sandbox {
         this.fork();
       }
 
-      this.finish({ error: new Error('worker exited') });
+      this.finish({ error: new HostError('worker exited') });
     });
   }
 
@@ -319,9 +326,10 @@ export default class Sandbox {
   callback(messageId, callbackId, args) {
     if (args && args.length > 0 && args[0] instanceof Error) {
       args[0] = {
+        ...args[0],
         name: args[0].name,
         message: args[0].message,
-        stack: args[0].stack,
+        ...(this.debug ? { stack: args[0].stack } : {}),
       };
     }
 
@@ -353,7 +361,7 @@ export default class Sandbox {
           this.onExecute(message);
           break;
         default:
-          this.finish({ error: new Error('invalid message') });
+          this.finish({ error: new HostError('invalid message') });
       }
     });
   };

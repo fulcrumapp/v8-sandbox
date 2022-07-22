@@ -1038,6 +1038,7 @@ errorAsync(1, 2);
     const { error } = await sandbox.execute({ code, timeout: 10000 });
 
     assert.equal(error?.message, 'worker disconnected');
+    assert.ok(error?.isHost);
 
     sandbox.shutdown();
   });
@@ -1069,6 +1070,29 @@ errorAsync(1, 2);
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error?.message, '1337');
+    assert.equal(error?.stack, undefined);
+
+    sandbox.shutdown();
+  });
+
+  it('should support calling fail() from async nodejs functions that call respond() when debug mode is enabled', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE, debug: true });
+
+    const code = `
+    errorAsyncCallbackWithRespond(1337, (error, value) => {
+      setResult({ error, value });
+    });
+`;
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error?.message, '1337');
+    assert.equal(error?.stack, `
+Error: 1337
+    at Timeout._onTimeout (/Users/zac/Documents/dev/v8-sandbox/test/test-functions.js:56:14)
+    at listOnTimeout (node:internal/timers:564:17)
+    at process.processTimers (node:internal/timers:507:7)
+    `.trim());
 
     sandbox.shutdown();
   });
@@ -1201,6 +1225,7 @@ setResult({ value: fetchLargeValue() });
     console.log('=============================================================');
 
     assert.equal(error?.message, 'worker exited');
+    assert.ok(error?.isHost);
 
     const { value } = await sandbox.execute({ code: 'setResult({ value: 1 });', timeout: 3000 });
 
@@ -1217,6 +1242,45 @@ setResult({ value: fetchLargeValue() });
     const { value } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.deepStrictEqual(value.argv, [ '--harmony' ]);
+
+    sandbox.shutdown();
+  });
+
+  it('should not show stack traces from the host unless in debug mode', async () => {
+    const sandbox = new Sandbox({ require: REQUIRE, timersEnabled: false, debug: false });
+
+    const code = 'setTimeout(() => {}, 1);';
+
+    let result: Result;
+
+    result = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
+    assert.equal(result?.error?.stack, `
+Error: setTimeout is disabled
+    at environment.dispatch (script:16:23)
+    at environment.setTimeout (script:23:61)
+    at script:1:1
+    `.trim());
+
+    sandbox.debug = true;
+
+    result = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
+    assert.equal(result?.error?.stack, `
+Error: setTimeout is disabled
+    at Functions.setTimeout (/Users/zac/Documents/dev/v8-sandbox/lib/host/functions.ts:156:12)
+    at Functions.dispatch (/Users/zac/Documents/dev/v8-sandbox/lib/host/functions.ts:105:59)
+    at Sandbox.dispatch (/Users/zac/Documents/dev/v8-sandbox/lib/host/sandbox.ts:219:20)
+    at Socket.handleData (/Users/zac/Documents/dev/v8-sandbox/lib/host/socket.ts:128:22)
+    at Socket.emit (node:events:537:28)
+    at Socket.emit (node:domain:482:12)
+    at addChunk (node:internal/streams/readable:324:12)
+    at readableAddChunk (node:internal/streams/readable:297:9)
+    at Socket.Readable.push (node:internal/streams/readable:234:10)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:190:23)
+    `.trim());
 
     sandbox.shutdown();
   });

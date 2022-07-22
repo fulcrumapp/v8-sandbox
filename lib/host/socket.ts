@@ -1,7 +1,7 @@
 import net from 'net';
 import { once } from 'lodash';
 import { ChildProcess } from 'child_process';
-import Sandbox from './sandbox';
+import Sandbox, { HostError } from './sandbox';
 
 function tryParseJSON(value) {
   try {
@@ -111,16 +111,18 @@ export default class Socket {
 
         write({
           error: {
+            ...error,
+            isHost: true,
             name: error.name,
             message: error.message,
-            stack: error.stack,
+            ...(this.sandbox.debug ? { stack: error.stack } : {}),
           },
         });
       });
 
       try {
         if (invocation == null) {
-          throw new Error('invalid dispatch');
+          throw new HostError('invalid dispatch');
         }
 
         this.sandbox.dispatch(messageId, invocation, {

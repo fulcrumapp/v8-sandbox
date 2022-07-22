@@ -1,6 +1,6 @@
 import axios from 'axios';
 import util from 'util';
-import Sandbox, { Message } from './sandbox';
+import Sandbox, { Message, HostError } from './sandbox';
 import Timer from './timer';
 
 const SYNC_FUNCTIONS = {};
@@ -127,7 +127,7 @@ export default class Functions {
         if (fn) {
           fn(...params);
         } else {
-          throw new Error(`${name} is not a valid method`);
+          throw new HostError(`${name} is not a valid method`);
         }
       }
     }
@@ -135,7 +135,7 @@ export default class Functions {
 
   finish([messageId], { message, respond }) {
     if (this.sandbox.message.id !== messageId) {
-      throw new Error('invalid call to finish');
+      throw new HostError('invalid call to finish');
     }
 
     this.sandbox.finish(null);
@@ -153,7 +153,7 @@ export default class Functions {
     fail, respond, callback, cancel,
   }) => {
     if (!this.timersEnabled) {
-      fail(new Error('setTimeout is disabled'));
+      fail(new HostError('setTimeout is disabled'));
       return;
     }
 
@@ -170,7 +170,7 @@ export default class Functions {
 
   clearTimeout = ([timerId], { fail, respond }) => {
     if (!this.timersEnabled) {
-      fail(new Error('clearTimeout is disabled'));
+      fail(new HostError('clearTimeout is disabled'));
       return;
     }
 
@@ -188,7 +188,7 @@ export default class Functions {
     respond, fail, callback, context,
   }) => {
     if (!this.httpEnabled) {
-      fail(new Error('httpRequest is disabled'));
+      fail(new HostError('httpRequest is disabled'));
       return;
     }
 
@@ -239,7 +239,7 @@ export default class Functions {
 
   info = (args, { message, fail, respond }) => {
     if (!this.sandbox.debug) {
-      fail(new Error('info is disabled'));
+      fail(new HostError('info is disabled'));
       return;
     }
 

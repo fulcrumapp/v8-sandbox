@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TimeoutError = void 0;
+exports.TimeoutError = exports.HostError = void 0;
 const path_1 = __importDefault(require("path"));
 const net_1 = __importDefault(require("net"));
 const fs_1 = __importDefault(require("fs"));
@@ -15,7 +15,13 @@ const signal_exit_1 = __importDefault(require("signal-exit"));
 const timer_1 = __importDefault(require("./timer"));
 const socket_1 = __importDefault(require("./socket"));
 const functions_1 = __importDefault(require("./functions"));
-class TimeoutError extends Error {
+class HostError extends Error {
+    get isHost() {
+        return true;
+    }
+}
+exports.HostError = HostError;
+class TimeoutError extends HostError {
     constructor(timeout) {
         super(`timeout: ${timeout}ms`);
     }
@@ -52,7 +58,7 @@ class Sandbox {
                         this.onExecute(message);
                         break;
                     default:
-                        this.finish({ error: new Error('invalid message') });
+                        this.finish({ error: new HostError('invalid message') });
                 }
             });
         };
@@ -122,7 +128,7 @@ class Sandbox {
     }
     dispatch(messageId, invocation, { fail, respond, callback, cancel, }) {
         if (messageId !== this.message.id) {
-            throw new Error('invalid dispatch');
+            throw new HostError('invalid dispatch');
         }
         this.functions.dispatch(invocation, {
             message: this.message, fail, respond, callback, cancel,
@@ -144,7 +150,7 @@ class Sandbox {
             if (this.running) {
                 this.fork();
             }
-            this.finish({ error: new Error('worker exited') });
+            this.finish({ error: new HostError('worker exited') });
         });
     }
     kill() {
@@ -201,9 +207,10 @@ class Sandbox {
     callback(messageId, callbackId, args) {
         if (args && args.length > 0 && args[0] instanceof Error) {
             args[0] = {
+                ...args[0],
                 name: args[0].name,
                 message: args[0].message,
-                stack: args[0].stack,
+                ...(this.debug ? { stack: args[0].stack } : {}),
             };
         }
         this.worker.send({
