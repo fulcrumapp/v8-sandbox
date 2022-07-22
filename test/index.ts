@@ -35,49 +35,49 @@ describe('sandbox', () => {
   });
 
   it('should execute simple script with setResult', async () => {
-    const js = 'setResult({ value: "hi" })';
+    const code = 'setResult({ value: "hi" })';
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 'hi');
   });
 
   it('should execute simple script with multiple setResult calls', async () => {
-    const js = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
+    const code = 'setResult({ value: "hi" }); setResult({ value: "hello" });';
 
-    const { error, value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 'hello');
   });
 
   it('should fail after setResult', async () => {
-    const js = 'setResult({ value: "hi" }); throw new Error("hi");';
+    const code = 'setResult({ value: "hi" }); throw new Error("hi");';
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.equal(error?.message, 'Uncaught Error: hi');
   });
 
   it('should timeout when script keeps running after setResult', async () => {
-    const js = 'setResult({ value: "hi" }); while(true) {}';
+    const code = 'setResult({ value: "hi" }); while(true) {}';
 
-    const { error } = await runWithTimeout(js, 200);
-
-    assert.ok(error?.isTimeout);
-  });
-
-  it('should timeout when script keeps running in a setTimeout after setResult', async () => {
-    const js = 'setResult({ value: "hi" }); setTimeout(() => { while(true) {}; }, 20);';
-
-    const { error } = await runWithTimeout(js, 200);
+    const { error } = await runWithTimeout(code, 200);
 
     assert.ok(error?.isTimeout);
   });
 
   it('should timeout when script keeps running in a setTimeout after setResult', async () => {
-    const js = 'setResult({ value: "hi" }); setTimeout(() => { setResult({ value: "world" }); }, 20);';
+    const code = 'setResult({ value: "hi" }); setTimeout(() => { while(true) {}; }, 20);';
 
-    const { value } = await run(js);
+    const { error } = await runWithTimeout(code, 200);
+
+    assert.ok(error?.isTimeout);
+  });
+
+  it('should timeout when script keeps running in a setTimeout after setResult', async () => {
+    const code = 'setResult({ value: "hi" }); setTimeout(() => { setResult({ value: "world" }); }, 20);';
+
+    const { value } = await run(code);
 
     assert.equal(value, 'world');
   });
@@ -94,23 +94,23 @@ describe('sandbox', () => {
   });
 
   it('should execute simple httpRequest', async () => {
-    const js = `
+    const code = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   setResult({value: body});
 });
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 'hi there');
   });
 
   it('should execute simple synchronous httpRequest', async () => {
-    const js = `
+    const code = `
 setResult({ value: httpRequest({uri: '${TEST_URL}'}).body });
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 'hi there');
   });
@@ -153,13 +153,13 @@ httpRequest({uri: '${TEST_FILE}'}, (err, res, body) => {
   });
 
   it('should handle errors from httpRequest', async () => {
-    const js = `
+    const code = `
 httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
   throw new Error('yoyo');
 });
 `;
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
@@ -211,19 +211,19 @@ httpRequest({uri: '${TEST_URL}', invalidOption: true}, (err, res, body) => {
   });
 
   it('should handle network errors from httpRequest', async () => {
-    const js = `
+    const code = `
 httpRequest({uri: 'http://no-way-this-exists-12345.net'}, (error, res, body) => {
   setResult({ error });
 });
 `;
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.equal(error?.code, 'ENOTFOUND');
   });
 
   it('should execute httpRequest within a timeout and async function', async () => {
-    const js = `
+    const code = `
 setTimeout(() => {
   httpRequest({uri: '${TEST_URL}'}, (err, res, body) => {
     (async () => {
@@ -241,13 +241,13 @@ setTimeout(() => {
 11;
 `;
 
-    const { value, error } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 'hi there');
   });
 
   it('should handle promises', async () => {
-    const js = `
+    const code = `
 new Promise((resolve) => {
   setTimeout(() => {
     setResult({value: 1});
@@ -256,13 +256,13 @@ new Promise((resolve) => {
 });
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should handle async functions', async () => {
-    const js = `
+    const code = `
 (async () => {
   await new Promise((resolve) => {
     setTimeout(() => {
@@ -274,7 +274,7 @@ new Promise((resolve) => {
 })();
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
@@ -282,23 +282,23 @@ new Promise((resolve) => {
   it('should handle strings with null bytes', async () => {
     const string = 'test\u0000\u0000\u0000string';
 
-    const js = `setResult({ value: ${ JSON.stringify(string) } })`;
+    const code = `setResult({ value: ${ JSON.stringify(string) } })`;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, string);
   });
 
   it('should handle buffers', async () => {
-    const js = 'setResult({ value: new SharedArrayBuffer(1024).byteLength })';
+    const code = 'setResult({ value: new SharedArrayBuffer(1024).byteLength })';
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1024);
   });
 
   it('should handle async function with no setResult', async () => {
-    const js = `
+    const code = `
   (async () => {
     return await new Promise((resolve) => {
       setTimeout(() => {
@@ -308,13 +308,13 @@ new Promise((resolve) => {
   })();
   `;
 
-    const { value, error } = await runWithTimeout(js, 300);
+    const { value } = await runWithTimeout(code, 300);
 
     assert.equal(value, undefined);
   });
 
   it('should handle multiple async functions', async () => {
-    const js = `
+    const code = `
 (async () => {
   await new Promise((resolve) => {
     setTimeout(() => {
@@ -339,13 +339,13 @@ new Promise((resolve) => {
 })();
 `;
 
-    const { value, error } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should handle multiple async functions nested within timeouts', async () => {
-    const js = `
+    const code = `
 setTimeout(() => {
   (async () => {
     await new Promise((resolve) => {
@@ -371,13 +371,13 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 12);
   });
 
   it('should collect garbage', async () => {
-    const js = `
+    const code = `
 let objects = []
 
 for (let i = 0; i < 100000; ++i) {
@@ -389,13 +389,13 @@ objects = [];
 setResult({value: 1});
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should handle simple errors', async () => {
-    const js = `
+    const code = `
     (() => {
       function test() {
         throw new Error("yo");
@@ -404,7 +404,7 @@ setResult({value: 1});
     })();
     `.trim();
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     const stack = `
 Error: yo
@@ -425,9 +425,9 @@ Error: yo
   });
 
   it('should handle string errors', async () => {
-    const js = 'throw "yo"';
+    const code = 'throw "yo"';
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.ok(error);
     assert.equal(error.message, 'Uncaught yo');
@@ -435,9 +435,9 @@ Error: yo
   });
 
   it('should handle syntax errors', async () => {
-    const js = '}';
+    const code = '}';
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.ok(error);
     assert.equal(error.message, 'Uncaught SyntaxError: Unexpected token \'}\'');
@@ -451,35 +451,35 @@ Error: yo
   });
 
   it('should capture logs', async () => {
-    const js = 'console.log(\'hi\'); console.error(\'there\'); console.log(\'yo\'); setResult();';
+    const code = 'console.log(\'hi\'); console.error(\'there\'); console.log(\'yo\'); setResult();';
 
-    const { output } = await runWithTimeout(js, 30);
+    const { output } = await runWithTimeout(code, 30);
 
     assert.deepStrictEqual(output?.map(o => o.message), [ 'hi', 'there', 'yo' ]);
   });
 
   it('should run simple script', async () => {
-    const js = 'setResult({value: 1337});';
+    const code = 'setResult({value: 1337});';
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1337);
   });
 
   it('should execute setTimeout', async () => {
-    const js = `
+    const code = `
 setTimeout(() => {
   setResult({value: 1});
 }, 1);
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should execute setTimeout multiple times', async () => {
-    const js = `
+    const code = `
 setTimeout(() => {
   setTimeout(() => {
     setTimeout(() => {
@@ -489,13 +489,13 @@ setTimeout(() => {
 }, 1);
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should execute setTimeout multiple times with clearTimeout', async () => {
-    const js = `
+    const code = `
 let value = 1;
 
 const id = setTimeout(() => {
@@ -509,13 +509,13 @@ setTimeout(() => {
 }, 5);
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should clearTimeout multiple times', async () => {
-    const js = `
+    const code = `
 let value = 1;
 
 const id = setTimeout(() => {
@@ -529,13 +529,13 @@ setTimeout(() => {
   setResult({value});
 }, 15);
 `;
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 1);
   });
 
   it('should setTimeout with setResult', async () => {
-    const js = `
+    const code = `
 let value = 1;
 
 const id = setTimeout(() => {
@@ -547,36 +547,36 @@ setTimeout(() => {
 }, 15);
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.equal(value, 2);
   });
 
   it('should timeout when locked up in js', async () => {
-    const js = 'while (true) {}';
+    const code = 'while (true) {}';
 
-    const { error } = await runWithTimeout(js, 30);
+    const { error } = await runWithTimeout(code, 30);
 
     assert.equal(error?.isTimeout, true);
   });
 
   it('should timeout when idling in the run loop', async () => {
-    const js = 'setTimeout(() => {}, 10000)';
+    const code = 'setTimeout(() => {}, 10000)';
 
-    const { error } = await runWithTimeout(js, 30);
+    const { error } = await runWithTimeout(code, 30);
 
     assert.equal(error?.isTimeout, true);
   });
 
   it('should timeout many times', async () => {
-    const js = 'while (true) {}';
+    const code = 'while (true) {}';
 
     const count = 20;
 
     const operations: Promise<Result>[] = [];
 
     for (let i = count; i > 0; --i) {
-      operations.push(runWithTimeout(js, 30));
+      operations.push(runWithTimeout(code, 30));
     }
 
     const results = await Promise.all(operations);
@@ -589,27 +589,27 @@ setTimeout(() => {
   });
 
   it('should throw errors from top level script', async () => {
-    const js = 'throw new Error(\'yoyo\')';
+    const code = 'throw new Error(\'yoyo\')';
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
 
   it('should throw errors from setTimeout callbacks', async () => {
-    const js = `
+    const code = `
 setTimeout(() => {
   throw new Error('yoyo');
 }, 1);
 `;
 
-    const { error } = await run(js);
+    const { error } = await run(code);
 
     assert.equal(error?.message, 'Uncaught Error: yoyo');
   });
 
   it('should not crash when calling native functions with invalid arguments', async () => {
-    const js = `
+    const code = `
       function invoke(fn) {
         try {
           return fn();
@@ -643,7 +643,7 @@ setTimeout(() => {
       ]});
 `;
 
-    const { value } = await run(js);
+    const { value } = await run(code);
 
     assert.deepEqual(value, [
       '_setTimeout is not defined',
@@ -706,17 +706,16 @@ setTimeout(() => {
   it('should handle stress', async () => {
     const iterations = 500;
 
-    const count = 0;
     const operations: Promise<Result>[] = [];
 
     for (let i = 0; i < iterations; ++i) {
-      const js = `
+      const code = `
 setTimeout(() => {
   setResult({value: ${i}});
 }, 1);
 `;
 
-      operations.push(run(js));
+      operations.push(run(code));
     }
 
     const results = await Promise.all(operations);
@@ -733,14 +732,14 @@ setTimeout(() => {
 
     return new Promise((resolve) => {
       for (let i = 0; i < iterations; ++i) {
-        const js = `
+        const code = `
   setTimeout(() => {
     setResult({value: ${i}});
   }, 1);
   `;
 
         setImmediate(() => {
-          run(js).then(({ error, value }) => {
+          run(code).then(({ error, value }) => {
             count++;
 
             assert.equal(value, i);
@@ -758,11 +757,11 @@ setTimeout(() => {
     const iterations = 500;
 
     const executeNext = (i) => {
-      const js = `
+      const code = `
 setResult({value: ${i}});
 `;
 
-      run(js).then(({ error, value }) => {
+      run(code).then(({ value }) => {
         assert.equal(value, i);
 
         if (i === iterations) {
@@ -883,7 +882,7 @@ setTimeout(() => {
 `;
 
     for (let count = 0; count < 20; ++count) {
-      const { value, error } = await sandbox.execute({ code, timeout: 3000 });
+      const { value } = await sandbox.execute({ code, timeout: 3000 });
 
       assert.equal(value, 3);
     }
@@ -898,7 +897,7 @@ setTimeout(() => {
     setResult({value: callRespondTwice(1, 2)})
 `;
 
-    const { value, error } = await sandbox.execute({ code, timeout: 3000 });
+    const { value } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(value, 3);
 
