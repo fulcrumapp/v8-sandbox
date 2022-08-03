@@ -5,15 +5,15 @@
 #include <memory>
 #include <v8.h>
 #include <node.h>
-#include <unistd.h>
 
-void Debug(const char *msg) {
-  std::cout << getpid() << " : " << msg << std::endl;
-}
+// #include <unistd.h>
+// void Debug(const char *msg) {
+//   std::cout << getpid() << " : " << msg << std::endl;
+// }
 
-void Debug(std::string message) {
-  Debug(message.c_str());
-}
+// void Debug(std::string message) {
+//   Debug(message.c_str());
+// }
 
 using namespace v8;
 
