@@ -22,7 +22,7 @@
   "devDependencies": {
     "@types/async": "^3.0.8",
     "@types/lodash": "^4.14.149",
-    "@types/mocha": "^9.1.1",
+    "@types/mocha": "^10.0.1",
     "@types/node": "^18.0.3",
     "@types/request": "^2.48.8",
     "@types/signal-exit": "^3.0.1",
