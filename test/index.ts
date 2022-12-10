@@ -1102,10 +1102,10 @@ errorAsync(1, 2);
     assert.equal(error?.message, '1337');
     assert.equal(error?.stack, `
 Error: 1337
-    at Timeout._onTimeout (/Users/zac/Documents/dev/v8-sandbox/test/test-functions.js:56:14)
+    at Timeout._onTimeout (<cwd>/test/test-functions.js:56:14)
     at listOnTimeout (node:internal/timers:564:17)
     at process.processTimers (node:internal/timers:507:7)
-    `.trim());
+    `.trim().replace(/<cwd>/g, process.cwd()));
 
     sandbox.shutdown();
   });
@@ -1285,7 +1285,7 @@ Error: setTimeout is disabled
 Error: setTimeout is disabled
     at Functions.setTimeout (<cwd>/lib/host/functions.ts:158:12)
     at Functions.dispatch (<cwd>/lib/host/functions.ts:107:59)
-    at Sandbox.dispatch (<cwd>/lib/host/sandbox.ts:222:20)
+    at Sandbox.dispatch (<cwd>/lib/host/sandbox.ts:221:20)
     at Socket.handleData (<cwd>/lib/host/socket.ts:128:22)
     at Socket.emit (node:events:513:28)
     at Socket.emit (node:domain:489:12)
