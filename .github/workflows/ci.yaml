@@ -48,7 +48,7 @@ jobs:
       - name: 🔎 Type Check
         run: yarn run typecheck
 
-  vitest:
+  test:
     name: ⚡ Tests
     runs-on: ubuntu-latest
     steps:
@@ -66,5 +66,5 @@ jobs:
       - name: 📥 Download Dependencies
         uses: bahmutov/npm-install@v1
 
-      - name: ⚡ Run Vitest
+      - name: ⚡ Run Tests
         run: yarn run test
