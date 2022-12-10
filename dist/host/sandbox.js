@@ -86,6 +86,7 @@ class Sandbox {
     }
     initialize({ timeout } = { timeout: null }) {
         this.setResult(null);
+        this.functions.setup();
         return new Promise((resolve) => {
             this.queue.push({
                 id: nextMessageId(),
