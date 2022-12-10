@@ -11,7 +11,8 @@
     "rebuild": "node-gyp configure rebuild",
     "test": "TS_NODE_IGNORE='node_modules,dist' mocha -r ts-node/register test/index.ts",
     "clean": "rm -rf dist build",
-    "lint": "eslint 'lib/**/*.js'"
+    "lint": "eslint 'lib/**/*.ts'",
+    "typecheck": "tsc -b"
   },
   "author": "Zac McCormick <zac.mccormick@gmail.com> (http://github.com/zhm)",
   "license": "BSD",
