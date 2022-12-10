@@ -22,6 +22,7 @@ const run = (code, globals?, context?) => {
 };
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
+const REQUIRE_INVALID = path.join(__dirname, 'test-functions-invalid.js');
 
 const TEST_URL = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.txt';
 const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg';
@@ -872,6 +873,18 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
+  it('should return an error when the require script is invalid', async () => {
+    const sandbox = new SandboxCluster({ require: REQUIRE_INVALID });
+
+    const code = `setResult({value: 1})`;
+
+    const { error } = await sandbox.execute({ code, timeout: 3000 });
+
+    assert.equal(error?.message, 'Cannot use import statement outside a module');
+
+    sandbox.shutdown();
+  });
+
   it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
     const sandbox = new SandboxCluster({ require: REQUIRE });
 
@@ -1089,10 +1102,10 @@ errorAsync(1, 2);
     assert.equal(error?.message, '1337');
     assert.equal(error?.stack, `
 Error: 1337
-    at Timeout._onTimeout (/Users/zac/Documents/dev/v8-sandbox/test/test-functions.js:56:14)
+    at Timeout._onTimeout (<cwd>/test/test-functions.js:56:14)
     at listOnTimeout (node:internal/timers:564:17)
     at process.processTimers (node:internal/timers:507:7)
-    `.trim());
+    `.trim().replace(/<cwd>/g, process.cwd()));
 
     sandbox.shutdown();
   });
@@ -1270,17 +1283,17 @@ Error: setTimeout is disabled
     assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
     assert.equal(result?.error?.stack, `
 Error: setTimeout is disabled
-    at Functions.setTimeout (/Users/zac/Documents/dev/v8-sandbox/lib/host/functions.ts:156:12)
-    at Functions.dispatch (/Users/zac/Documents/dev/v8-sandbox/lib/host/functions.ts:105:59)
-    at Sandbox.dispatch (/Users/zac/Documents/dev/v8-sandbox/lib/host/sandbox.ts:219:20)
-    at Socket.handleData (/Users/zac/Documents/dev/v8-sandbox/lib/host/socket.ts:128:22)
+    at Functions.setTimeout (<cwd>/lib/host/functions.ts:158:12)
+    at Functions.dispatch (<cwd>/lib/host/functions.ts:107:59)
+    at Sandbox.dispatch (<cwd>/lib/host/sandbox.ts:221:20)
+    at Socket.handleData (<cwd>/lib/host/socket.ts:128:22)
     at Socket.emit (node:events:513:28)
     at Socket.emit (node:domain:489:12)
     at addChunk (node:internal/streams/readable:324:12)
     at readableAddChunk (node:internal/streams/readable:297:9)
     at Socket.Readable.push (node:internal/streams/readable:234:10)
     at Pipe.onStreamRead (node:internal/stream_base_commons:190:23)
-    `.trim());
+    `.trim().replace(/<cwd>/g, process.cwd()));
 
     sandbox.shutdown();
   });

@@ -36,11 +36,13 @@ export default class Functions {
     this.httpEnabled = httpEnabled ?? true;
     this.timersEnabled = timersEnabled ?? true;
     this.timers = {};
-
-    this.setup();
   }
 
   setup() {
+    if (this.syncFunctions) {
+      return;
+    }
+
     global.define = this.define;
     global.defineAsync = this.defineAsync;
 

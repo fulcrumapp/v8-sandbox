@@ -98,10 +98,12 @@ class Functions {
         this.httpEnabled = httpEnabled ?? true;
         this.timersEnabled = timersEnabled ?? true;
         this.timers = {};
-        this.setup();
     }
     setup() {
         var _a, _b;
+        if (this.syncFunctions) {
+            return;
+        }
         global.define = this.define;
         global.defineAsync = this.defineAsync;
         this.syncFunctions = {};

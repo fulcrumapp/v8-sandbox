@@ -159,6 +159,8 @@ export default class Sandbox {
   initialize({ timeout } = { timeout: null }): Promise<Result> {
     this.setResult(null);
 
+    this.functions.setup();
+
     return new Promise<Result>((resolve) => {
       this.queue.push({
         id: nextMessageId(),
