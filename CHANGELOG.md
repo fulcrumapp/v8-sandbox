@@ -1,3 +1,12 @@
+## 3.2.7
+
+* Updated dependencies
+
+## 3.2.6
+
+* Report errors in `require` script https://github.com/fulcrumapp/v8-sandbox/pull/29
+* Updated dependencies
+
 ## 3.2.5
 
 * Updated dependencies
