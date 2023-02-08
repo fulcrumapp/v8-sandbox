@@ -1,6 +1,6 @@
-import path from 'path';
-import assert from 'assert';
-import fs from 'fs';
+import path from 'node:path';
+import assert from 'node:assert';
+import fs from 'node:fs';
 
 import { Sandbox, SandboxCluster, Result } from '../dist';
 
@@ -20,6 +20,16 @@ const runWithTimeout = async (code, timeout?, globals?, context?) => {
 const run = (code, globals?, context?) => {
   return runWithTimeout(code, 4000, globals, context);
 };
+
+const cleanStackTrace = (stack: string | undefined) => {
+  if (!stack) {
+    return null;
+  }
+
+  return stack.trim()
+    .replaceAll(process.cwd() + '/', '')
+    .replaceAll(/:[0-9]+:[0-9]+/g, '');
+}
 
 const REQUIRE = path.join(__dirname, 'test-functions.js');
 const REQUIRE_INVALID = path.join(__dirname, 'test-functions-invalid.js');
@@ -1100,12 +1110,12 @@ errorAsync(1, 2);
     const { error } = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(error?.message, '1337');
-    assert.equal(error?.stack, `
+    assert.equal(cleanStackTrace(error?.stack), `
 Error: 1337
-    at Timeout._onTimeout (<cwd>/test/test-functions.js:56:14)
-    at listOnTimeout (node:internal/timers:564:17)
-    at process.processTimers (node:internal/timers:507:7)
-    `.trim().replace(/<cwd>/g, process.cwd()));
+    at Timeout._onTimeout (test/test-functions.js)
+    at listOnTimeout (node:internal/timers)
+    at process.processTimers (node:internal/timers)
+    `.trim());
 
     sandbox.shutdown();
   });
@@ -1269,11 +1279,11 @@ setResult({ value: fetchLargeValue() });
     result = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
-    assert.equal(result?.error?.stack, `
+    assert.equal(cleanStackTrace(result?.error?.stack), `
 Error: setTimeout is disabled
-    at environment.dispatch (script:16:23)
-    at environment.setTimeout (script:23:61)
-    at script:1:1
+    at environment.dispatch (script)
+    at environment.setTimeout (script)
+    at script
     `.trim());
 
     sandbox.debug = true;
@@ -1281,19 +1291,19 @@ Error: setTimeout is disabled
     result = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
-    assert.equal(result?.error?.stack, `
+    assert.equal(cleanStackTrace(result?.error?.stack), `
 Error: setTimeout is disabled
-    at Functions.setTimeout (<cwd>/lib/host/functions.ts:158:12)
-    at Functions.dispatch (<cwd>/lib/host/functions.ts:107:59)
-    at Sandbox.dispatch (<cwd>/lib/host/sandbox.ts:221:20)
-    at Socket.handleData (<cwd>/lib/host/socket.ts:128:22)
-    at Socket.emit (node:events:513:28)
-    at Socket.emit (node:domain:489:12)
-    at addChunk (node:internal/streams/readable:324:12)
-    at readableAddChunk (node:internal/streams/readable:297:9)
-    at Socket.Readable.push (node:internal/streams/readable:234:10)
-    at Pipe.onStreamRead (node:internal/stream_base_commons:190:23)
-    `.trim().replace(/<cwd>/g, process.cwd()));
+    at Functions.setTimeout (lib/host/functions.ts)
+    at Functions.dispatch (lib/host/functions.ts)
+    at Sandbox.dispatch (lib/host/sandbox.ts)
+    at Socket.handleData (lib/host/socket.ts)
+    at Socket.emit (node:events)
+    at Socket.emit (node:domain)
+    at addChunk (node:internal/streams/readable)
+    at readableAddChunk (node:internal/streams/readable)
+    at Socket.Readable.push (node:internal/streams/readable)
+    at Pipe.onStreamRead (node:internal/stream_base_commons)
+    `.trim());
 
     sandbox.shutdown();
   });

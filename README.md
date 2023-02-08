@@ -155,3 +155,7 @@ function nodeFunctionAsync([ arg1, arg2, arg3 ], { respond, fail, callback, cont
   respond(); // you must call this to complete this invocation and pass control back to the sandbox
 }
 ```
+
+# Architecture
+
+![architecture](docs/v8-sandbox.png)
