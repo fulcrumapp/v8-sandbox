@@ -1,6 +1,12 @@
+## 3.2.9
+
+* Fix memory leak #e821700
+* Updated dependencies
+
 ## 3.2.8
 
 * Updated dependencies
+
 ## 3.2.7
 
 * Updated dependencies

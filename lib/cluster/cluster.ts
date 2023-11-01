@@ -1,7 +1,7 @@
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import async from 'async';
-import onExit from 'signal-exit';
+import { onExit } from 'signal-exit';
 import { once } from 'lodash';
 import {
   Result, Options, ExecutionOptions, TimeoutError, HostError,
