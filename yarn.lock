@@ -202,10 +202,10 @@
   resolved "https://registry.yarnpkg.com/@types/semver/-/semver-7.5.4.tgz#0a41252ad431c473158b22f9bfb9a63df7541cff"
   integrity sha512-MMzuxN3GdFwskAnb6fz0orFvhfqi752yjaXylr0Rp4oDg5H0Zn1IuyRhDVvYOwAXoJirx2xuS16I3WjxnAIHiQ==
 
-"@types/signal-exit@^3.0.1":
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/@types/signal-exit/-/signal-exit-3.0.1.tgz#ec9fb8e3fbf0ed5d9f7d22b5647214bece916a5b"
-  integrity sha512-OSitN9PP9E/c4tlt1Qdj3CAz5uHD9Da5rhUqlaKyQRCX1T7Zdpbk6YdeZbR2eiE2ce+NMBgVnMxGqpaPSNQDUQ==
+"@types/signal-exit@^3.0.3":
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/@types/signal-exit/-/signal-exit-3.0.3.tgz#851774cb5110ca95238823d5ffb56ac90c3ecdf2"
+  integrity sha512-QO78drzuQZHO9L66ABcdNTv6gNq6UYeyBUu/fXIpbmCt0GJsd53f4p9nMptaHd9o3ineg3zKHTXKJhmQNnvDHw==
 
 "@types/tough-cookie@*":
   version "4.0.4"
@@ -2380,10 +2380,15 @@ side-channel@^1.0.4:
     get-intrinsic "^1.0.2"
     object-inspect "^1.9.0"
 
-signal-exit@^3.0.2, signal-exit@^3.0.7:
+signal-exit@^3.0.7:
   version "3.0.7"
   resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-3.0.7.tgz#a9a1767f8af84155114eaabd73f99273c8f59ad9"
   integrity sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==
+
+signal-exit@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-4.1.0.tgz#952188c1cbd546070e2dd20d0f41c0ae0530cb04"
+  integrity sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==
 
 slash@^3.0.0:
   version "3.0.0"
