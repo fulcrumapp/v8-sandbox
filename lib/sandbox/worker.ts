@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { writeHeapSnapshot } from 'node:v8';
 
 const NativeSandbox = require('bindings')('sandbox').Sandbox;
 
@@ -14,6 +15,8 @@ export interface WorkerMessage {
   callbackId: string;
   args: string;
 }
+
+let counter = 0;
 
 export default class Worker {
   native: any = null;
@@ -41,6 +44,10 @@ export default class Worker {
     this.connect();
 
     this.messageId = messageId;
+
+    if (++counter === 1000) {
+      writeHeapSnapshot();
+    }
 
     if (globals !== '{}') {
       this._execute(`Object.assign(global, ${globals});`);
