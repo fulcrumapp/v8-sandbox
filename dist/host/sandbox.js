@@ -11,7 +11,7 @@ const child_process_1 = require("child_process");
 const crypto_1 = require("crypto");
 const async_1 = __importDefault(require("async"));
 const lodash_1 = require("lodash");
-const signal_exit_1 = require("signal-exit");
+const signal_exit_1 = __importDefault(require("signal-exit"));
 const timer_1 = __importDefault(require("./timer"));
 const socket_1 = __importDefault(require("./socket"));
 const functions_1 = __importDefault(require("./functions"));
@@ -80,7 +80,7 @@ class Sandbox {
         this.template = template || '';
         this.functions = new functions_1.default(this, { require, httpEnabled, timersEnabled });
         this.start();
-        (0, signal_exit_1.onExit)((code, signal) => {
+        (0, signal_exit_1.default)((code, signal) => {
             this.shutdown();
         });
     }

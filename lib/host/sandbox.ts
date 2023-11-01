@@ -5,7 +5,7 @@ import { fork, ChildProcess } from 'child_process';
 import { randomInt } from 'crypto';
 import async from 'async';
 import { once } from 'lodash';
-import { onExit } from 'signal-exit';
+import onExit from 'signal-exit';
 
 import Timer from './timer';
 import Socket from './socket';

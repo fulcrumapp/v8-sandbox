@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
 const async_1 = __importDefault(require("async"));
-const signal_exit_1 = require("signal-exit");
+const signal_exit_1 = __importDefault(require("signal-exit"));
 const lodash_1 = require("lodash");
 const sandbox_1 = require("../host/sandbox");
 function remove(array, object) {
@@ -63,7 +63,7 @@ class Cluster {
         this.activeWorkers = [];
         this.queue = async_1.default.queue(this.worker, this.workerCount);
         this.ensureWorkers();
-        (0, signal_exit_1.onExit)((code, signal) => {
+        (0, signal_exit_1.default)((code, signal) => {
             this.shutdown();
         });
     }
