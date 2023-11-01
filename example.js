@@ -3,7 +3,7 @@ const path = require('path');
 
 const sandbox = new Sandbox({ require: path.join(process.cwd(), 'example-functions.js') });
 
-const timeout = 1000;
+const timeout = 5000;
 
 const run = (code) => {
   return sandbox.execute({ code, timeout });
@@ -38,6 +38,20 @@ var response = httpRequest({uri: 'https://gist.githubusercontent.com/zhm/39714de
 });
 `;
 
+// a lot of data
+const example6 = `
+let data = '';
+
+for(let i = 0; i < 2e4; ++i) {
+  data += Math.random().toString();
+}
+
+simpleAsync(data, function(error, value) {
+  setResult({error, value: value.length});
+});
+`;
+
+
 const runExample = async (code) => {
   const { error, value } = await run(code);
 
@@ -49,14 +63,13 @@ const runExample = async (code) => {
 };
 
 (async () => {
-  console.log('example 1:', await runExample(example1));
-  console.log('example 2:', await runExample(example2));
-  console.log('example 3:', await runExample(example3));
-  console.log('example 4:', await runExample(example4));
-  console.log('example 5:', await runExample(example5));
-
-  for (let i = 0; i < 100; ++i) {
+  for (let i = 0; i < 10; ++i) {
+    console.log('example 1:', await runExample(example1));
     console.log('example 2:', await runExample(example2));
+    console.log('example 3:', await runExample(example3));
+    console.log('example 4:', await runExample(example4));
+    console.log('example 5:', await runExample(example5));
+    console.log('example 6:', await runExample(example6));
   }
 
   sandbox.shutdown();

@@ -13,3 +13,12 @@ defineAsync('addNumbersAsync', ([ value1, value2 ], { respond, callback }) => {
 
   respond();
 });
+
+// Example of a simple asynchronous function
+defineAsync('simpleAsync', ([ value ], { respond, callback }) => {
+  setTimeout(() => {
+    callback(null, value);
+  }, 1);
+
+  respond();
+});

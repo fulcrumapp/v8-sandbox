@@ -18,7 +18,11 @@ public:
       callback(callback)
   {}
 
-  virtual ~Baton() {}
+  virtual ~Baton() {
+    if (callback) {
+      callback->Reset();
+    }
+  }
 
   int id;
 
