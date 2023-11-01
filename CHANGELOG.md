@@ -1,3 +1,7 @@
+## 3.2.10
+
+* Fix propagating isHost in cluster mode
+
 ## 3.2.9
 
 * Fix memory leak #e821700

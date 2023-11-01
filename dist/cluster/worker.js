@@ -82,6 +82,7 @@ class Worker {
                 name: result.error.name,
                 message: result.error.message,
                 stack: result.error.stack,
+                isHost: result.error.isHost,
                 ...result.error,
             };
         }
