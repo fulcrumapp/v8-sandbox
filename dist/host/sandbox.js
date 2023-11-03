@@ -103,9 +103,11 @@ class Sandbox {
     }
     async execute({ code, timeout, globals, context, }) {
         this.start();
-        const result = await this.initialize({ timeout });
-        if (result.error) {
-            return result;
+        if(!this.initialized) { 
+            const result = await this.initialize({ timeout });
+            if (result.error) {
+                return result;
+            }
         }
         return new Promise((resolve) => {
             this.queue.push({
@@ -117,7 +119,6 @@ class Sandbox {
                 context: context ?? {},
                 output: [],
                 callback: (res) => {
-                    this.initialized = false;
                     resolve(res);
                 },
             });
