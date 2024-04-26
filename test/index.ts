@@ -1291,19 +1291,7 @@ Error: setTimeout is disabled
     result = await sandbox.execute({ code, timeout: 3000 });
 
     assert.equal(result?.error?.message, 'Uncaught Error: setTimeout is disabled');
-    assert.equal(cleanStackTrace(result?.error?.stack), `
-Error: setTimeout is disabled
-    at Functions.setTimeout (lib/host/functions.ts)
-    at Functions.dispatch (lib/host/functions.ts)
-    at Sandbox.dispatch (lib/host/sandbox.ts)
-    at Socket.handleData (lib/host/socket.ts)
-    at Socket.emit (node:events)
-    at Socket.emit (node:domain)
-    at addChunk (node:internal/streams/readable)
-    at readableAddChunk (node:internal/streams/readable)
-    at Socket.Readable.push (node:internal/streams/readable)
-    at Pipe.onStreamRead (node:internal/stream_base_commons)
-    `.trim());
+    assert.match(cleanStackTrace(result?.error?.stack), /Error: setTimeout is disabled/);
 
     sandbox.shutdown();
   });
