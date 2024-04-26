@@ -266,7 +266,7 @@ void Sandbox::Callback(int messageId, int callbackId, const char *args) {
 
   Nan::TryCatch tryCatch;
 
-  Local<Function> callback = Nan::New(operation->callback->As<Function>());
+  Local<Function> callback = Nan::New(*operation->callback);
 
   Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
 

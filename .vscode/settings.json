@@ -17,7 +17,7 @@
   "javascript.preferences.quoteStyle": "single",
   "typescript.preferences.quoteStyle": "single",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "mochaExplorer.files": "test/**/*.ts",
   "mochaExplorer.parallel": false,

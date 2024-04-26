@@ -1,6 +1,6 @@
 {
   "name": "v8-sandbox",
-  "version": "3.2.10",
+  "version": "3.2.12",
   "description": "V8 Sandbox",
   "homepage": "http://github.com/fulcrumapp/v8-sandbox",
   "main": "dist/index.js",
@@ -27,9 +27,9 @@
     "@types/node": "^20.8.10",
     "@types/request": "^2.48.11",
     "@types/signal-exit": "^3.0.3",
-    "@typescript-eslint/eslint-plugin": "^6.9.1",
-    "@typescript-eslint/parser": "^6.9.1",
-    "eslint": "^8.52.0",
+    "@typescript-eslint/eslint-plugin": "^7.7.1",
+    "@typescript-eslint/parser": "^7.7.1",
+    "eslint": "^9.1.1",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.29.0",
     "mocha": "^10.0.0",
@@ -42,7 +42,7 @@
     "bindings": "^1.5.0",
     "lodash": "^4.17.21",
     "nan": "^2.18.0",
-    "node-gyp": "^9.0.0",
+    "node-gyp": "^10.1.0",
     "signal-exit": "^4.1.0"
   },
   "keywords": [
