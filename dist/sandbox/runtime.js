@@ -32,8 +32,16 @@ environment.define = (name) => {
 };
 environment.defineAsync = (name) => {
     environment[name] = (...args) => {
-        const callback = args.pop();
-        return environment.dispatch(name, args, callback);
+        if (typeof args[args.length-1] == 'function') { // water-fall function
+            let callback = args.pop();
+            return environment.dispatch(name, args, callback);
+        }else {
+            return new Promise(async(resolve, reject) => { // standard await function
+                environment.dispatch(name, args, function(value) {
+                    resolve(value);
+                })
+            })
+        }
     };
 };
 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
