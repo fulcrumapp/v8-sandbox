@@ -17,8 +17,35 @@ It's intentionally not possible to expose any nodejs objects or functions direct
 # Installation
 
 ```sh
-npm install v8-sandbox
+npm install @fulcrumapp/v8-sandbox
 ```
+
+The scoped package is published to GitHub Packages and requires GitHub Packages
+authentication. It is a different package identity from the historical
+unscoped `v8-sandbox` package on npmjs.org; consumers must update their imports
+and registry configuration. Installation compiles the native addon with
+`node-gyp`, so a supported C++ toolchain, Python, and Node.js headers are required.
+
+## CI and releases
+
+Pull requests, merge queue entries, and changes to `main` run a native
+build, type checking, and sandbox tests on GitHub-hosted runners. The existing
+lint command also runs as a non-blocking check until its ESLint configuration
+is fixed.
+
+After main validation succeeds, a GitHub App commits the next version to
+`package.json` and creates a matching stable SemVer tag. Do not edit the root
+package version manually. A separate tag-creation workflow rebuilds and
+publishes the scoped package to GitHub Packages and creates GitHub Release
+notes. It does not publish to npmjs.org. The package contains native build
+inputs rather than runner-specific binaries, so each consumer compiles the
+addon for its own platform and Node.js version.
+
+Before enabling releases, ensure external-fork workflow approval remains
+enabled and verify the required checks, GitHub Packages access, public CI App
+secrets, and branch, queue, and tag protection bypasses. Disable any other
+publisher at cutover. If publishing fails, rerun the publish workflow for the
+same tag; later workflow changes do not alter the code captured by that tag.
 
 # API
 
@@ -57,7 +84,7 @@ Shutdown the sandbox instance. Stops the nodejs host process. You must call `shu
 ## Examples
 
 ```js
-import Sandbox from 'v8-sandbox';
+import Sandbox from '@fulcrumapp/v8-sandbox';
 
 const sandbox = new Sandbox();
 
@@ -75,7 +102,7 @@ const code = 'setResult({ value: 1 + inputValue });';
 
 
 ```js
-import Sandbox from 'v8-sandbox';
+import Sandbox from '@fulcrumapp/v8-sandbox';
 
 const sandbox = new Sandbox();
 
@@ -99,7 +126,7 @@ setTimeout(() => {
 ```
 
 ```js
-import Sandbox from 'v8-sandbox';
+import Sandbox from '@fulcrumapp/v8-sandbox';
 
 const sandbox = new Sandbox();
 

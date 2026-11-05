@@ -1,0 +1,59 @@
+name: Publish npm package to GitHub Packages
+description: Verify a release tag, build a package, and publish its exact tarball.
+inputs:
+  token:
+    description: GitHub token with permission to publish this package.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify release tag and commit
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: node "$GITHUB_ACTION_PATH/publish.js" verify
+    - name: Install npm for script-free packing
+      shell: bash
+      run: npm install --global npm@11.5.1 --ignore-scripts
+    - name: Enable the configured Yarn version
+      shell: bash
+      env:
+        COREPACK_ENABLE_AUTO_PIN: '0'
+      run: |
+        set -euo pipefail
+        corepack enable
+        corepack prepare yarn@1.22.22 --activate
+    - name: Install dependencies
+      shell: bash
+      run: yarn install --frozen-lockfile --production=false --ignore-scripts --non-interactive
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+        COREPACK_ENABLE_AUTO_PIN: '0'
+    - name: Build package
+      shell: bash
+      env:
+        COREPACK_ENABLE_AUTO_PIN: '0'
+      run: yarn clean && yarn build && node .github/scripts/check-package.cjs
+    - name: Pack without lifecycle scripts
+      id: pack
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/npm-pack.json"
+        file=$(node -e 'const p=require(process.argv[1]); if (!Array.isArray(p) || p.length !== 1 || !/^[A-Za-z0-9._-]+\.tgz$/.test(p[0].filename)) process.exit(1); console.log(p[0].filename)' "$RUNNER_TEMP/npm-pack.json")
+        echo "file=$RUNNER_TEMP/$file" >> "$GITHUB_OUTPUT"
+    - name: Publish package to GitHub Packages
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+        GH_TOKEN: ${{ github.token }}
+        PACKAGE_FILE: ${{ steps.pack.outputs.file }}
+      run: |
+        set -euo pipefail
+        config="$RUNNER_TEMP/npm-publish-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.npmrc"
+        trap 'rm -f "$config"' EXIT
+        umask 077
+        printf '%s\n' '@fulcrumapp:registry=https://npm.pkg.github.com/' \
+          '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > "$config"
+        export NPM_CONFIG_USERCONFIG="$config"
+        node "$GITHUB_ACTION_PATH/publish.js" publish "$PACKAGE_FILE"

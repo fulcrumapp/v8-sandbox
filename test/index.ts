@@ -1,6 +1,7 @@
 import path from 'node:path';
 import assert from 'node:assert';
 import fs from 'node:fs';
+import http from 'node:http';
 
 import { Sandbox, SandboxCluster, Result } from '../dist';
 
@@ -34,14 +35,52 @@ const cleanStackTrace = (stack: string | undefined) => {
 const REQUIRE = path.join(__dirname, 'test-functions.js');
 const REQUIRE_INVALID = path.join(__dirname, 'test-functions-invalid.js');
 
-const TEST_URL = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.txt';
-const TEST_FILE = 'https://github.com/fulcrumapp/v8-sandbox/raw/main/test/test.jpg';
+let TEST_URL: string;
+let TEST_FILE: string;
+let ERROR_URL: string;
 const BINARY_FILE = fs.readFileSync(path.join('test', 'test.jpg'));
 
 describe('sandbox', () => {
+  const server = http.createServer((request, response) => {
+    if (request.url === '/network-error') {
+      request.socket.destroy();
+    } else if (request.url === '/test.txt') {
+      response.end(fs.readFileSync(path.join('test', 'test.txt')));
+    } else if (request.url === '/test.jpg') {
+      response.end(BINARY_FILE);
+    } else {
+      response.writeHead(404).end();
+    }
+  });
+
+  before(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        server.removeListener('error', reject);
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          reject(new Error('HTTP fixture server did not expose a TCP address'));
+          return;
+        }
+        const baseUrl = `http://127.0.0.1:${address.port}`;
+        TEST_URL = `${baseUrl}/test.txt`;
+        TEST_FILE = `${baseUrl}/test.jpg`;
+        ERROR_URL = `${baseUrl}/network-error`;
+        resolve();
+      });
+    });
+  });
+
   after(async () => {
-    if (globalSandbox) {
-      await globalSandbox.shutdown();
+    try {
+      if (globalSandbox) {
+        await globalSandbox.shutdown();
+      }
+    } finally {
+      if (server.listening) {
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      }
     }
   });
 
@@ -223,14 +262,14 @@ httpRequest({uri: '${TEST_URL}', invalidOption: true}, (err, res, body) => {
 
   it('should handle network errors from httpRequest', async () => {
     const code = `
-httpRequest({uri: 'http://no-way-this-exists-12345.net'}, (error, res, body) => {
+httpRequest({uri: '${ERROR_URL}'}, (error, res, body) => {
   setResult({ error });
 });
 `;
 
     const { error } = await run(code);
 
-    assert.equal(error?.code, 'ENOTFOUND');
+    assert.equal(error?.code, 'ECONNRESET');
   });
 
   it('should execute httpRequest within a timeout and async function', async () => {

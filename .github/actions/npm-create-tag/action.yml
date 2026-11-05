@@ -1,0 +1,18 @@
+name: Create npm release tag
+description: Commit the release version to main and create its SemVer tag after validation.
+outputs:
+  tag:
+    description: Created or previously released tag.
+    value: ${{ steps.create.outputs.tag }}
+  alreadyReleased:
+    description: Whether the tested commit was already covered by a tag.
+    value: ${{ steps.create.outputs.alreadyReleased }}
+  superseded:
+    description: Whether a newer main commit superseded the tested commit.
+    value: ${{ steps.create.outputs.superseded }}
+runs:
+  using: composite
+  steps:
+    - id: create
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/create-tag.js"
