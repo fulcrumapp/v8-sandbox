@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'push' && github.run_id || github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        node-version: ['18', '20.20.2']
+    env:
+      COREPACK_ENABLE_AUTO_PIN: '0'
+      TZ: America/Los_Angeles
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Enable Yarn classic
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+
+      - name: Protect release-managed version
+        if: github.event_name == 'merge_group' || github.base_ref == 'main' || github.ref == 'refs/heads/main'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const base = process.env.BASE_SHA || '';
+          if (!/^[0-9a-f]{40,64}$/.test(base) || /^0+$/.test(base)) {
+            console.error('::error::Cannot determine the base commit for the release version check.');
+            process.exit(1);
+          }
+          function version(ref) {
+            let manifest;
+            try {
+              manifest = JSON.parse(execFileSync('git', ['show', `${ref}:package.json`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+            } catch (error) {
+              console.error(`::error::Cannot read or parse package.json at ${ref}: ${error.message}`);
+              process.exit(1);
+            }
+            if (!manifest || typeof manifest.version !== 'string' || !manifest.version.trim()) {
+              console.error(`::error::package.json at ${ref} must have a nonempty version string.`);
+              process.exit(1);
+            }
+            return manifest.version;
+          }
+          if (version(base) !== version('HEAD')) {
+            console.error('::error file=package.json::Do not manually change the root package.json version. Revert that version change; GitHub Actions manages release versions.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --production=false --ignore-scripts --non-interactive
+
+      - name: Test release workflow contracts
+        run: node --test .github/tests/*.cjs
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: yarn lint
+
+      - name: Report non-blocking lint failure
+        if: steps.lint.outcome == 'failure'
+        run: echo "::warning::The existing lint command failed; fix its ESLint configuration before making lint required."
+
+      - name: Build distribution
+        run: yarn clean && yarn build
+
+      - name: Type check
+        run: yarn typecheck
+
+      - name: Test
+        timeout-minutes: 3
+        run: yarn test
+
+      - name: Check package contents
+        run: node .github/scripts/check-package.cjs
+
+      - name: Install and exercise packed package
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/npm-pack.json"
+          file=$(node -e 'const p=require(process.argv[1]); if (!Array.isArray(p) || p.length !== 1 || !/^[A-Za-z0-9._-]+\.tgz$/.test(p[0].filename)) process.exit(1); console.log(p[0].filename)' "$RUNNER_TEMP/npm-pack.json")
+          npm install --prefix "$RUNNER_TEMP/package-consumer" --no-package-lock --no-save --no-audit --no-fund --registry=https://registry.npmjs.org/ "$RUNNER_TEMP/$file"
+          node .github/scripts/check-installed.cjs "$RUNNER_TEMP/package-consumer/node_modules/@fulcrumapp/v8-sandbox"
+
+  build-and-test:
+    if: always()
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require CI to succeed
+        env:
+          CI_RESULT: ${{ needs.ci.result }}
+        run: |
+          if [ "$CI_RESULT" != success ]; then
+            echo "::error::CI did not succeed: $CI_RESULT"
+            exit 1
+          fi
+
+  tag:
+    name: Create npm release tag
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.repository }}-npm-release-tag
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.14.0'
+      - name: Create scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.FULCRUM_CI_APP_ID_PUBLIC }}
+          private-key: ${{ secrets.FULCRUM_CI_APP_PRIVATE_KEY_PUBLIC }}
+          permission-contents: write
+      - name: Commit release version to main and tag it
+        uses: ./.github/actions/npm-create-tag
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CHECK_NPMJS: 'false'

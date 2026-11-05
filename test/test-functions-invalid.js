@@ -1,1 +1,1 @@
-import 'cannot-use-import-syntax';
+const invalid = ;

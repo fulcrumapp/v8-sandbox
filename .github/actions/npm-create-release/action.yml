@@ -1,0 +1,25 @@
+name: Create GitHub release
+description: Create release notes for an already published npm version.
+runs:
+  using: composite
+  steps:
+    - name: Create or confirm release
+      shell: bash
+      run: |
+        set -euo pipefail
+        [[ "$GITHUB_REF" =~ ^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+          echo "::error::A stable version tag is required"
+          exit 1
+        }
+        tag="${GITHUB_REF#refs/tags/}"
+        if response=$(gh api --include "repos/$GITHUB_REPOSITORY/releases/tags/$tag" 2>&1); then
+          node "$GITHUB_ACTION_PATH/../npm-common/remote-tag.js"
+          echo "GitHub release $tag already exists."
+        elif [[ "$response" =~ ^HTTP/[^[:space:]]+[[:space:]]404[[:space:]] ]]; then
+          node "$GITHUB_ACTION_PATH/../npm-common/remote-tag.js"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$tag"
+        else
+          echo "::error::Could not inspect release $tag"
+          printf '%s\n' "$response" >&2
+          exit 1
+        fi
