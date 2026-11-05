@@ -94,6 +94,7 @@ jobs:
         run: yarn typecheck
 
       - name: Test
+        timeout-minutes: 3
         run: yarn test
 
       - name: Check package contents

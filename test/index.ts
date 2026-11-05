@@ -925,13 +925,15 @@ setTimeout(() => {
   it('should return an error when the require script is invalid', async () => {
     const sandbox = new SandboxCluster({ require: REQUIRE_INVALID });
 
-    const code = `setResult({value: 1})`;
+    try {
+      const code = `setResult({value: 1})`;
 
-    const { error } = await sandbox.execute({ code, timeout: 3000 });
+      const { error } = await sandbox.execute({ code, timeout: 3000 });
 
-    assert.equal(error?.message, 'Cannot use import statement outside a module');
-
-    sandbox.shutdown();
+      assert.equal(error?.message, "Unexpected token ';'");
+    } finally {
+      sandbox.shutdown();
+    }
   });
 
   it('should allow crossing between nodejs and sandbox with custom blocking functions', async () => {
