@@ -1,77 +1,87 @@
 #ifndef __SANDBOX_WRAP_H__
 #define __SANDBOX_WRAP_H__
 
-#include <nan.h>
-#include <vector>
 #include <map>
+#include <memory>
+#include <string>
+#include <vector>
+#include <node.h>
+#include <node_object_wrap.h>
+#include <uv.h>
+#include <v8.h>
 #include "baton.h"
-
-using namespace v8;
 
 class Sandbox;
 
 typedef Baton<Sandbox> AsyncOperation;
 
-class Sandbox : public Nan::ObjectWrap {
+class Sandbox : public node::ObjectWrap {
 public:
-  static void Init(v8::Local<v8::Object> exports);
+  static void Init(v8::Local<v8::Object> exports, v8::Local<v8::Context> context);
 
 private:
   explicit Sandbox();
 
   ~Sandbox();
 
-  static NAN_METHOD(New);
+  static void New(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Initialize);
+  static void Initialize(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Connect);
+  static void Connect(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Disconnect);
+  static void Disconnect(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Execute);
+  static void Execute(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Callback);
+  static void Callback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Cancel);
+  static void Cancel(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Dispatch);
+  static void Dispatch(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  static NAN_METHOD(Finish);
+  static void Finish(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-  void Initialize();
+  void Initialize(v8::Isolate* isolate);
 
   void Connect();
 
   void Disconnect();
 
-  void Execute(int messageId, const char *code);
+  void Execute(v8::Isolate* isolate, int messageId, const char *code);
 
-  void Callback(int messageId, int callbackId, const char *args);
+  void Callback(v8::Isolate* isolate, int messageId, int callbackId, const char *args);
 
   void Cancel(int messageId, int callbackId);
 
-  std::string Dispatch(const char *name, const char *arguments, Local<Function> *callback);
+  std::string Dispatch(v8::Isolate* isolate, const char *name, const char *arguments, v8::Local<v8::Function> *callback);
 
-  void Finish();
+  void Finish(v8::Isolate* isolate);
 
-  void SetResult(Local<Context> &context, Local<Object> result);
+  bool IsActiveContext(v8::Isolate* isolate, v8::Local<v8::Context> context) const;
 
-  void MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context);
+  void SetResult(v8::Isolate* isolate, v8::Local<v8::Context> &context, v8::Local<v8::Object> result);
 
-  static Sandbox *GetSandboxFromContext();
+  void MaybeHandleError(v8::Isolate* isolate, v8::TryCatch &tryCatch, v8::Local<v8::Context> &context);
 
-  Nan::Global<Context> sandboxContext_;
+  static v8::MaybeLocal<v8::Value> PrepareStackTrace(
+    v8::Local<v8::Context> context,
+    v8::Local<v8::Value> error,
+    v8::Local<v8::Array> sites);
+
+  static Sandbox *GetSandboxFromContext(v8::Isolate* isolate);
+
+  v8::Global<v8::Context> sandboxContext_;
 
   int messageId_;
 
   std::string result_;
 
-  std::vector<std::string> buffers_;
+  std::string readBuffer_;
 
-  int32_t bytesRead_;
+  bool hasExpected_;
 
-  int32_t bytesExpected_;
+  uint32_t bytesExpected_;
 
   std::string socket_;
 
@@ -80,8 +90,6 @@ private:
   uv_loop_t *loop_;
 
   std::map<int, std::shared_ptr<AsyncOperation>> pendingOperations_;
-
-  static Nan::Persistent<v8::Function> constructor;
 
   static void AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer);
 

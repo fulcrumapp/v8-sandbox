@@ -1,9 +1,12 @@
 #include "sandbox.h"
 
-using v8::FunctionTemplate;
-
-NAN_MODULE_INIT(Init) {
-  Sandbox::Init(target);
+static void Init(
+  v8::Local<v8::Object> exports,
+  v8::Local<v8::Value>,
+  v8::Local<v8::Context> context,
+  void*
+) {
+  Sandbox::Init(exports, context);
 }
 
-NODE_MODULE(sandbox, Init)
+NODE_MODULE_CONTEXT_AWARE(sandbox, Init)

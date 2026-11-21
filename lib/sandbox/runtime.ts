@@ -7,11 +7,9 @@ environment.dispatch = (name, args, callback) => {
 
   const parameters = [name, JSON.stringify({ name, args: args ?? [] })];
 
-  const wrappedCallback = callback && ((jsonArguments) => {
-    if (callback) {
-      callback(...JSON.parse(jsonArguments));
-    }
-  });
+  const wrappedCallback = callback ? function wrappedCallback(jsonArguments) {
+    callback(...JSON.parse(jsonArguments));
+  } : null;
 
   parameters.push(wrappedCallback);
 
@@ -49,7 +47,7 @@ environment.define = (name) => {
 
 environment.defineAsync = (name) => {
   environment[name] = (...args) => {
-    const callback = args.pop();
+    const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
 
     return environment.dispatch(name, args, callback);
   };
@@ -90,10 +88,6 @@ environment.base64ToBuffer = (base64) => {
   const len = base64.length;
 
   let p = 0;
-  let encoded1 = null;
-  let encoded2 = null;
-  let encoded3 = null;
-  let encoded4 = null;
 
   if (base64[base64.length - 1] === '=') {
     bufferLength--;
@@ -107,10 +101,10 @@ environment.base64ToBuffer = (base64) => {
   const bytes = new Uint8Array(arrayBuffer);
 
   for (let i = 0; i < len; i += 4) {
-    encoded1 = lookup[base64.charCodeAt(i)];
-    encoded2 = lookup[base64.charCodeAt(i + 1)];
-    encoded3 = lookup[base64.charCodeAt(i + 2)];
-    encoded4 = lookup[base64.charCodeAt(i + 3)];
+    const encoded1 = lookup[base64.charCodeAt(i)];
+    const encoded2 = lookup[base64.charCodeAt(i + 1)];
+    const encoded3 = lookup[base64.charCodeAt(i + 2)];
+    const encoded4 = lookup[base64.charCodeAt(i + 3)];
 
     bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
     bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);

@@ -1,13 +1,14 @@
 {
   "include": ["lib/**/*"],
   "compilerOptions": {
-    "alwaysStrict": false,
-    "target": "es2020",
+    "target": "es2022",
     "sourceMap": true,
+    "rootDir": "lib",
     "outDir": "dist",
     "strict": false,
     "lib": ["esnext"],
     "module": "commonjs",
+    "types": ["node"],
     "allowJs": true,
     "esModuleInterop": true,
     "noImplicitAny": false,

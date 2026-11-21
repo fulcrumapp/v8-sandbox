@@ -32,7 +32,9 @@ export default class Timer {
       delete TIMERS[this.id];
       this.id = null;
 
-      callback();
+      if (typeof callback === 'function') {
+        callback();
+      }
     }, timeout == null ? 1e8 : timeout);
   }
 

@@ -1,6 +1,6 @@
-import async from 'async';
 import assert from 'assert';
 import Sandbox, { Options } from '../host/sandbox';
+import Queue from '../queue';
 
 let globalSandbox: Sandbox | null = null;
 
@@ -15,7 +15,7 @@ interface Message {
 }
 
 class Worker {
-  queue: async.QueueObject<Message>;
+  queue: Queue<Message>;
 
   sandboxOptions?: Options;
 
@@ -26,7 +26,7 @@ class Worker {
   error: any;
 
   constructor() {
-    this.queue = async.queue(this.worker, 1);
+    this.queue = new Queue(this.worker, 1);
   }
 
   create() {
@@ -90,13 +90,19 @@ class Worker {
 
     // convert native error objects into an object that can be serialized
     if (result.error) {
-      result.error = {
+      const includeStack = !result.error.isHost || Boolean(this.sandboxOptions?.debug);
+      const serializedError: Record<string, any> = {
         name: result.error.name,
         message: result.error.message,
-        stack: result.error.stack,
         isHost: result.error.isHost,
         ...result.error,
       };
+      if (includeStack && result.error.stack !== undefined) {
+        serializedError.stack = result.error.stack;
+      } else {
+        delete serializedError.stack;
+      }
+      result.error = serializedError;
     }
 
     process.send(result);

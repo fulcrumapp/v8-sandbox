@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        node-version: ['18', '20.20.2']
+        node-version: ['22', '24', '26']
     env:
       COREPACK_ENABLE_AUTO_PIN: '0'
       TZ: America/Los_Angeles
@@ -79,13 +79,7 @@ jobs:
         run: node --test .github/tests/*.cjs
 
       - name: Lint
-        id: lint
-        continue-on-error: true
         run: yarn lint
-
-      - name: Report non-blocking lint failure
-        if: steps.lint.outcome == 'failure'
-        run: echo "::warning::The existing lint command failed; fix its ESLint configuration before making lint required."
 
       - name: Build distribution
         run: yarn clean && yarn build
@@ -138,7 +132,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.14.0'
+          node-version: '24'
       - name: Create scoped GitHub App token
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2

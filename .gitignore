@@ -1,5 +1,7 @@
 node_modules/
 build/
+dist/
+*.tsbuildinfo
 npm-debug.log
 test.db
 bench/*.db

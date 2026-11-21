@@ -1,11 +1,10 @@
 #ifndef __BATON_H__
 #define __BATON_H__
 
-#include <nan.h>
+#include <memory>
+#include <v8.h>
 
-using namespace v8;
-
-typedef std::shared_ptr<Nan::Persistent<Function>> PersistentCallback;
+typedef std::shared_ptr<v8::Global<v8::Function>> PersistentCallback;
 
 extern int nextBatonID;
 

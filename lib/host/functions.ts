@@ -46,17 +46,16 @@ export default class Functions {
     global.define = this.define;
     global.defineAsync = this.defineAsync;
 
-    this.syncFunctions = {};
-    this.asyncFunctions = {};
+    this.syncFunctions = Object.create(null);
+    this.asyncFunctions = Object.create(null);
 
     if (this.require) {
-      SYNC_FUNCTIONS[this.require] ??= {};
-      ASYNC_FUNCTIONS[this.require] ??= {};
+      SYNC_FUNCTIONS[this.require] ??= Object.create(null);
+      ASYNC_FUNCTIONS[this.require] ??= Object.create(null);
 
       this.syncFunctions = SYNC_FUNCTIONS[this.require];
       this.asyncFunctions = ASYNC_FUNCTIONS[this.require];
 
-      // eslint-disable-next-line global-require
       require(this.require);
     }
   }
@@ -71,8 +70,8 @@ export default class Functions {
 
   defines() {
     return [
-      ...Object.entries(this.syncFunctions).map(([name]) => `define('${name}');\n`),
-      ...Object.entries(this.asyncFunctions).map(([name]) => `defineAsync('${name}');\n`),
+      ...Object.keys(this.syncFunctions).map((name) => `define(${JSON.stringify(name)});\n`),
+      ...Object.keys(this.asyncFunctions).map((name) => `defineAsync(${JSON.stringify(name)});\n`),
     ];
   }
 
@@ -124,9 +123,10 @@ export default class Functions {
         break;
       }
       default: {
-        const fn = this.syncFunctions[name] ?? this.asyncFunctions[name];
+        const fn = (Object.hasOwn(this.syncFunctions, name) ? this.syncFunctions[name] : null)
+          ?? (Object.hasOwn(this.asyncFunctions, name) ? this.asyncFunctions[name] : null);
 
-        if (fn) {
+        if (typeof fn === 'function') {
           fn(...params);
         } else {
           throw new HostError(`${name} is not a valid method`);
@@ -156,6 +156,11 @@ export default class Functions {
   }) => {
     if (!this.timersEnabled) {
       fail(new HostError('setTimeout is disabled'));
+      return;
+    }
+
+    if (typeof callback !== 'function') {
+      fail(new HostError('callback must be a function'));
       return;
     }
 
@@ -252,10 +257,29 @@ export default class Functions {
   };
 
   processHttpRequest(rawOptions, context) {
+    const allowedResponseTypes = new Set(['text', 'json', 'arraybuffer']);
+
+    if (rawOptions.responseType && !allowedResponseTypes.has(rawOptions.responseType)) {
+      throw new HostError(`unsupported responseType: ${rawOptions.responseType}`);
+    }
+
+    const rawUrl = rawOptions.uri ?? rawOptions.url;
+    if (typeof rawUrl === 'string') {
+      let parsed: URL;
+      try {
+        parsed = new URL(rawUrl);
+      } catch {
+        throw new HostError('invalid url');
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new HostError(`unsupported protocol: ${parsed.protocol}`);
+      }
+    }
+
     const options = {
       method: rawOptions.method ?? 'GET',
-      url: rawOptions.uri ?? rawOptions.url,
-      ...(rawOptions.proxy ? { proxy: rawOptions.proxy } : {}),
+      url: rawUrl,
+      proxy: false as const,
       ...(rawOptions.headers ? { headers: rawOptions.headers } : {}),
       ...(rawOptions.params ? { params: rawOptions.params } : {}),
       ...(rawOptions.form ? { data: rawOptions.form } : {}),
