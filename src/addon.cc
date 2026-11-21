@@ -3,10 +3,10 @@
 static void Init(
   v8::Local<v8::Object> exports,
   v8::Local<v8::Value>,
-  v8::Local<v8::Context>,
+  v8::Local<v8::Context> context,
   void*
 ) {
-  Sandbox::Init(exports);
+  Sandbox::Init(exports, context);
 }
 
 NODE_MODULE_CONTEXT_AWARE(sandbox, Init)

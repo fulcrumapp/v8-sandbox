@@ -17,7 +17,7 @@ typedef Baton<Sandbox> AsyncOperation;
 
 class Sandbox : public node::ObjectWrap {
 public:
-  static void Init(v8::Local<v8::Object> exports);
+  static void Init(v8::Local<v8::Object> exports, v8::Local<v8::Context> context);
 
 private:
   explicit Sandbox();
@@ -90,8 +90,6 @@ private:
   uv_loop_t *loop_;
 
   std::map<int, std::shared_ptr<AsyncOperation>> pendingOperations_;
-
-  static v8::Global<v8::Function> constructor;
 
   static void AllocateBuffer(uv_handle_t *handle, size_t size, uv_buf_t *buffer);
 

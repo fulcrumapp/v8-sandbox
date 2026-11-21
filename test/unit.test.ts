@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { describe, it } from 'vitest';
 import once from '../lib/once';
 import Queue from '../lib/queue';
+import SandboxCluster from '../lib/cluster/cluster';
 import Timer from '../lib/host/timer';
 import Socket from '../lib/host/socket';
 
@@ -130,6 +131,41 @@ describe('Queue', () => {
 
     assert.deepEqual(started, [1]);
     assert.deepEqual(callbacks, []);
+  });
+
+  it('rejects invalid concurrency values immediately', () => {
+    for (const invalid of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+      assert.throws(() => new Queue(async () => {}, invalid), RangeError);
+    }
+
+    assert.throws(() => new SandboxCluster({ workers: 0 }), RangeError);
+  });
+
+  it('drains a large synchronous backlog without overflowing the call stack', async () => {
+    const count = 10000;
+    let processed = 0;
+
+    const queue = new Queue<number>((item, done) => {
+      if (item === 0) {
+        setTimeout(() => {
+          processed += 1;
+          done(item);
+        }, 5);
+      } else {
+        processed += 1;
+        done(item);
+      }
+    }, 1);
+
+    const lastCompleted = new Promise<number>((resolve) => {
+      for (let i = 0; i < count; i += 1) {
+        queue.push(i, i === count - 1 ? resolve : undefined);
+      }
+    });
+
+    const lastValue = await lastCompleted;
+    assert.equal(lastValue, count - 1);
+    assert.equal(processed, count);
   });
 });
 

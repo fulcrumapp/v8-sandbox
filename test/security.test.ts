@@ -808,5 +808,103 @@ describe('v8-sandbox security', () => {
         await sandbox.shutdown();
       }
     });
+
+    it('preserves caller frames below Array.prototype.map builtin without leaking host frames', async () => {
+      const sandbox = new Sandbox({ debug: false });
+      try {
+        const { error } = await sandbox.execute({
+          code: `
+            function outerCaller() {
+              return [1].map(function innerCallback() {
+                throw new Error('map-boom');
+              });
+            }
+            outerCaller();
+          `,
+          timeout: 3000,
+        });
+
+        assert.ok(error);
+        assert.match(error.stack || '', /Error: map-boom/);
+        assert.match(error.stack || '', /innerCallback/);
+        assert.match(error.stack || '', /Array\.map/);
+        assert.match(error.stack || '', /outerCaller/);
+        assert.doesNotMatch(error.stack || '', /worker\.js/);
+        assert.doesNotMatch(error.stack || '', /node:events/);
+        assert.doesNotMatch(error.stack || '', /node:internal/);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('preserves embedded NUL bytes in Error.stack without truncating message or frames', async () => {
+      const sandbox = new Sandbox({ debug: false });
+      try {
+        const { value, error } = await sandbox.execute({
+          code: `
+            function nulCaller() {
+              const obj = {
+                ['meth\\0od']() {
+                  return new Error('before\\0after').stack;
+                },
+              };
+              return obj['meth\\0od']();
+            }
+            setResult({ value: nulCaller() });
+          `,
+          timeout: 3000,
+        });
+
+        assert.equal(error, undefined);
+        assert.equal(typeof value, 'string');
+        assert.match(value, /Error: before\0after/);
+        assert.match(value, /meth\0od/);
+        assert.match(value, /nulCaller/);
+        assert.doesNotMatch(value, /worker\.js/);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('keeps stack filtering active for deferred Promise continuations with Error.prepareStackTrace override', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const { value, error } = await sandbox.execute({
+          code: `
+            let overrideCalled = false;
+            Error.prepareStackTrace = (_err, sites) => {
+              overrideCalled = true;
+              return sites.map((s) => (s.getFileName ? s.getFileName() : String(s))).join('\\n');
+            };
+            const sab = new SharedArrayBuffer(4);
+            const i32 = new Int32Array(sab);
+            let timer;
+            Atomics.waitAsync(i32, 0, 0, 20).value.then(() => {
+              clearTimeout(timer);
+              const stack = new Error('deferred-override-probe').stack;
+              setResult({
+                value: {
+                  overrideCalled,
+                  stack: typeof stack === 'string' ? stack : JSON.stringify(stack),
+                },
+              });
+            });
+            timer = setTimeout(() => {
+              setResult({ value: { timedOut: true } });
+            }, 2000);
+          `,
+          timeout: 3000,
+        });
+
+        assert.equal(error, undefined);
+        assert.equal(value.overrideCalled, false);
+        assert.match(value.stack, /Error: deferred-override-probe/);
+        assert.doesNotMatch(value.stack, /worker\.js/);
+        assert.doesNotMatch(value.stack, /node:events/);
+        assert.doesNotMatch(value.stack, /node:internal/);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
   });
 });

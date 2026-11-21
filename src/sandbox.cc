@@ -32,6 +32,18 @@ inline Local<Private> SandboxPrivateKey(Isolate* isolate) {
   return Private::ForApi(isolate, NewUtf8String(isolate, "sandbox"));
 }
 
+inline Local<Private> SandboxContextMarkerKey(Isolate* isolate) {
+  return Private::ForApi(isolate, NewUtf8String(isolate, "sandbox_context"));
+}
+
+struct SandboxAddonData {
+  Global<Function> constructor;
+};
+
+void DeleteAddonData(void* arg) {
+  delete static_cast<SandboxAddonData*>(arg);
+}
+
 inline std::string JsonEscape(const std::string& input) {
   std::string out;
   out.reserve(input.size() + 8);
@@ -59,8 +71,6 @@ inline std::string JsonEscape(const std::string& input) {
 
 }  // namespace
 
-Global<Function> Sandbox::constructor;
-
 Sandbox::Sandbox()
   : messageId_(0),
     result_(""),
@@ -77,12 +87,19 @@ Sandbox::~Sandbox() {
   Disconnect();
 }
 
-void Sandbox::Init(Local<Object> exports) {
+void Sandbox::Init(Local<Object> exports, Local<Context> context) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
-  Local<Context> context = isolate->GetCurrentContext();
 
-  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
+  auto* addonData = new SandboxAddonData();
+
+#if V8_MAJOR_VERSION >= 14
+  Local<External> externalData = External::New(isolate, addonData, v8::kExternalPointerTypeTagDefault);
+#else
+  Local<External> externalData = External::New(isolate, addonData);
+#endif
+
+  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New, externalData);
 
   tpl->SetClassName(NewUtf8String(isolate, "Sandbox"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
@@ -97,7 +114,10 @@ void Sandbox::Init(Local<Object> exports) {
 
   Local<Function> function = tpl->GetFunction(context).ToLocalChecked();
 
-  constructor.Reset(isolate, function);
+  addonData->constructor.Reset(isolate, function);
+  node::AddEnvironmentCleanupHook(isolate, DeleteAddonData, addonData);
+
+  isolate->SetPrepareStackTraceCallback(PrepareStackTrace);
 
   exports->Set(context, NewUtf8String(isolate, "Sandbox"), function).Check();
 }
@@ -121,7 +141,13 @@ void Sandbox::New(const FunctionCallbackInfo<Value>& info) {
   else {
     const int argc = 1;
     Local<Value> argv[argc] = { info[0] };
-    Local<Function> cons = Local<Function>::New(isolate, constructor);
+    Local<External> externalData = info.Data().As<External>();
+#if V8_MAJOR_VERSION >= 14
+    auto* addonData = static_cast<SandboxAddonData*>(externalData->Value(v8::kExternalPointerTypeTagDefault));
+#else
+    auto* addonData = static_cast<SandboxAddonData*>(externalData->Value());
+#endif
+    Local<Function> cons = Local<Function>::New(isolate, addonData->constructor);
     Local<Object> instance;
     if (cons->NewInstance(context, argc, argv).ToLocal(&instance)) {
       info.GetReturnValue().Set(instance);
@@ -260,6 +286,7 @@ void Sandbox::Initialize(Isolate* isolate) {
 #endif
 
   global->SetPrivate(context, SandboxPrivateKey(isolate), external).Check();
+  global->SetPrivate(context, SandboxContextMarkerKey(isolate), True(isolate)).Check();
   global->Set(context, NewUtf8String(isolate, "global"), global).Check();
 
   Local<Function> dispatchFn = FunctionTemplate::New(isolate, Dispatch)
@@ -327,18 +354,32 @@ MaybeLocal<Value> Sandbox::PrepareStackTrace(
   Isolate* isolate = Isolate::GetCurrent();
   EscapableHandleScope scope(isolate);
 
+  bool isSandboxContext = false;
+  if (!context.IsEmpty()) {
+    isSandboxContext = context->Global()
+      ->HasPrivate(context, SandboxContextMarkerKey(isolate))
+      .FromMaybe(false);
+  }
+
+  if (!isSandboxContext) {
+    Local<Value> hostResult;
+    if (node::PrepareStackTraceCallback(context, error, sites).ToLocal(&hostResult)) {
+      return scope.Escape(hostResult);
+    }
+    return MaybeLocal<Value>();
+  }
+
   std::string result;
 
   Local<String> errorStr;
   if (error->ToString(context).ToLocal(&errorStr)) {
     String::Utf8Value utf8(isolate, errorStr);
     if (*utf8) {
-      result = *utf8;
+      result.assign(*utf8, utf8.length());
     }
   }
 
   Local<String> getFileNameKey = NewUtf8String(isolate, "getFileName");
-  Local<String> isEvalKey = NewUtf8String(isolate, "isEval");
 
   uint32_t length = sites->Length();
   for (uint32_t i = 0; i < length; ++i) {
@@ -349,31 +390,22 @@ MaybeLocal<Value> Sandbox::PrepareStackTrace(
 
     Local<Object> site = siteVal.As<Object>();
 
-    bool isSandboxFrame = false;
+    bool isHostFrame = false;
 
     Local<Value> getFileNameVal;
     if (site->Get(context, getFileNameKey).ToLocal(&getFileNameVal) && getFileNameVal->IsFunction()) {
       Local<Value> fileNameVal;
       if (getFileNameVal.As<Function>()->Call(context, site, 0, nullptr).ToLocal(&fileNameVal) && fileNameVal->IsString()) {
         String::Utf8Value fileName(isolate, fileNameVal);
-        if (*fileName && std::strcmp(*fileName, "script") == 0) {
-          isSandboxFrame = true;
-        }
-      }
-    }
-
-    if (!isSandboxFrame) {
-      Local<Value> isEvalVal;
-      if (site->Get(context, isEvalKey).ToLocal(&isEvalVal) && isEvalVal->IsFunction()) {
-        Local<Value> evalResult;
-        if (isEvalVal.As<Function>()->Call(context, site, 0, nullptr).ToLocal(&evalResult) && evalResult->BooleanValue(isolate)) {
-          isSandboxFrame = true;
+        if (!*fileName || fileName.length() != 6 || std::memcmp(*fileName, "script", 6) != 0) {
+          isHostFrame = true;
         }
       }
     }
 
     // Stop at the first host/Node.js frame so sandbox stack traces never leak host paths.
-    if (!isSandboxFrame) {
+    // Builtin frames (e.g., Array.map) and eval frames have null/undefined fileName and are preserved.
+    if (isHostFrame) {
       break;
     }
 
@@ -382,7 +414,7 @@ MaybeLocal<Value> Sandbox::PrepareStackTrace(
       String::Utf8Value utf8(isolate, siteStr);
       if (*utf8) {
         result += "\n    at ";
-        result += *utf8;
+        result.append(*utf8, utf8.length());
       }
     }
   }
@@ -403,8 +435,6 @@ void Sandbox::Execute(Isolate* isolate, int messageId, const char *code) {
 
   ScriptOrigin origin(NewUtf8String(isolate, "script"));
 
-  isolate->SetPrepareStackTraceCallback(PrepareStackTrace);
-
   MaybeLocal<Script> script = Script::Compile(context, NewUtf8String(isolate, code), &origin);
 
   if (!tryCatch.HasCaught()) {
@@ -417,8 +447,6 @@ void Sandbox::Execute(Isolate* isolate, int messageId, const char *code) {
   isolate->PerformMicrotaskCheckpoint();
 
   MaybeHandleError(isolate, tryCatch, context);
-
-  isolate->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
 void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const char *args) {
@@ -445,8 +473,6 @@ void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const ch
 
   Local<Function> callback = Local<Function>::New(isolate, *operation->callback);
 
-  isolate->SetPrepareStackTraceCallback(PrepareStackTrace);
-
   if (callback->IsFunction()) {
     Local<Value> argv[] = {
       NewUtf8String(isolate, args)
@@ -460,8 +486,6 @@ void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const ch
   isolate->PerformMicrotaskCheckpoint();
 
   MaybeHandleError(isolate, tryCatch, context);
-
-  isolate->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
 void Sandbox::Cancel(int messageId, int callbackId) {
