@@ -121,7 +121,7 @@ export default class Socket {
       });
 
       try {
-        if (invocation == null) {
+        if (invocation == null || typeof invocation !== 'object' || Array.isArray(invocation)) {
           throw new HostError('invalid dispatch');
         }
 

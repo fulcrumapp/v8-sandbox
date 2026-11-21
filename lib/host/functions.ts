@@ -46,12 +46,12 @@ export default class Functions {
     global.define = this.define;
     global.defineAsync = this.defineAsync;
 
-    this.syncFunctions = {};
-    this.asyncFunctions = {};
+    this.syncFunctions = Object.create(null);
+    this.asyncFunctions = Object.create(null);
 
     if (this.require) {
-      SYNC_FUNCTIONS[this.require] ??= {};
-      ASYNC_FUNCTIONS[this.require] ??= {};
+      SYNC_FUNCTIONS[this.require] ??= Object.create(null);
+      ASYNC_FUNCTIONS[this.require] ??= Object.create(null);
 
       this.syncFunctions = SYNC_FUNCTIONS[this.require];
       this.asyncFunctions = ASYNC_FUNCTIONS[this.require];
@@ -123,9 +123,10 @@ export default class Functions {
         break;
       }
       default: {
-        const fn = this.syncFunctions[name] ?? this.asyncFunctions[name];
+        const fn = (Object.hasOwn(this.syncFunctions, name) ? this.syncFunctions[name] : null)
+          ?? (Object.hasOwn(this.asyncFunctions, name) ? this.asyncFunctions[name] : null);
 
-        if (fn) {
+        if (typeof fn === 'function') {
           fn(...params);
         } else {
           throw new HostError(`${name} is not a valid method`);

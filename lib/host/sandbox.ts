@@ -169,7 +169,9 @@ export default class Sandbox {
         timeout,
         output: [],
         callback: (result: Result) => {
-          this.initialized = true;
+          if (!result?.error) {
+            this.initialized = true;
+          }
 
           resolve(result);
         },
