@@ -3,19 +3,14 @@ import once from '../once';
 import { ChildProcess } from 'child_process';
 import Sandbox, { HostError } from './sandbox';
 
+const MAX_IPC_FRAME_BYTES = 64 * 1024 * 1024;
+
 function tryParseJSON(value) {
   try {
     return JSON.parse(value);
   } catch (ex) {
     return null;
   }
-}
-
-interface Packet {
-  messageId: number;
-  callbackId: number;
-  length: number;
-  data: Buffer;
 }
 
 export default class Socket {
@@ -27,12 +22,14 @@ export default class Socket {
 
   closed: boolean;
 
-  packet: Packet;
+  buffer: Buffer;
 
   constructor(socket, sandbox) {
     this.sandbox = sandbox;
     this.worker = sandbox.worker;
     this.socket = socket;
+    this.closed = false;
+    this.buffer = Buffer.alloc(0);
     this.socket.on('data', this.handleData);
     this.socket.on('end', this.handleEnd);
     this.socket.on('close', this.handleClose);
@@ -54,25 +51,29 @@ export default class Socket {
     return !this.closed && this.worker === this.sandbox.worker;
   }
 
-  handleData = (rawData) => {
-    if (!this.packet) {
-      this.packet = {
-        messageId: rawData.readInt32BE(0),
-        callbackId: rawData.readInt32BE(4),
-        length: rawData.readInt32BE(8),
-        data: rawData.subarray(12),
-      };
-    } else {
-      this.packet.data = Buffer.concat([this.packet.data, rawData]);
-    }
+  handleData = (rawData: Buffer) => {
+    this.buffer = this.buffer.length === 0 ? rawData : Buffer.concat([this.buffer, rawData]);
 
-    if (this.packet.data.length === this.packet.length) {
-      const { messageId, callbackId, data } = this.packet;
+    while (this.buffer.length >= 12) {
+      const messageId = this.buffer.readInt32BE(0);
+      const callbackId = this.buffer.readInt32BE(4);
+      const length = this.buffer.readInt32BE(8);
+
+      if (length < 0 || length > MAX_IPC_FRAME_BYTES) {
+        this.closed = true;
+        this.buffer = Buffer.alloc(0);
+        this.socket.destroy();
+        return;
+      }
+
+      if (this.buffer.length < 12 + length) {
+        return;
+      }
+
+      const data = this.buffer.subarray(12, 12 + length);
+      this.buffer = this.buffer.subarray(12 + length);
 
       const json = data.toString('utf8');
-
-      this.packet = null;
-
       const invocation = tryParseJSON(json);
 
       const callback = callbackId > 0 ? once(((...args) => {
@@ -88,11 +89,27 @@ export default class Socket {
       })) : null;
 
       const write = once((result) => {
-        const string = JSON.stringify({ result: result ?? { value: undefined } });
-        const length = Buffer.byteLength(string, 'utf8');
-        const buffer = Buffer.alloc(length + 4);
+        let string: string;
+        try {
+          string = JSON.stringify({ result: result ?? { value: undefined } });
+        } catch (serializationError) {
+          string = JSON.stringify({
+            result: {
+              error: {
+                isHost: true,
+                name: 'Error',
+                message: serializationError instanceof Error
+                  ? serializationError.message
+                  : 'failed to serialize response',
+              },
+            },
+          });
+        }
 
-        buffer.writeInt32BE(length);
+        const byteLength = Buffer.byteLength(string, 'utf8');
+        const buffer = Buffer.alloc(byteLength + 4);
+
+        buffer.writeInt32BE(byteLength);
         buffer.write(string, 4);
 
         if (this.isConnected) {
@@ -109,15 +126,24 @@ export default class Socket {
           cancel();
         }
 
-        write({
-          error: {
-            ...error,
-            isHost: true,
-            name: error.name,
-            message: error.message,
-            ...(this.sandbox.debug ? { stack: error.stack } : {}),
-          },
-        });
+        const err = error != null && typeof error === 'object'
+          ? error
+          : new HostError(error != null ? String(error) : 'host error');
+
+        const payload: Record<string, any> = {
+          ...err,
+          isHost: true,
+          name: err.name,
+          message: err.message,
+        };
+
+        if (this.sandbox.debug && err.stack) {
+          payload.stack = err.stack;
+        } else {
+          delete payload.stack;
+        }
+
+        write({ error: payload });
       });
 
       try {

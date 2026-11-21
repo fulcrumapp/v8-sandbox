@@ -1,6 +1,7 @@
 import path from 'path';
 import net from 'net';
 import fs from 'fs';
+import os from 'os';
 import { fork, ChildProcess } from 'child_process';
 import { randomInt } from 'crypto';
 import { onExit } from 'signal-exit';
@@ -48,6 +49,7 @@ export interface Message {
   context?: object;
   output: Log[];
   timeout?: number;
+  result?: Result | null;
   callback: Function;
 }
 
@@ -128,7 +130,9 @@ export default class Sandbox {
 
   gid: number | null;
 
-  socketPath: string;
+  socketPath: string | null;
+
+  privateSocketDir: string | null = null;
 
   result: Result;
 
@@ -143,7 +147,7 @@ export default class Sandbox {
     this.argv = argv ?? [];
     this.uid = uid ?? null;
     this.gid = gid ?? null;
-    this.socketPath = socketPath ?? '/tmp';
+    this.socketPath = socketPath ?? null;
     this.debug = debug ?? false;
 
     this.template = template || '';
@@ -157,8 +161,6 @@ export default class Sandbox {
   }
 
   initialize({ timeout } = { timeout: null }): Promise<Result> {
-    this.setResult(null);
-
     this.functions.setup();
 
     return new Promise<Result>((resolve) => {
@@ -168,11 +170,8 @@ export default class Sandbox {
         template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
         timeout,
         output: [],
+        result: null,
         callback: (result: Result) => {
-          if (!result?.error) {
-            this.initialized = true;
-          }
-
           resolve(result);
         },
       });
@@ -183,34 +182,44 @@ export default class Sandbox {
     code, timeout, globals, context,
   }: ExecutionOptions): Promise<Result> {
     this.start();
-
-    const result = await this.initialize({ timeout });
-
-    if (result.error) {
-      return result;
-    }
+    this.functions.setup();
 
     return new Promise<Result>((resolve) => {
       this.queue.push({
         id: nextMessageId(),
         type: 'execute',
+        template: [this.functions.defines().join('\n'), this.template].join('\n').trim(),
         code,
         timeout,
         globals: globals ?? {},
         context: context ?? {},
         output: [],
+        result: null,
         callback: (res: Result) => {
-          this.initialized = false;
-
           resolve(res);
         },
       });
     });
   }
 
+  get socketDir() {
+    if (this.socketPath) {
+      return this.socketPath;
+    }
+
+    if (!this.privateSocketDir) {
+      this.privateSocketDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v8-sandbox-'));
+      if (process.platform !== 'win32') {
+        fs.chmodSync(this.privateSocketDir, this.uid != null || this.gid != null ? 0o750 : 0o700);
+      }
+    }
+
+    return this.privateSocketDir;
+  }
+
   get socketName() {
     return process.platform === 'win32' ? path.join('\\\\?\\pipe', process.cwd(), this.id)
-      : `${this.socketPath}/${this.id}`;
+      : path.join(this.socketDir, this.id);
   }
 
   dispatch(messageId, invocation, {
@@ -269,12 +278,33 @@ export default class Sandbox {
     }
   }
 
-  cleanupSocket() {
-    try {
-      fs.unlinkSync(this.socketName);
-    } catch (ex) {
-      // silent
+  removeSocketPaths(socketFile: string | null, privateDir: string | null) {
+    if (socketFile) {
+      try {
+        fs.unlinkSync(socketFile);
+      } catch (ex) {
+        // silent
+      }
     }
+
+    if (privateDir) {
+      try {
+        fs.rmSync(privateDir, { recursive: true, force: true });
+      } catch (ex) {
+        // silent
+      }
+    }
+  }
+
+  cleanupSocket(removePrivateDir = false) {
+    const socketFile = this.socketPath || this.privateSocketDir ? this.socketName : null;
+    const privateDir = removePrivateDir ? this.privateSocketDir : null;
+
+    if (removePrivateDir) {
+      this.privateSocketDir = null;
+    }
+
+    this.removeSocketPaths(socketFile, privateDir);
   }
 
   start() {
@@ -313,11 +343,22 @@ export default class Sandbox {
       }
 
       if (this.server) {
-        this.server.close(resolve);
-
-        this.cleanupSocket();
+        const oldServer = this.server;
+        const oldSocket = this.socketPath || this.privateSocketDir ? this.socketName : null;
+        const oldPrivateDir = this.privateSocketDir;
 
         this.server = null;
+        this.privateSocketDir = null;
+
+        this.removeSocketPaths(oldSocket, oldPrivateDir);
+
+        oldServer.close(() => {
+          this.removeSocketPaths(oldSocket, oldPrivateDir);
+          resolve(undefined);
+        });
+      } else {
+        this.cleanupSocket(true);
+        resolve(undefined);
       }
     });
   }
@@ -346,28 +387,63 @@ export default class Sandbox {
     this.worker.send({ messageId, type: 'cancel', callbackId });
   }
 
-  processMessage = async (message: Message) => {
+  runSinglePhase(message: Message, trigger: () => void): Promise<Result> {
     this.message = message;
 
-    return new Promise<void>((resolve) => {
-      const { callback } = this.message;
-
+    return new Promise<Result>((resolve) => {
       this.message.callback = once((result) => {
-        callback(result);
-        resolve();
+        resolve(result);
       });
 
-      switch (message.type) {
-        case 'initialize':
-          this.onInitialize(message);
-          break;
-        case 'execute':
-          this.onExecute(message);
-          break;
-        default:
-          this.finish({ error: new HostError('invalid message') });
-      }
+      trigger();
     });
+  }
+
+  processMessage = async (message: Message) => {
+    const outerCallback = message.callback;
+
+    if (message.type === 'initialize') {
+      const result = await this.runSinglePhase(message, () => this.onInitialize(message));
+      if (!result?.error) {
+        this.initialized = true;
+      }
+      outerCallback(result);
+      return;
+    }
+
+    if (message.type === 'execute') {
+      if (!this.initialized) {
+        const initMessage: Message = {
+          id: nextMessageId(),
+          type: 'initialize',
+          template: message.template,
+          timeout: message.timeout,
+          output: [],
+          result: null,
+          callback: () => {},
+        };
+
+        const initResult = await this.runSinglePhase(initMessage, () => this.onInitialize(initMessage));
+
+        if (initResult?.error) {
+          this.initialized = false;
+          outerCallback(initResult);
+          return;
+        }
+
+        this.initialized = true;
+      }
+
+      const execResult = await this.runSinglePhase(message, () => this.onExecute(message));
+      this.initialized = false;
+      outerCallback(execResult);
+      return;
+    }
+
+    const result = await this.runSinglePhase(message, () => {
+      this.finish({ error: new HostError('invalid message') });
+    });
+    outerCallback(result);
   };
 
   onInitialize({ id, template, timeout }: Message) {
@@ -393,10 +469,26 @@ export default class Sandbox {
 
   setResult(result) {
     this.result = result;
+    if (this.message) {
+      this.message.result = result;
+    }
   }
 
   finish(result) {
-    const finishResult = result ?? this.result;
+    const rawResult = result ?? this.message?.result;
+    let finishResult = rawResult;
+
+    if (rawResult?.error?.isHost && !this.debug) {
+      const err = rawResult.error;
+      const sanitized: Record<string, any> = {
+        name: err.name,
+        message: err.message,
+        isHost: true,
+        ...(err.isTimeout ? { isTimeout: true } : {}),
+        ...(err.code ? { code: err.code } : {}),
+      };
+      finishResult = { ...rawResult, error: sanitized };
+    }
 
     this.functions.clearTimers();
 
@@ -406,6 +498,11 @@ export default class Sandbox {
   }
 
   handleConnection = (socket) => {
+    if (this.socket && this.socket.isConnected) {
+      socket.destroy();
+      return;
+    }
+
     this.socket = new Socket(socket, this);
   };
 

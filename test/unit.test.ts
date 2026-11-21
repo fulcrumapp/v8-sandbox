@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { describe, it } from 'vitest';
 import once from '../lib/once';
 import Queue from '../lib/queue';
 import Timer from '../lib/host/timer';
+import Socket from '../lib/host/socket';
 
 describe('once', () => {
   it('invokes the wrapped function only once and caches the result', () => {
@@ -162,5 +164,106 @@ describe('Timer', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 70));
     assert.equal(fired, false);
+  });
+});
+
+describe('Socket IPC framing', () => {
+  function makeMockSocket() {
+    const emitter = new EventEmitter() as any;
+    emitter.written = [] as Buffer[];
+    emitter.destroyed = false;
+    emitter.write = (buf: Buffer) => {
+      emitter.written.push(buf);
+      return true;
+    };
+    emitter.end = () => {};
+    emitter.unref = () => {};
+    emitter.resume = () => {};
+    emitter.destroy = () => {
+      emitter.destroyed = true;
+    };
+    return emitter;
+  }
+
+  function encodeFrame(messageId: number, callbackId: number, payload: string): Buffer {
+    const body = Buffer.from(payload, 'utf8');
+    const buf = Buffer.alloc(12 + body.length);
+    buf.writeInt32BE(messageId, 0);
+    buf.writeInt32BE(callbackId, 4);
+    buf.writeInt32BE(body.length, 8);
+    body.copy(buf, 12);
+    return buf;
+  }
+
+  it('handles split headers (1 byte + 11 bytes + body) without throwing', () => {
+    const rawSocket = makeMockSocket();
+    const dispatched: any[] = [];
+    const fakeSandbox: any = {
+      worker: {},
+      debug: false,
+      dispatch(messageId: number, invocation: any, { respond }: any) {
+        dispatched.push({ messageId, invocation });
+        respond('ok');
+      },
+    };
+
+    const sock = new Socket(rawSocket, fakeSandbox);
+    const frame = encodeFrame(7, 0, JSON.stringify({ name: 'ping', args: [1] }));
+
+    assert.doesNotThrow(() => {
+      rawSocket.emit('data', frame.subarray(0, 1));
+      rawSocket.emit('data', frame.subarray(1, 12));
+      rawSocket.emit('data', frame.subarray(12));
+    });
+
+    assert.equal(dispatched.length, 1);
+    assert.deepEqual(dispatched[0], { messageId: 7, invocation: { name: 'ping', args: [1] } });
+    sock.shutdown();
+  });
+
+  it('handles two coalesced frames in a single data chunk', () => {
+    const rawSocket = makeMockSocket();
+    const dispatched: any[] = [];
+    const fakeSandbox: any = {
+      worker: {},
+      debug: false,
+      dispatch(messageId: number, invocation: any, { respond }: any) {
+        dispatched.push({ messageId, invocation });
+        respond('ok');
+      },
+    };
+
+    const sock = new Socket(rawSocket, fakeSandbox);
+    const combined = Buffer.concat([
+      encodeFrame(1, 0, JSON.stringify({ name: 'a', args: [] })),
+      encodeFrame(2, 0, JSON.stringify({ name: 'b', args: [] })),
+    ]);
+
+    assert.doesNotThrow(() => {
+      rawSocket.emit('data', combined);
+    });
+
+    assert.equal(dispatched.length, 2);
+    assert.equal(dispatched[0].invocation.name, 'a');
+    assert.equal(dispatched[1].invocation.name, 'b');
+    sock.shutdown();
+  });
+
+  it('rejects negative and oversized frame lengths by destroying the socket without throwing', () => {
+    for (const badLength of [-1, 0x7fffffff]) {
+      const rawSocket = makeMockSocket();
+      const fakeSandbox: any = { worker: {}, debug: false, dispatch() {} };
+      new Socket(rawSocket, fakeSandbox);
+
+      const badHeader = Buffer.alloc(12);
+      badHeader.writeInt32BE(1, 0);
+      badHeader.writeInt32BE(0, 4);
+      badHeader.writeInt32BE(badLength, 8);
+
+      assert.doesNotThrow(() => {
+        rawSocket.emit('data', badHeader);
+      });
+      assert.equal(rawSocket.destroyed, true);
+    }
   });
 });

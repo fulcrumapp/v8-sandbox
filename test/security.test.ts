@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -510,6 +513,299 @@ describe('v8-sandbox security', () => {
         }
       } finally {
         cluster.shutdown();
+      }
+    });
+  });
+
+  describe('security review regressions (findings #1-#10)', () => {
+    it('#1: concurrent execute() on a single Sandbox isolates V8 context, globals, prototypes, and results', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const [resA, resB] = await Promise.all([
+          sandbox.execute({
+            globals: { apiKeyA: 'sk-live-secret-A' },
+            code: `
+              global.leakedFromA = 'SUPER_SECRET';
+              Object.prototype.pollutedByA = 'pwned';
+              setTimeout(() => setResult({ value: 'done-A' }), 40);
+            `,
+            timeout: 3000,
+          }),
+          sandbox.execute({
+            code: `
+              setResult({
+                value: {
+                  leakedFromA: typeof global.leakedFromA,
+                  apiKeyA: typeof global.apiKeyA,
+                  pollutedByA: ({}).pollutedByA ?? null,
+                },
+              });
+            `,
+            timeout: 3000,
+          }),
+        ]);
+
+        assert.equal(resA.error, undefined);
+        assert.equal(resA.value, 'done-A');
+        assert.equal(resB.error, undefined);
+        assert.deepEqual(resB.value, {
+          leakedFromA: 'undefined',
+          apiKeyA: 'undefined',
+          pollutedByA: null,
+        });
+
+        // Also ensure a subsequent call that does NOT call setResult never receives A's result
+        const [first, second] = await Promise.all([
+          sandbox.execute({ code: 'setResult({ value: "sentinel-1" });', timeout: 3000 }),
+          sandbox.execute({ code: '1 + 1;', timeout: 3000 }),
+        ]);
+        assert.equal(first.value, 'sentinel-1');
+        assert.equal(second.value, undefined);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#2: stale context callbacks via Atomics.waitAsync cannot hijack later executions or steal context', async () => {
+      const sandbox = new Sandbox({ require: REQUIRE_EXTRA });
+      try {
+        const resA = await sandbox.execute({
+          code: `
+            const sab = new SharedArrayBuffer(4);
+            const i32 = new Int32Array(sab);
+            Atomics.waitAsync(i32, 0, 0, 120).value.then(() => {
+              const stolen = echoContextDelayed(0);
+              console.log('leaked-from-A');
+              setResult({ value: { hijackedBy: 'A', stolen } });
+            });
+            setResult({ value: 'A' });
+          `,
+          context: { tenant: 'A' },
+          timeout: 3000,
+        });
+        assert.equal(resA.value, 'A');
+
+        const resB = await sandbox.execute({
+          code: `
+            setResult({ value: 'B' });
+            setTimeout(() => {}, 300);
+          `,
+          context: { tenant: 'B', apiToken: 'secret-B-token' },
+          timeout: 3000,
+        });
+
+        assert.equal(resB.error, undefined);
+        assert.equal(resB.value, 'B');
+        assert.equal(resB.output?.some((o) => o.message.includes('leaked-from-A')), false);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#3: setTimeout(null, 1) does not crash the host process', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const { value, error } = await sandbox.execute({
+          code: `
+            const errors = [];
+            for (const bad of [null, undefined, 'code', 123]) {
+              try {
+                setTimeout(bad, 1);
+                errors.push('no-error');
+              } catch (err) {
+                errors.push(err.message);
+              }
+            }
+            setTimeout(() => setResult({ value: errors }), 20);
+          `,
+          timeout: 3000,
+        });
+
+        assert.equal(error, undefined);
+        assert.deepEqual(value, [
+          'callback must be a function',
+          'callback must be a function',
+          'callback must be a function',
+          'callback must be a function',
+        ]);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#4: native addon callback/cancel with unknown callbackId does not abort', () => {
+      const nativePath = path.join(__dirname, '..', 'build', 'Release', 'sandbox.node');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Sandbox: NativeSandbox } = require(nativePath);
+      const native = new NativeSandbox('/tmp/unused-native-test.sock');
+      native.initialize();
+      assert.doesNotThrow(() => {
+        native.callback(1, 99999, '[]');
+        native.cancel(1, 99999);
+      });
+    });
+
+    it('#6: default UNIX socket is created in a private 0700 directory and rejects extra connections', async () => {
+      if (process.platform === 'win32') return;
+      const sandbox = new Sandbox();
+      try {
+        const { value, error } = await sandbox.execute({
+          code: 'setResult({ value: 1 });',
+          timeout: 3000,
+        });
+        assert.equal(error, undefined);
+        assert.equal(value, 1);
+
+        const dirStat = fs.statSync(path.dirname(sandbox.socketName));
+        assert.equal(dirStat.mode & 0o777, 0o700);
+
+        // An extra unauthenticated client connecting and writing 1 byte must NOT hijack or crash the host
+        const rogue = net.createConnection(sandbox.socketName);
+        await new Promise<void>((resolve) => {
+          rogue.on('close', () => resolve());
+          rogue.on('error', () => resolve());
+          rogue.write(Buffer.from([0x01]));
+        });
+
+        const after = await sandbox.execute({
+          code: 'setResult({ value: 2 });',
+          timeout: 3000,
+        });
+        assert.equal(after.error, undefined);
+        assert.equal(after.value, 2);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#7: httpRequest ignores sandbox proxy override and rejects responseType stream without deadlocking', async () => {
+      const secretServer = http.createServer((_req, res) => {
+        res.end('internal-secret');
+      });
+      await new Promise<void>((resolve) => secretServer.listen(0, '127.0.0.1', () => resolve()));
+      const addr = secretServer.address() as net.AddressInfo;
+
+      const sandbox = new Sandbox();
+      try {
+        const proxyAttempt = await sandbox.execute({
+          code: `
+            try {
+              const res = httpRequest({
+                url: 'http://example.invalid/meta',
+                proxy: { protocol: 'http', host: '127.0.0.1', port: ${addr.port} },
+                timeout: 500,
+              });
+              setResult({ value: res.body });
+            } catch (err) {
+              setResult({ value: { blocked: true, message: err.message } });
+            }
+          `,
+          timeout: 3000,
+        });
+        assert.equal(proxyAttempt.error, undefined);
+        assert.notEqual(proxyAttempt.value, 'internal-secret');
+        assert.equal(proxyAttempt.value.blocked, true);
+
+        const streamAttempt = await sandbox.execute({
+          code: `
+            try {
+              httpRequest({
+                url: 'http://127.0.0.1:${addr.port}/',
+                responseType: 'stream',
+              });
+              setResult({ value: 'unexpected-success' });
+            } catch (err) {
+              setResult({ value: { rejected: true, message: err.message } });
+            }
+          `,
+          timeout: 3000,
+        });
+        assert.equal(streamAttempt.error, undefined);
+        assert.equal(streamAttempt.value.rejected, true);
+      } finally {
+        await sandbox.shutdown();
+        await new Promise<void>((resolve) => secretServer.close(() => resolve()));
+      }
+    });
+
+    it('#8: throwing non-JSON-serializable values or polluted Object.prototype setters does not abort worker or leak host paths', async () => {
+      const sandbox = new Sandbox({ debug: false });
+      try {
+        const cases = [
+          'throw 1n;',
+          'const o = {}; o.self = o; throw o;',
+          'throw { toJSON() { throw new Error("boom"); } };',
+          'Object.defineProperty(Object.prototype, "error", { set() { throw new Error("trap"); } }); throw new Error("trigger");',
+        ];
+
+        for (const code of cases) {
+          const { error } = await sandbox.execute({ code, timeout: 3000 });
+          assert.ok(error, `Expected error for: ${code}`);
+          assert.notEqual(error.message, 'worker exited', `Worker aborted on: ${code}`);
+          assert.doesNotMatch(error.stack || '', /worker\.js/);
+          assert.doesNotMatch(error.stack || '', new RegExp(process.cwd().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        }
+
+        const recovered = await sandbox.execute({
+          code: 'setResult({ value: "alive" });',
+          timeout: 3000,
+        });
+        assert.equal(recovered.value, 'alive');
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#9: globals cannot pollute Object.prototype via __proto__ or overwrite core runtime functions', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const maliciousGlobals = JSON.parse('{"__proto__":{"polluted":true},"setResult":null,"_dispatch":null,"safe":"ok"}');
+        const { value, error } = await sandbox.execute({
+          code: `
+            setResult({
+              value: {
+                polluted: ({}).polluted ?? null,
+                safe,
+                hasSetResult: typeof setResult === 'function',
+              },
+            });
+          `,
+          globals: maliciousGlobals,
+          timeout: 3000,
+        });
+
+        assert.equal(error, undefined);
+        assert.deepEqual(value, {
+          polluted: null,
+          safe: 'ok',
+          hasSetResult: true,
+        });
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
+
+    it('#10: deferred Promise microtasks format Error.stack under sandbox filter and do not leak host paths', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const { value, error } = await sandbox.execute({
+          code: `
+            const err = new Error('deferred-probe');
+            Promise.resolve().then(() => {
+              setResult({ value: err.stack });
+            });
+          `,
+          timeout: 3000,
+        });
+
+        assert.equal(error, undefined);
+        assert.equal(typeof value, 'string');
+        assert.match(value, /Error: deferred-probe/);
+        assert.doesNotMatch(value, /worker\.js/);
+        assert.doesNotMatch(value, /node:events/);
+        assert.doesNotMatch(value, /node:internal/);
+      } finally {
+        await sandbox.shutdown();
       }
     });
   });

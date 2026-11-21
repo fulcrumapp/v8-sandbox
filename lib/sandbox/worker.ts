@@ -58,8 +58,26 @@ export default class Worker {
 
     this.messageId = messageId;
 
-    if (globals !== '{}') {
-      this._execute(`Object.assign(global, ${globals});`);
+    if (globals && globals !== '{}') {
+      const reserved = JSON.stringify([
+        '__proto__',
+        'constructor',
+        'prototype',
+        '_dispatch',
+        'dispatch',
+        'setResult',
+        'setTimeout',
+        'clearTimeout',
+        'httpRequest',
+        'console',
+        'info',
+        'define',
+        'defineAsync',
+      ]);
+      this._execute(
+        `(() => { const _r = new Set(${reserved}); const _g = JSON.parse(${JSON.stringify(globals)}); `
+        + 'for (const _k of Object.keys(_g)) { if (!_r.has(_k)) { Object.defineProperty(global, _k, { value: _g[_k], writable: true, enumerable: true, configurable: true }); } } })();',
+      );
     }
 
     this._execute(code);

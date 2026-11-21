@@ -2,6 +2,7 @@
 #include "common.h"
 
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -17,8 +18,10 @@ using namespace v8;
 
 namespace {
 
+constexpr uint32_t kMaxIpcFrameBytes = 64 * 1024 * 1024;
+
 inline Local<String> NewUtf8String(Isolate* isolate, const char* value) {
-  return String::NewFromUtf8(isolate, value).ToLocalChecked();
+  return String::NewFromUtf8(isolate, value ? value : "").ToLocalChecked();
 }
 
 inline Local<String> NewUtf8String(Isolate* isolate, const std::string& value) {
@@ -29,6 +32,31 @@ inline Local<Private> SandboxPrivateKey(Isolate* isolate) {
   return Private::ForApi(isolate, NewUtf8String(isolate, "sandbox"));
 }
 
+inline std::string JsonEscape(const std::string& input) {
+  std::string out;
+  out.reserve(input.size() + 8);
+  for (unsigned char c : input) {
+    switch (c) {
+      case '"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default:
+        if (c < 0x20) {
+          char buf[8];
+          std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+          out += buf;
+        } else {
+          out += static_cast<char>(c);
+        }
+    }
+  }
+  return out;
+}
+
 }  // namespace
 
 Global<Function> Sandbox::constructor;
@@ -36,9 +64,9 @@ Global<Function> Sandbox::constructor;
 Sandbox::Sandbox()
   : messageId_(0),
     result_(""),
-    buffers_(),
-    bytesRead_(-1),
-    bytesExpected_(-1),
+    readBuffer_(""),
+    hasExpected_(false),
+    bytesExpected_(0),
     socket_(""),
     pipe_(nullptr),
     loop_(nullptr)
@@ -46,6 +74,7 @@ Sandbox::Sandbox()
 }
 
 Sandbox::~Sandbox() {
+  Disconnect();
 }
 
 void Sandbox::Init(Local<Object> exports) {
@@ -93,7 +122,10 @@ void Sandbox::New(const FunctionCallbackInfo<Value>& info) {
     const int argc = 1;
     Local<Value> argv[argc] = { info[0] };
     Local<Function> cons = Local<Function>::New(isolate, constructor);
-    info.GetReturnValue().Set(cons->NewInstance(context, argc, argv).ToLocalChecked());
+    Local<Object> instance;
+    if (cons->NewInstance(context, argc, argv).ToLocal(&instance)) {
+      info.GetReturnValue().Set(instance);
+    }
   }
 }
 
@@ -179,6 +211,11 @@ void Sandbox::Dispatch(const FunctionCallbackInfo<Value>& info) {
 
   Sandbox* sandbox = GetSandboxFromContext(isolate);
 
+  if (!sandbox || !sandbox->IsActiveContext(isolate, isolate->GetCurrentContext())) {
+    isolate->ThrowException(Exception::Error(NewUtf8String(isolate, "sandbox context is no longer active")));
+    return;
+  }
+
   std::string result;
 
   if (info[2]->IsNull()) {
@@ -202,6 +239,13 @@ void Sandbox::Finish(const FunctionCallbackInfo<Value>& info) {
 }
 
 void Sandbox::Initialize(Isolate* isolate) {
+  if (!sandboxContext_.IsEmpty()) {
+    Local<Context> prevContext = Local<Context>::New(isolate, sandboxContext_);
+    (void)prevContext->Global()->DeletePrivate(prevContext, SandboxPrivateKey(isolate));
+  }
+
+  pendingOperations_.clear();
+
   Local<Context> context = Context::New(isolate);
   sandboxContext_.Reset(isolate, context);
 
@@ -222,6 +266,13 @@ void Sandbox::Initialize(Isolate* isolate) {
     ->GetFunction(context)
     .ToLocalChecked();
   global->Set(context, NewUtf8String(isolate, "_dispatch"), dispatchFn).Check();
+}
+
+bool Sandbox::IsActiveContext(Isolate* isolate, Local<Context> context) const {
+  if (sandboxContext_.IsEmpty() || messageId_ == 0) {
+    return false;
+  }
+  return sandboxContext_.Get(isolate) == context;
 }
 
 void Sandbox::Connect() {
@@ -251,15 +302,21 @@ void Sandbox::Disconnect() {
     return;
   }
 
-  uv_close((uv_handle_t *)pipe_, nullptr);
+  if (pipe_ && !uv_is_closing(reinterpret_cast<uv_handle_t *>(pipe_))) {
+    uv_close(reinterpret_cast<uv_handle_t *>(pipe_), OnClose);
+  }
+
+  uv_run(loop_, UV_RUN_DEFAULT);
 
   uv_loop_close(loop_);
 
-  free(pipe_);
   free(loop_);
 
   loop_ = nullptr;
   pipe_ = nullptr;
+  readBuffer_.clear();
+  hasExpected_ = false;
+  bytesExpected_ = 0;
 }
 
 MaybeLocal<Value> Sandbox::PrepareStackTrace(
@@ -351,8 +408,13 @@ void Sandbox::Execute(Isolate* isolate, int messageId, const char *code) {
   MaybeLocal<Script> script = Script::Compile(context, NewUtf8String(isolate, code), &origin);
 
   if (!tryCatch.HasCaught()) {
-    (void)script.ToLocalChecked()->Run(context);
+    Local<Script> compiled;
+    if (script.ToLocal(&compiled)) {
+      (void)compiled->Run(context);
+    }
   }
+
+  isolate->PerformMicrotaskCheckpoint();
 
   MaybeHandleError(isolate, tryCatch, context);
 
@@ -360,13 +422,18 @@ void Sandbox::Execute(Isolate* isolate, int messageId, const char *code) {
 }
 
 void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const char *args) {
-  assert(messageId_ == 0 || messageId_ == messageId);
-  assert(callbackId > 0);
-  assert(pendingOperations_[callbackId]);
+  if (callbackId <= 0) {
+    return;
+  }
+
+  auto it = pendingOperations_.find(callbackId);
+  if (it == pendingOperations_.end() || !it->second) {
+    return;
+  }
 
   messageId_ = messageId;
 
-  auto operation = pendingOperations_[callbackId];
+  auto operation = it->second;
 
   Local<Context> context = Local<Context>::New(isolate, sandboxContext_);
 
@@ -388,7 +455,9 @@ void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const ch
     (void)callback->Call(context, global, 1, argv);
   }
 
-  pendingOperations_.erase(callbackId);
+  pendingOperations_.erase(it);
+
+  isolate->PerformMicrotaskCheckpoint();
 
   MaybeHandleError(isolate, tryCatch, context);
 
@@ -396,16 +465,25 @@ void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const ch
 }
 
 void Sandbox::Cancel(int messageId, int callbackId) {
-  assert(messageId_ == 0 || messageId_ == messageId);
-  assert(callbackId > 0);
-  assert(pendingOperations_[callbackId]);
+  if (callbackId <= 0) {
+    return;
+  }
+
+  auto it = pendingOperations_.find(callbackId);
+  if (it == pendingOperations_.end()) {
+    return;
+  }
 
   messageId_ = messageId;
 
-  pendingOperations_.erase(callbackId);
+  pendingOperations_.erase(it);
 }
 
 std::string Sandbox::Dispatch(Isolate* isolate, const char *name, const char *arguments, Local<Function> *callback) {
+  if (!loop_ || !pipe_) {
+    return "";
+  }
+
   int callbackId = 0;
 
   if (callback) {
@@ -417,10 +495,6 @@ std::string Sandbox::Dispatch(Isolate* isolate, const char *name, const char *ar
     pendingOperations_[operation->id] = operation;
   }
 
-  bytesRead_ = -1;
-  bytesExpected_ = -1;
-
-  buffers_.clear();
   result_.clear();
 
   std::string message(arguments);
@@ -447,20 +521,50 @@ void Sandbox::Finish(Isolate* isolate) {
 }
 
 void Sandbox::SetResult(Isolate* isolate, Local<Context> &context, Local<Object> result) {
-  Local<Object> invocation = Object::New(isolate);
+  Local<Object> invocation = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
   Local<Array> arguments = Array::New(isolate, 1);
 
-  arguments->Set(context, 0, result).Check();
+  (void)arguments->CreateDataProperty(context, 0, result);
+  (void)invocation->CreateDataProperty(context, NewUtf8String(isolate, "name"), NewUtf8String(isolate, "setResult"));
+  (void)invocation->CreateDataProperty(context, NewUtf8String(isolate, "args"), arguments);
 
-  invocation->Set(context, NewUtf8String(isolate, "name"), NewUtf8String(isolate, "setResult")).Check();
-  invocation->Set(context, NewUtf8String(isolate, "args"), arguments).Check();
+  TryCatch stringifyCatch(isolate);
+  Local<String> json;
+  if (JSON::Stringify(context, invocation).ToLocal(&json)) {
+    String::Utf8Value utf8(isolate, json);
+    if (*utf8) {
+      std::string args(*utf8, utf8.length());
+      Dispatch(isolate, "setResult", args.c_str(), nullptr);
+      return;
+    }
+  }
 
-  Local<String> json = JSON::Stringify(context, invocation).ToLocalChecked();
+  stringifyCatch.Reset();
 
-  String::Utf8Value utf8(isolate, json);
-  std::string args(*utf8, utf8.length());
+  // Fallback when exception payload cannot be JSON-stringified (e.g., BigInt, circular object, hostile toJSON)
+  std::string fallbackMessage = "Uncaught exception";
+  std::string fallbackStack;
+  Local<Value> errorVal;
+  if (result->Get(context, NewUtf8String(isolate, "error")).ToLocal(&errorVal) && errorVal->IsObject()) {
+    Local<Object> errObj = errorVal.As<Object>();
+    Local<Value> msgVal;
+    if (errObj->Get(context, NewUtf8String(isolate, "message")).ToLocal(&msgVal) && msgVal->IsString()) {
+      String::Utf8Value utf8(isolate, msgVal);
+      if (*utf8) fallbackMessage.assign(*utf8, utf8.length());
+    }
+    Local<Value> stackVal;
+    if (errObj->Get(context, NewUtf8String(isolate, "stack")).ToLocal(&stackVal) && stackVal->IsString()) {
+      String::Utf8Value utf8(isolate, stackVal);
+      if (*utf8) fallbackStack.assign(*utf8, utf8.length());
+    }
+  }
 
-  Dispatch(isolate, "setResult", args.c_str(), nullptr);
+  std::string safeArgs = std::string("{\"name\":\"setResult\",\"args\":[{\"error\":{\"message\":\"")
+    + JsonEscape(fallbackMessage)
+    + "\",\"stack\":\""
+    + JsonEscape(fallbackStack)
+    + "\"}}]}";
+  Dispatch(isolate, "setResult", safeArgs.c_str(), nullptr);
 }
 
 void Sandbox::MaybeHandleError(Isolate* isolate, TryCatch &tryCatch, Local<Context> &context) {
@@ -468,39 +572,59 @@ void Sandbox::MaybeHandleError(Isolate* isolate, TryCatch &tryCatch, Local<Conte
     return;
   }
 
-  Local<Object> result = Object::New(isolate);
-  Local<Object> error = Object::New(isolate);
+  Local<Object> result = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
+  Local<Object> error = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
 
   Local<Value> exception = tryCatch.Exception();
   Local<Message> msg = tryCatch.Message();
 
-  String::Utf8Value message(isolate, msg->Get());
-  String::Utf8Value sourceLine(isolate, msg->GetSourceLine(context).ToLocalChecked());
+  std::string messageStr = "Uncaught exception";
+  std::string sourceLineStr;
+  int lineNumber = 0;
+  int startColumn = 0;
+  int endColumn = 0;
+  int startPosition = 0;
+  int endPosition = 0;
 
-  int lineNumber = msg->GetLineNumber(context).FromJust();
-  int startColumn = msg->GetStartColumn(context).FromJust();
-  int endColumn = msg->GetEndColumn(context).FromJust();
-  int startPosition = msg->GetStartPosition();
-  int endPosition = msg->GetEndPosition();
+  if (!msg.IsEmpty()) {
+    String::Utf8Value message(isolate, msg->Get());
+    if (*message) {
+      messageStr.assign(*message, message.length());
+    }
 
-  result->Set(context, NewUtf8String(isolate, "error"), error).Check();
+    Local<String> sourceLineVal;
+    if (msg->GetSourceLine(context).ToLocal(&sourceLineVal)) {
+      String::Utf8Value sourceLine(isolate, sourceLineVal);
+      if (*sourceLine) {
+        sourceLineStr.assign(*sourceLine, sourceLine.length());
+      }
+    }
+
+    lineNumber = msg->GetLineNumber(context).FromMaybe(0);
+    startColumn = msg->GetStartColumn(context).FromMaybe(0);
+    endColumn = msg->GetEndColumn(context).FromMaybe(0);
+    startPosition = msg->GetStartPosition();
+    endPosition = msg->GetEndPosition();
+  }
+
+  (void)result->CreateDataProperty(context, NewUtf8String(isolate, "error"), error);
 
   Local<Value> stackTrace;
   if (tryCatch.StackTrace(context).ToLocal(&stackTrace)) {
-    error->Set(context, NewUtf8String(isolate, "stack"), stackTrace).Check();
+    (void)error->CreateDataProperty(context, NewUtf8String(isolate, "stack"), stackTrace);
   }
   else {
-    error->Set(context, NewUtf8String(isolate, "stack"), NewUtf8String(isolate, "")).Check();
+    (void)error->CreateDataProperty(context, NewUtf8String(isolate, "stack"), NewUtf8String(isolate, ""));
   }
 
-  error->Set(context, NewUtf8String(isolate, "exception"), exception).Check();
-  error->Set(context, NewUtf8String(isolate, "message"), NewUtf8String(isolate, *message)).Check();
-  error->Set(context, NewUtf8String(isolate, "lineNumber"), Integer::New(isolate, lineNumber)).Check();
-  error->Set(context, NewUtf8String(isolate, "startColumn"), Integer::New(isolate, startColumn)).Check();
-  error->Set(context, NewUtf8String(isolate, "endColumn"), Integer::New(isolate, endColumn)).Check();
-  error->Set(context, NewUtf8String(isolate, "startPosition"), Integer::New(isolate, startPosition)).Check();
-  error->Set(context, NewUtf8String(isolate, "endPosition"), Integer::New(isolate, endPosition)).Check();
-  error->Set(context, NewUtf8String(isolate, "sourceLine"), NewUtf8String(isolate, *sourceLine)).Check();
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "exception"), exception);
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "message"), NewUtf8String(isolate, messageStr));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "lineNumber"), Integer::New(isolate, lineNumber));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "startColumn"), Integer::New(isolate, startColumn));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "endColumn"), Integer::New(isolate, endColumn));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "startPosition"), Integer::New(isolate, startPosition));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "endPosition"), Integer::New(isolate, endPosition));
+  (void)error->CreateDataProperty(context, NewUtf8String(isolate, "sourceLine"), NewUtf8String(isolate, sourceLineStr));
 
   SetResult(isolate, context, result);
 }
@@ -543,41 +667,49 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
   Sandbox *sandbox = (Sandbox *)pipe->data;
 
   if (bytesRead > 0) {
-    char *chunk = (char *)buffer->base;
-    int chunkLength = bytesRead;
+    sandbox->readBuffer_.append(buffer->base, static_cast<size_t>(bytesRead));
 
-    if (sandbox->bytesExpected_ == -1) {
+    if (!sandbox->hasExpected_ && sandbox->readBuffer_.size() >= sizeof(uint32_t)) {
       uint32_t rawExpected = 0;
-      std::memcpy(&rawExpected, chunk, sizeof(rawExpected));
-      sandbox->bytesExpected_ = static_cast<int32_t>(ntohl(rawExpected));
-      sandbox->bytesRead_ = 0;
-      sandbox->result_ = "";
+      std::memcpy(&rawExpected, sandbox->readBuffer_.data(), sizeof(rawExpected));
+      uint32_t expected = ntohl(rawExpected);
 
-      chunk += sizeof(sandbox->bytesExpected_);
-      chunkLength -= sizeof(sandbox->bytesExpected_);
-    }
-
-    std::string chunkString(chunk, chunkLength);
-
-    sandbox->buffers_.push_back(chunkString);
-    sandbox->bytesRead_ += chunkLength;
-
-    if (sandbox->bytesRead_ == sandbox->bytesExpected_) {
-      for (const auto &chunk : sandbox->buffers_) {
-        sandbox->result_ += chunk;
+      if (expected > kMaxIpcFrameBytes) {
+        sandbox->readBuffer_.clear();
+        uv_read_stop(pipe);
+        if (!uv_is_closing(reinterpret_cast<uv_handle_t *>(pipe))) {
+          uv_close(reinterpret_cast<uv_handle_t *>(pipe), OnClose);
+        }
+        free(buffer->base);
+        return;
       }
 
+      sandbox->bytesExpected_ = expected;
+      sandbox->hasExpected_ = true;
+    }
+
+    if (sandbox->hasExpected_ && sandbox->readBuffer_.size() >= sizeof(uint32_t) + sandbox->bytesExpected_) {
+      sandbox->result_.assign(sandbox->readBuffer_, sizeof(uint32_t), sandbox->bytesExpected_);
+      sandbox->readBuffer_.erase(0, sizeof(uint32_t) + sandbox->bytesExpected_);
+      sandbox->hasExpected_ = false;
+      sandbox->bytesExpected_ = 0;
       uv_read_stop(pipe);
     }
   }
   else if (bytesRead < 0) {
-    uv_close((uv_handle_t *)pipe, OnClose);
+    if (!uv_is_closing(reinterpret_cast<uv_handle_t *>(pipe))) {
+      uv_close(reinterpret_cast<uv_handle_t *>(pipe), OnClose);
+    }
   }
 
   free(buffer->base);
 }
 
 void Sandbox::OnClose(uv_handle_t *pipe) {
+  Sandbox *sandbox = static_cast<Sandbox *>(pipe->data);
+  if (sandbox && reinterpret_cast<uv_handle_t *>(sandbox->pipe_) == pipe) {
+    sandbox->pipe_ = nullptr;
+  }
   free(pipe);
 }
 
@@ -612,10 +744,8 @@ void Sandbox::WriteData(uv_stream_t *pipe, int messageId, int callbackId, std::s
 
 void Sandbox::OnWriteComplete(uv_write_t *request, int status) {
   if (status != 0) {
-    std::cout << " OnWriteComplete failed, status: " << status << " : " << uv_strerror(status) << " : " << (char *)request->data << std::endl;
+    std::cout << " OnWriteComplete failed, status: " << status << " : " << uv_strerror(status) << std::endl;
   }
-
-  assert(status == 0);
 
   free(request->data);
   free(request);

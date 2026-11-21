@@ -70,8 +70,8 @@ export default class Functions {
 
   defines() {
     return [
-      ...Object.entries(this.syncFunctions).map(([name]) => `define('${name}');\n`),
-      ...Object.entries(this.asyncFunctions).map(([name]) => `defineAsync('${name}');\n`),
+      ...Object.keys(this.syncFunctions).map((name) => `define(${JSON.stringify(name)});\n`),
+      ...Object.keys(this.asyncFunctions).map((name) => `defineAsync(${JSON.stringify(name)});\n`),
     ];
   }
 
@@ -156,6 +156,11 @@ export default class Functions {
   }) => {
     if (!this.timersEnabled) {
       fail(new HostError('setTimeout is disabled'));
+      return;
+    }
+
+    if (typeof callback !== 'function') {
+      fail(new HostError('callback must be a function'));
       return;
     }
 
@@ -252,10 +257,29 @@ export default class Functions {
   };
 
   processHttpRequest(rawOptions, context) {
+    const allowedResponseTypes = new Set(['text', 'json', 'arraybuffer']);
+
+    if (rawOptions.responseType && !allowedResponseTypes.has(rawOptions.responseType)) {
+      throw new HostError(`unsupported responseType: ${rawOptions.responseType}`);
+    }
+
+    const rawUrl = rawOptions.uri ?? rawOptions.url;
+    if (typeof rawUrl === 'string') {
+      let parsed: URL;
+      try {
+        parsed = new URL(rawUrl);
+      } catch {
+        throw new HostError('invalid url');
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new HostError(`unsupported protocol: ${parsed.protocol}`);
+      }
+    }
+
     const options = {
       method: rawOptions.method ?? 'GET',
-      url: rawOptions.uri ?? rawOptions.url,
-      ...(rawOptions.proxy ? { proxy: rawOptions.proxy } : {}),
+      url: rawUrl,
+      proxy: false as const,
       ...(rawOptions.headers ? { headers: rawOptions.headers } : {}),
       ...(rawOptions.params ? { params: rawOptions.params } : {}),
       ...(rawOptions.form ? { data: rawOptions.form } : {}),

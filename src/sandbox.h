@@ -58,6 +58,8 @@ private:
 
   void Finish(v8::Isolate* isolate);
 
+  bool IsActiveContext(v8::Isolate* isolate, v8::Local<v8::Context> context) const;
+
   void SetResult(v8::Isolate* isolate, v8::Local<v8::Context> &context, v8::Local<v8::Object> result);
 
   void MaybeHandleError(v8::Isolate* isolate, v8::TryCatch &tryCatch, v8::Local<v8::Context> &context);
@@ -75,11 +77,11 @@ private:
 
   std::string result_;
 
-  std::vector<std::string> buffers_;
+  std::string readBuffer_;
 
-  int32_t bytesRead_;
+  bool hasExpected_;
 
-  int32_t bytesExpected_;
+  uint32_t bytesExpected_;
 
   std::string socket_;
 
