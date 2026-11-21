@@ -210,7 +210,12 @@ export default class Sandbox {
     if (!this.privateSocketDir) {
       this.privateSocketDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v8-sandbox-'));
       if (process.platform !== 'win32') {
-        fs.chmodSync(this.privateSocketDir, this.uid != null || this.gid != null ? 0o750 : 0o700);
+        if (this.uid != null || this.gid != null) {
+          fs.chownSync(this.privateSocketDir, this.uid ?? -1, this.gid ?? -1);
+          fs.chmodSync(this.privateSocketDir, this.uid != null ? 0o700 : 0o750);
+        } else {
+          fs.chmodSync(this.privateSocketDir, 0o700);
+        }
       }
     }
 
@@ -322,7 +327,16 @@ export default class Sandbox {
 
     this.cleanupSocket();
 
-    this.server.listen(this.socketName);
+    this.server.listen(this.socketName, () => {
+      if (process.platform !== 'win32' && (this.uid != null || this.gid != null)) {
+        try {
+          fs.chownSync(this.socketName, this.uid ?? -1, this.gid ?? -1);
+          fs.chmodSync(this.socketName, this.uid != null ? 0o600 : 0o660);
+        } catch (ex) {
+          // silent
+        }
+      }
+    });
 
     this.queue = new Queue(this.processMessage, 1);
 
@@ -353,7 +367,7 @@ export default class Sandbox {
         this.removeSocketPaths(oldSocket, oldPrivateDir);
 
         oldServer.close(() => {
-          this.removeSocketPaths(oldSocket, oldPrivateDir);
+          this.removeSocketPaths(null, oldPrivateDir);
           resolve(undefined);
         });
       } else {

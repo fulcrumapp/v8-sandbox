@@ -302,4 +302,61 @@ describe('Socket IPC framing', () => {
       assert.equal(rawSocket.destroyed, true);
     }
   });
+
+  it('fails the active execution and replaces the worker on oversized incoming frame', () => {
+    const rawSocket = makeMockSocket();
+    let forked = false;
+    let finishedWith: any = null;
+    const fakeSandbox: any = {
+      worker: {},
+      debug: false,
+      fork() {
+        forked = true;
+      },
+      finish(res: any) {
+        finishedWith = res;
+      },
+      dispatch() {},
+    };
+
+    new Socket(rawSocket, fakeSandbox);
+
+    const badHeader = Buffer.alloc(12);
+    badHeader.writeInt32BE(1, 0);
+    badHeader.writeInt32BE(0, 4);
+    badHeader.writeInt32BE(65 * 1024 * 1024, 8);
+
+    rawSocket.emit('data', badHeader);
+
+    assert.equal(rawSocket.destroyed, true);
+    assert.equal(forked, true);
+    assert.match(finishedWith?.error?.message || '', /IPC frame exceeds maximum size/);
+  });
+
+  it('returns a small error frame and cancels callback when host response exceeds 64 MiB', () => {
+    const rawSocket = makeMockSocket();
+    let cancelled = false;
+    const fakeSandbox: any = {
+      worker: {},
+      debug: false,
+      cancel() {
+        cancelled = true;
+      },
+      dispatch(_messageId: number, _invocation: any, { respond }: any) {
+        respond('x'.repeat(65 * 1024 * 1024));
+      },
+    };
+
+    const sock = new Socket(rawSocket, fakeSandbox);
+    const frame = encodeFrame(1, 5, JSON.stringify({ name: 'big', args: [] }));
+    rawSocket.emit('data', frame);
+
+    assert.equal(cancelled, true);
+    assert.equal(rawSocket.written.length, 1);
+    const len = rawSocket.written[0].readInt32BE(0);
+    const body = JSON.parse(rawSocket.written[0].subarray(4, 4 + len).toString('utf8'));
+    assert.equal(body.result.error.name, 'RangeError');
+    assert.match(body.result.error.message, /IPC response exceeds maximum size/);
+    sock.shutdown();
+  });
 });

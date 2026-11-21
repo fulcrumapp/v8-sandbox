@@ -906,5 +906,30 @@ describe('v8-sandbox security', () => {
         await sandbox.shutdown();
       }
     });
+
+    it('rejects oversized (>64 MiB) native _dispatch invocations before writing to IPC', async () => {
+      const sandbox = new Sandbox();
+      try {
+        const { value, error } = await sandbox.execute({
+          code: `
+            try {
+              _dispatch('setResult', 'x'.repeat(65 * 1024 * 1024), null);
+              setResult({ value: 'unexpected-success' });
+            } catch (err) {
+              setResult({ value: { name: err.name, message: err.message } });
+            }
+          `,
+          timeout: 5000,
+        });
+
+        assert.equal(error, undefined);
+        assert.deepEqual(value, {
+          name: 'RangeError',
+          message: 'IPC frame exceeds maximum size',
+        });
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
   });
 });

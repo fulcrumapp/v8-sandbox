@@ -60,9 +60,14 @@ export default class Socket {
       const length = this.buffer.readInt32BE(8);
 
       if (length < 0 || length > MAX_IPC_FRAME_BYTES) {
+        const wasConnected = this.isConnected;
         this.closed = true;
         this.buffer = Buffer.alloc(0);
         this.socket.destroy();
+        if (wasConnected && typeof this.sandbox.fork === 'function' && typeof this.sandbox.finish === 'function') {
+          this.sandbox.fork();
+          this.sandbox.finish({ error: new HostError('IPC frame exceeds maximum size') });
+        }
         return;
       }
 
@@ -106,7 +111,23 @@ export default class Socket {
           });
         }
 
-        const byteLength = Buffer.byteLength(string, 'utf8');
+        let byteLength = Buffer.byteLength(string, 'utf8');
+        if (byteLength > MAX_IPC_FRAME_BYTES) {
+          if (cancel) {
+            cancel();
+          }
+          string = JSON.stringify({
+            result: {
+              error: {
+                isHost: true,
+                name: 'RangeError',
+                message: 'IPC response exceeds maximum size',
+              },
+            },
+          });
+          byteLength = Buffer.byteLength(string, 'utf8');
+        }
+
         const buffer = Buffer.alloc(byteLength + 4);
 
         buffer.writeInt32BE(byteLength);

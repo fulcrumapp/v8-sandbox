@@ -765,6 +765,55 @@ describe('v8-sandbox edge cases & isolation', () => {
         fs.rmSync(customDir, { recursive: true, force: true });
       }
     });
+
+    it('supports non-awaited shutdown() followed by execute() with a custom socketPath', async () => {
+      const customDir = fs.mkdtempSync(path.join(os.tmpdir(), 'v8-sandbox-restart-'));
+      const sandbox = new Sandbox({ socketPath: customDir });
+      try {
+        const first = await sandbox.execute({
+          code: 'setResult({ value: 1 });',
+          timeout: 3000,
+        });
+        assert.equal(first.error, undefined);
+        assert.equal(first.value, 1);
+
+        // Intentionally do not await shutdown before restarting on the same custom socketPath
+        sandbox.shutdown();
+
+        const second = await sandbox.execute({
+          code: 'setResult({ value: 2 });',
+          timeout: 3000,
+        });
+        assert.equal(second.error, undefined);
+        assert.equal(second.value, 2);
+
+        await sandbox.shutdown();
+      } finally {
+        fs.rmSync(customDir, { recursive: true, force: true });
+      }
+    });
+
+    it('applies owner-restricted directory and socket permissions when uid/gid are configured', async () => {
+      if (process.platform === 'win32' || typeof process.getuid !== 'function' || typeof process.getgid !== 'function') {
+        return;
+      }
+      const sandbox = new Sandbox({ uid: process.getuid(), gid: process.getgid() });
+      try {
+        const { value, error } = await sandbox.execute({
+          code: 'setResult({ value: "uid-ok" });',
+          timeout: 3000,
+        });
+        assert.equal(error, undefined);
+        assert.equal(value, 'uid-ok');
+
+        const dirStat = fs.statSync(path.dirname(sandbox.socketName));
+        const sockStat = fs.statSync(sandbox.socketName);
+        assert.equal(dirStat.mode & 0o777, 0o700);
+        assert.equal(sockStat.mode & 0o777, 0o600);
+      } finally {
+        await sandbox.shutdown();
+      }
+    });
   });
 
   describe('modern V8 language features', () => {

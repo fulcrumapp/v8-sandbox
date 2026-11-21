@@ -242,6 +242,11 @@ void Sandbox::Dispatch(const FunctionCallbackInfo<Value>& info) {
     return;
   }
 
+  if (arguments.length() > static_cast<int>(kMaxIpcFrameBytes)) {
+    isolate->ThrowException(Exception::RangeError(NewUtf8String(isolate, "IPC frame exceeds maximum size")));
+    return;
+  }
+
   std::string result;
 
   if (info[2]->IsNull()) {
