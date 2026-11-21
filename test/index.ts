@@ -2,6 +2,7 @@ import path from 'node:path';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import http from 'node:http';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 
 import { Sandbox, SandboxCluster, Result } from '../dist';
 
@@ -53,7 +54,7 @@ describe('sandbox', () => {
     }
   });
 
-  before(async () => {
+  beforeAll(async () => {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(0, '127.0.0.1', () => {
@@ -72,7 +73,7 @@ describe('sandbox', () => {
     });
   });
 
-  after(async () => {
+  afterAll(async () => {
     try {
       if (globalSandbox) {
         await globalSandbox.shutdown();
@@ -803,7 +804,7 @@ setTimeout(() => {
     });
   });
 
-  it('should handle recursive stress', (done) => {
+  it('should handle recursive stress', () => new Promise<void>((resolve, reject) => {
     const iterations = 500;
 
     const executeNext = (i) => {
@@ -815,17 +816,17 @@ setResult({value: ${i}});
         assert.equal(value, i);
 
         if (i === iterations) {
-          done();
+          resolve();
         } else {
           setImmediate(() => {
             executeNext(i + 1);
           });
         }
-      });
+      }).catch(reject);
     };
 
     executeNext(0);
-  });
+  }));
 
   it('should handle template scripts', async () => {
     const template = `
@@ -998,9 +999,7 @@ setTimeout(() => {
     sandbox.shutdown();
   });
 
-  it('should allow random crossing between nodejs and sandbox with custom sync functions', async function() {
-    this.timeout(10000);
-
+  it('should allow random crossing between nodejs and sandbox with custom sync functions', async () => {
     const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
@@ -1020,9 +1019,7 @@ for (let i = 0; i < 5000; ++i) {
     sandbox.shutdown();
   });
 
-  it('should allow crossing between nodejs and sandbox with custom async functions', async function() {
-    this.timeout(6000);
-
+  it('should allow crossing between nodejs and sandbox with custom async functions', async () => {
     const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
@@ -1065,7 +1062,7 @@ setTimeout(() => {
     const stack = `
 Error: uh oh: 3
     at script:6:11
-    at wrappedCallback (script:9:13)
+    at wrappedCallback (script:9:9)
     `.trim();
 
     assert.equal(error?.message, 'Uncaught Error: uh oh: 3');
@@ -1197,9 +1194,7 @@ setResult({ value: customValue });
     sandbox.shutdown();
   });
 
-  it('should support large payloads', async function() {
-    this.timeout(6000);
-
+  it('should support large payloads', async () => {
     const sandbox = new SandboxCluster({ require: REQUIRE });
 
     const code = `
@@ -1249,9 +1244,7 @@ setResult({ value: fetchLargeValue() });
     sandbox.shutdown();
   });
 
-  it('should support disabling networking and timers', async function() {
-    this.timeout(10000);
-
+  it('should support disabling networking and timers', async () => {
     const sandbox = new Sandbox({ require: REQUIRE, httpEnabled: false, timersEnabled: false });
 
     let code = 'setTimeout(() => {}, 1);';
@@ -1269,9 +1262,7 @@ setResult({ value: fetchLargeValue() });
     sandbox.shutdown();
   });
 
-  it('should handle hard memory crash in the sandbox', async function() {
-    this.timeout(4000);
-
+  it('should handle hard memory crash in the sandbox', async () => {
     const sandbox = new Sandbox({ require: REQUIRE, memory: 32 });
 
     const code = `

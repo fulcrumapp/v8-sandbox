@@ -1,6 +1,6 @@
-import async from 'async';
 import assert from 'assert';
 import Sandbox, { Options } from '../host/sandbox';
+import Queue from '../queue';
 
 let globalSandbox: Sandbox | null = null;
 
@@ -15,7 +15,7 @@ interface Message {
 }
 
 class Worker {
-  queue: async.QueueObject<Message>;
+  queue: Queue<Message>;
 
   sandboxOptions?: Options;
 
@@ -26,7 +26,7 @@ class Worker {
   error: any;
 
   constructor() {
-    this.queue = async.queue(this.worker, 1);
+    this.queue = new Queue(this.worker, 1);
   }
 
   create() {

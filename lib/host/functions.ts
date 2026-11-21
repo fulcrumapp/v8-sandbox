@@ -56,7 +56,6 @@ export default class Functions {
       this.syncFunctions = SYNC_FUNCTIONS[this.require];
       this.asyncFunctions = ASYNC_FUNCTIONS[this.require];
 
-      // eslint-disable-next-line global-require
       require(this.require);
     }
   }

@@ -3,9 +3,9 @@ import net from 'net';
 import fs from 'fs';
 import { fork, ChildProcess } from 'child_process';
 import { randomInt } from 'crypto';
-import async from 'async';
-import { once } from 'lodash';
 import { onExit } from 'signal-exit';
+import once from '../once';
+import Queue from '../queue';
 
 import Timer from './timer';
 import Socket from './socket';
@@ -112,7 +112,7 @@ export default class Sandbox {
 
   socket?: Socket;
 
-  queue?: async.QueueObject<Message>;
+  queue?: Queue<Message>;
 
   message?: Message;
 
@@ -292,7 +292,7 @@ export default class Sandbox {
 
     this.server.listen(this.socketName);
 
-    this.queue = async.queue(this.processMessage, 1);
+    this.queue = new Queue(this.processMessage, 1);
 
     this.fork();
   }

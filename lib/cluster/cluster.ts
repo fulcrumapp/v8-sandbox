@@ -1,8 +1,8 @@
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
-import async from 'async';
 import { onExit } from 'signal-exit';
-import { once } from 'lodash';
+import once from '../once';
+import Queue from '../queue';
 import {
   Result, Options, ExecutionOptions, TimeoutError, HostError,
 } from '../host/sandbox';
@@ -31,7 +31,7 @@ export default class Cluster {
 
   activeWorkers: ClusterWorker[] = [];
 
-  queue?: async.QueueObject<ExecutionOptions>;
+  queue?: Queue<ExecutionOptions>;
 
   sandboxOptions: Options;
 
@@ -80,13 +80,13 @@ export default class Cluster {
       this.queue.kill();
     }
 
-    this.queue = async.queue(this.worker, this.workerCount);
+    this.queue = new Queue(this.worker, this.workerCount);
   }
 
   start() {
     this.inactiveWorkers = [];
     this.activeWorkers = [];
-    this.queue = async.queue(this.worker, this.workerCount);
+    this.queue = new Queue(this.worker, this.workerCount);
     this.ensureWorkers();
 
     onExit((code, signal) => {

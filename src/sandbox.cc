@@ -1,23 +1,37 @@
 #include "sandbox.h"
 #include "common.h"
 
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <memory>
-#include <v8.h>
-#include <node.h>
 
-// #include <unistd.h>
-// void Debug(const char *msg) {
-//   std::cout << getpid() << " : " << msg << std::endl;
-// }
-
-// void Debug(std::string message) {
-//   Debug(message.c_str());
-// }
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#endif
 
 using namespace v8;
 
-Nan::Persistent<v8::Function> Sandbox::constructor;
+namespace {
+
+inline Local<String> NewUtf8String(Isolate* isolate, const char* value) {
+  return String::NewFromUtf8(isolate, value).ToLocalChecked();
+}
+
+inline Local<String> NewUtf8String(Isolate* isolate, const std::string& value) {
+  return String::NewFromUtf8(isolate, value.c_str(), NewStringType::kNormal, static_cast<int>(value.size())).ToLocalChecked();
+}
+
+inline Local<Private> SandboxPrivateKey(Isolate* isolate) {
+  return Private::ForApi(isolate, NewUtf8String(isolate, "sandbox"));
+}
+
+}  // namespace
+
+Global<Function> Sandbox::constructor;
 
 Sandbox::Sandbox()
   : messageId_(0),
@@ -34,37 +48,42 @@ Sandbox::Sandbox()
 Sandbox::~Sandbox() {
 }
 
-void Sandbox::Init(v8::Local<v8::Object> exports) {
-  Nan::HandleScope scope;
+void Sandbox::Init(Local<Object> exports) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
 
-  v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
+  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
 
-  tpl->SetClassName(Nan::New("Sandbox").ToLocalChecked());
+  tpl->SetClassName(NewUtf8String(isolate, "Sandbox"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
-  Nan::SetPrototypeMethod(tpl, "initialize", Initialize);
-  Nan::SetPrototypeMethod(tpl, "connect", Connect);
-  Nan::SetPrototypeMethod(tpl, "disconnect", Disconnect);
-  Nan::SetPrototypeMethod(tpl, "execute", Execute);
-  Nan::SetPrototypeMethod(tpl, "callback", Callback);
-  Nan::SetPrototypeMethod(tpl, "cancel", Cancel);
-  Nan::SetPrototypeMethod(tpl, "finish", Finish);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "initialize", Initialize);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "connect", Connect);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "disconnect", Disconnect);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "execute", Execute);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "callback", Callback);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "cancel", Cancel);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "finish", Finish);
 
-  auto function = Nan::GetFunction(tpl).ToLocalChecked();
+  Local<Function> function = tpl->GetFunction(context).ToLocalChecked();
 
-  constructor.Reset(function);
+  constructor.Reset(isolate, function);
 
-  Nan::Set(exports, Nan::New("Sandbox").ToLocalChecked(), function);
+  exports->Set(context, NewUtf8String(isolate, "Sandbox"), function).Check();
 }
 
-NAN_METHOD(Sandbox::New) {
+void Sandbox::New(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+
   if (info.IsConstructCall()) {
+    NODE_ARG_STRING(0, "socket");
+
     Sandbox *obj = new Sandbox();
     obj->Wrap(info.This());
 
-    NODE_ARG_STRING(0, "socket");
-
-    Nan::Utf8String socket(info[0]);
+    String::Utf8Value socket(isolate, info[0]);
 
     obj->socket_ = *socket;
 
@@ -72,117 +91,137 @@ NAN_METHOD(Sandbox::New) {
   }
   else {
     const int argc = 1;
-    v8::Local<v8::Value> argv[argc] = { info[0] };
-    v8::Local<v8::Function> cons = Nan::New<v8::Function>(constructor);
-    info.GetReturnValue().Set(Nan::NewInstance(cons, argc, argv).ToLocalChecked());
+    Local<Value> argv[argc] = { info[0] };
+    Local<Function> cons = Local<Function>::New(isolate, constructor);
+    info.GetReturnValue().Set(cons->NewInstance(context, argc, argv).ToLocalChecked());
   }
 }
 
-NAN_METHOD(Sandbox::Initialize) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+void Sandbox::Initialize(const FunctionCallbackInfo<Value>& info) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
-  sandbox->Initialize();
+  sandbox->Initialize(info.GetIsolate());
 
   info.GetReturnValue().Set(info.This());
 }
 
-NAN_METHOD(Sandbox::Connect) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+void Sandbox::Connect(const FunctionCallbackInfo<Value>& info) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
   sandbox->Connect();
 }
 
-NAN_METHOD(Sandbox::Disconnect) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+void Sandbox::Disconnect(const FunctionCallbackInfo<Value>& info) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
   sandbox->Disconnect();
 }
 
-NAN_METHOD(Sandbox::Execute) {
+void Sandbox::Execute(const FunctionCallbackInfo<Value>& info) {
   NODE_ARG_INTEGER(0, "messageId");
   NODE_ARG_STRING(1, "code");
 
-  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
-  Nan::Utf8String code(info[1]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
 
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+  int messageId = info[0]->Uint32Value(context).FromJust();
+  String::Utf8Value code(isolate, info[1]);
 
-  sandbox->Execute(messageId, *code);
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
+
+  sandbox->Execute(isolate, messageId, *code);
 
   info.GetReturnValue().Set(info.This());
 }
 
-NAN_METHOD(Sandbox::Callback) {
+void Sandbox::Callback(const FunctionCallbackInfo<Value>& info) {
   NODE_ARG_INTEGER(0, "messageId");
   NODE_ARG_INTEGER(1, "callbackId");
   NODE_ARG_STRING(2, "args");
 
-  Nan::Utf8String args(info[2]);
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
 
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+  String::Utf8Value args(isolate, info[2]);
 
-  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
-  int callbackId = Nan::To<uint32_t>(info[1]).FromJust();
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
-  sandbox->Callback(messageId, callbackId, *args);
+  int messageId = info[0]->Uint32Value(context).FromJust();
+  int callbackId = info[1]->Uint32Value(context).FromJust();
+
+  sandbox->Callback(isolate, messageId, callbackId, *args);
 }
 
-NAN_METHOD(Sandbox::Cancel) {
+void Sandbox::Cancel(const FunctionCallbackInfo<Value>& info) {
   NODE_ARG_INTEGER(0, "messageId");
   NODE_ARG_INTEGER(1, "callbackId");
 
-  int messageId = Nan::To<uint32_t>(info[0]).FromJust();
-  int callbackId = Nan::To<uint32_t>(info[1]).FromJust();
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
 
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+  int messageId = info[0]->Uint32Value(context).FromJust();
+  int callbackId = info[1]->Uint32Value(context).FromJust();
+
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
   sandbox->Cancel(messageId, callbackId);
 }
 
-NAN_METHOD(Sandbox::Dispatch) {
+void Sandbox::Dispatch(const FunctionCallbackInfo<Value>& info) {
   NODE_ARG_STRING(0, "name");
   NODE_ARG_STRING(1, "parameters");
   NODE_ARG_FUNCTION_OPTIONAL(2, "callback");
 
-  Nan::Utf8String name(info[0]);
-  Nan::Utf8String arguments(info[1]);
+  Isolate* isolate = info.GetIsolate();
 
-  Sandbox* sandbox = GetSandboxFromContext();
+  String::Utf8Value name(isolate, info[0]);
+  String::Utf8Value arguments(isolate, info[1]);
+
+  Sandbox* sandbox = GetSandboxFromContext(isolate);
 
   std::string result;
 
   if (info[2]->IsNull()) {
-    result = sandbox->Dispatch(*name, *arguments, nullptr);
+    result = sandbox->Dispatch(isolate, *name, *arguments, nullptr);
   }
   else {
     Local<Function> callback = info[2].As<Function>();
 
-    result = sandbox->Dispatch(*name, *arguments, &callback);
+    result = sandbox->Dispatch(isolate, *name, *arguments, &callback);
   }
 
-  info.GetReturnValue().Set(Nan::New(result.c_str()).ToLocalChecked());
+  info.GetReturnValue().Set(NewUtf8String(isolate, result));
 }
 
-NAN_METHOD(Sandbox::Finish) {
-  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.Holder());
+void Sandbox::Finish(const FunctionCallbackInfo<Value>& info) {
+  Sandbox* sandbox = ObjectWrap::Unwrap<Sandbox>(info.This());
 
-  sandbox->Finish();
+  sandbox->Finish(info.GetIsolate());
 
   info.GetReturnValue().Set(info.This());
 }
 
-void Sandbox::Initialize() {
-  sandboxContext_.Reset(Context::New(Isolate::GetCurrent()));
-
-  auto context = Nan::New(sandboxContext_);
+void Sandbox::Initialize(Isolate* isolate) {
+  Local<Context> context = Context::New(isolate);
+  sandboxContext_.Reset(isolate, context);
 
   Context::Scope context_scope(context);
 
-  auto global = context->Global();
+  Local<Object> global = context->Global();
 
-  Nan::SetPrivate(global, Nan::New("sandbox").ToLocalChecked(), External::New(Isolate::GetCurrent(), this));
-  Nan::Set(global, Nan::New("global").ToLocalChecked(), context->Global());
-  Nan::SetMethod(global, "_dispatch", Dispatch);
+#if V8_MAJOR_VERSION >= 14
+  Local<External> external = External::New(isolate, this, v8::kExternalPointerTypeTagDefault);
+#else
+  Local<External> external = External::New(isolate, this);
+#endif
+
+  global->SetPrivate(context, SandboxPrivateKey(isolate), external).Check();
+  global->Set(context, NewUtf8String(isolate, "global"), global).Check();
+
+  Local<Function> dispatchFn = FunctionTemplate::New(isolate, Dispatch)
+    ->GetFunction(context)
+    .ToLocalChecked();
+  global->Set(context, NewUtf8String(isolate, "_dispatch"), dispatchFn).Check();
 }
 
 void Sandbox::Connect() {
@@ -223,33 +262,104 @@ void Sandbox::Disconnect() {
   pipe_ = nullptr;
 }
 
-void Sandbox::Execute(int messageId, const char *code) {
+MaybeLocal<Value> Sandbox::PrepareStackTrace(
+  Local<Context> context,
+  Local<Value> error,
+  Local<Array> sites)
+{
+  Isolate* isolate = Isolate::GetCurrent();
+  EscapableHandleScope scope(isolate);
+
+  std::string result;
+
+  Local<String> errorStr;
+  if (error->ToString(context).ToLocal(&errorStr)) {
+    String::Utf8Value utf8(isolate, errorStr);
+    if (*utf8) {
+      result = *utf8;
+    }
+  }
+
+  Local<String> getFileNameKey = NewUtf8String(isolate, "getFileName");
+  Local<String> isEvalKey = NewUtf8String(isolate, "isEval");
+
+  uint32_t length = sites->Length();
+  for (uint32_t i = 0; i < length; ++i) {
+    Local<Value> siteVal;
+    if (!sites->Get(context, i).ToLocal(&siteVal) || !siteVal->IsObject()) {
+      continue;
+    }
+
+    Local<Object> site = siteVal.As<Object>();
+
+    bool isSandboxFrame = false;
+
+    Local<Value> getFileNameVal;
+    if (site->Get(context, getFileNameKey).ToLocal(&getFileNameVal) && getFileNameVal->IsFunction()) {
+      Local<Value> fileNameVal;
+      if (getFileNameVal.As<Function>()->Call(context, site, 0, nullptr).ToLocal(&fileNameVal) && fileNameVal->IsString()) {
+        String::Utf8Value fileName(isolate, fileNameVal);
+        if (*fileName && std::strcmp(*fileName, "script") == 0) {
+          isSandboxFrame = true;
+        }
+      }
+    }
+
+    if (!isSandboxFrame) {
+      Local<Value> isEvalVal;
+      if (site->Get(context, isEvalKey).ToLocal(&isEvalVal) && isEvalVal->IsFunction()) {
+        Local<Value> evalResult;
+        if (isEvalVal.As<Function>()->Call(context, site, 0, nullptr).ToLocal(&evalResult) && evalResult->BooleanValue(isolate)) {
+          isSandboxFrame = true;
+        }
+      }
+    }
+
+    // Stop at the first host/Node.js frame so sandbox stack traces never leak host paths.
+    if (!isSandboxFrame) {
+      break;
+    }
+
+    Local<String> siteStr;
+    if (site->ToString(context).ToLocal(&siteStr)) {
+      String::Utf8Value utf8(isolate, siteStr);
+      if (*utf8) {
+        result += "\n    at ";
+        result += *utf8;
+      }
+    }
+  }
+
+  return scope.Escape(NewUtf8String(isolate, result));
+}
+
+void Sandbox::Execute(Isolate* isolate, int messageId, const char *code) {
   assert(messageId_ == 0 || messageId_ == messageId);
 
   messageId_ = messageId;
 
-  auto context = Nan::New(sandboxContext_);
+  Local<Context> context = Local<Context>::New(isolate, sandboxContext_);
 
   Context::Scope context_scope(context);
 
-  Nan::TryCatch tryCatch;
+  TryCatch tryCatch(isolate);
 
-  ScriptOrigin origin(Isolate::GetCurrent(), Nan::New("script").ToLocalChecked());
+  ScriptOrigin origin(NewUtf8String(isolate, "script"));
 
-  Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
+  isolate->SetPrepareStackTraceCallback(PrepareStackTrace);
 
-  MaybeLocal<Script> script = Script::Compile(context, Nan::New(code).ToLocalChecked(), &origin);
+  MaybeLocal<Script> script = Script::Compile(context, NewUtf8String(isolate, code), &origin);
 
   if (!tryCatch.HasCaught()) {
     (void)script.ToLocalChecked()->Run(context);
   }
 
-  MaybeHandleError(tryCatch, context);
+  MaybeHandleError(isolate, tryCatch, context);
 
-  Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
+  isolate->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
-void Sandbox::Callback(int messageId, int callbackId, const char *args) {
+void Sandbox::Callback(Isolate* isolate, int messageId, int callbackId, const char *args) {
   assert(messageId_ == 0 || messageId_ == messageId);
   assert(callbackId > 0);
   assert(pendingOperations_[callbackId]);
@@ -258,31 +368,31 @@ void Sandbox::Callback(int messageId, int callbackId, const char *args) {
 
   auto operation = pendingOperations_[callbackId];
 
-  auto context = Nan::New(sandboxContext_);
+  Local<Context> context = Local<Context>::New(isolate, sandboxContext_);
 
-  auto global = context->Global();
+  Local<Object> global = context->Global();
 
   Context::Scope context_scope(context);
 
-  Nan::TryCatch tryCatch;
+  TryCatch tryCatch(isolate);
 
-  Local<Function> callback = Nan::New(*operation->callback);
+  Local<Function> callback = Local<Function>::New(isolate, *operation->callback);
 
-  Isolate::GetCurrent()->SetPrepareStackTraceCallback(nullptr);
+  isolate->SetPrepareStackTraceCallback(PrepareStackTrace);
 
   if (callback->IsFunction()) {
-    v8::Local<v8::Value> argv[] = {
-      Nan::New(args).ToLocalChecked()
+    Local<Value> argv[] = {
+      NewUtf8String(isolate, args)
     };
 
-    Nan::Call(callback, global, 1, argv);
+    (void)callback->Call(context, global, 1, argv);
   }
 
   pendingOperations_.erase(callbackId);
 
-  MaybeHandleError(tryCatch, context);
+  MaybeHandleError(isolate, tryCatch, context);
 
-  Isolate::GetCurrent()->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
+  isolate->SetPrepareStackTraceCallback(node::PrepareStackTraceCallback);
 }
 
 void Sandbox::Cancel(int messageId, int callbackId) {
@@ -295,11 +405,11 @@ void Sandbox::Cancel(int messageId, int callbackId) {
   pendingOperations_.erase(callbackId);
 }
 
-std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Function> *callback) {
+std::string Sandbox::Dispatch(Isolate* isolate, const char *name, const char *arguments, Local<Function> *callback) {
   int callbackId = 0;
 
   if (callback) {
-    auto cb = std::make_shared<Nan::Persistent<Function>>(*callback);
+    auto cb = std::make_shared<Global<Function>>(isolate, *callback);
     auto operation = std::make_shared<AsyncOperation>(this, cb);
 
     callbackId = operation->id;
@@ -322,7 +432,7 @@ std::string Sandbox::Dispatch(const char *name, const char *arguments, Local<Fun
   return result_;
 }
 
-void Sandbox::Finish() {
+void Sandbox::Finish(Isolate* isolate) {
   if (pendingOperations_.size() > 0) {
     return;
   }
@@ -331,79 +441,85 @@ void Sandbox::Finish() {
     std::string("{\"name\":\"finish\",\"args\":[") + std::to_string(messageId_) + std::string("]}")
   );
 
-  Dispatch("finish", invocation.c_str(), nullptr);
+  Dispatch(isolate, "finish", invocation.c_str(), nullptr);
 
   messageId_ = 0;
 }
 
-void Sandbox::SetResult(Local<Context> &context, Local<Object> result) {
-  auto invocation = Nan::New<Object>();
-  auto arguments = Nan::New<Array>();
+void Sandbox::SetResult(Isolate* isolate, Local<Context> &context, Local<Object> result) {
+  Local<Object> invocation = Object::New(isolate);
+  Local<Array> arguments = Array::New(isolate, 1);
 
-  Nan::Set(arguments, 0, result);
+  arguments->Set(context, 0, result).Check();
 
-  Nan::Set(invocation, Nan::New("name").ToLocalChecked(), Nan::New("setResult").ToLocalChecked());
-  Nan::Set(invocation, Nan::New("args").ToLocalChecked(), arguments);
+  invocation->Set(context, NewUtf8String(isolate, "name"), NewUtf8String(isolate, "setResult")).Check();
+  invocation->Set(context, NewUtf8String(isolate, "args"), arguments).Check();
 
-  auto json = JSON::Stringify(context, invocation).ToLocalChecked();
+  Local<String> json = JSON::Stringify(context, invocation).ToLocalChecked();
 
-  std::string args = *Nan::Utf8String(json);
+  String::Utf8Value utf8(isolate, json);
+  std::string args(*utf8, utf8.length());
 
-  Dispatch("setResult", args.c_str(), nullptr);
+  Dispatch(isolate, "setResult", args.c_str(), nullptr);
 }
 
-void Sandbox::MaybeHandleError(Nan::TryCatch &tryCatch, Local<Context> &context) {
+void Sandbox::MaybeHandleError(Isolate* isolate, TryCatch &tryCatch, Local<Context> &context) {
   if (!tryCatch.HasCaught()) {
     return;
   }
 
-  auto result = Nan::New<Object>();
-  auto error = Nan::New<Object>();
+  Local<Object> result = Object::New(isolate);
+  Local<Object> error = Object::New(isolate);
 
-  auto exception = tryCatch.Exception();
+  Local<Value> exception = tryCatch.Exception();
+  Local<Message> msg = tryCatch.Message();
 
-  Nan::Utf8String message(tryCatch.Message()->Get());
-  Nan::Utf8String sourceLine(tryCatch.Message()->GetSourceLine(context).ToLocalChecked());
+  String::Utf8Value message(isolate, msg->Get());
+  String::Utf8Value sourceLine(isolate, msg->GetSourceLine(context).ToLocalChecked());
 
-  int lineNumber = tryCatch.Message()->GetLineNumber(context).FromJust();
-  int startColumn = tryCatch.Message()->GetStartColumn(context).FromJust();
-  int endColumn = tryCatch.Message()->GetEndColumn(context).FromJust();
-  int startPosition = tryCatch.Message()->GetStartPosition();
-  int endPosition = tryCatch.Message()->GetEndPosition();
+  int lineNumber = msg->GetLineNumber(context).FromJust();
+  int startColumn = msg->GetStartColumn(context).FromJust();
+  int endColumn = msg->GetEndColumn(context).FromJust();
+  int startPosition = msg->GetStartPosition();
+  int endPosition = msg->GetEndPosition();
 
-  Nan::Set(result, Nan::New("error").ToLocalChecked(), error);
+  result->Set(context, NewUtf8String(isolate, "error"), error).Check();
 
-  if (!tryCatch.StackTrace().IsEmpty()) {
-    Nan::Set(error, Nan::New("stack").ToLocalChecked(), tryCatch.StackTrace().ToLocalChecked());
+  Local<Value> stackTrace;
+  if (tryCatch.StackTrace(context).ToLocal(&stackTrace)) {
+    error->Set(context, NewUtf8String(isolate, "stack"), stackTrace).Check();
   }
   else {
-    Nan::Set(error, Nan::New("stack").ToLocalChecked(), Nan::New("").ToLocalChecked());
+    error->Set(context, NewUtf8String(isolate, "stack"), NewUtf8String(isolate, "")).Check();
   }
 
-  Nan::Set(error, Nan::New("exception").ToLocalChecked(), exception);
-  Nan::Set(error, Nan::New("message").ToLocalChecked(), Nan::New(*message).ToLocalChecked());
-  Nan::Set(error, Nan::New("lineNumber").ToLocalChecked(), Nan::New(lineNumber));
-  Nan::Set(error, Nan::New("startColumn").ToLocalChecked(), Nan::New(startColumn));
-  Nan::Set(error, Nan::New("endColumn").ToLocalChecked(), Nan::New(endColumn));
-  Nan::Set(error, Nan::New("startPosition").ToLocalChecked(), Nan::New(startPosition));
-  Nan::Set(error, Nan::New("endPosition").ToLocalChecked(), Nan::New(endPosition));
-  Nan::Set(error, Nan::New("sourceLine").ToLocalChecked(), Nan::New(*sourceLine).ToLocalChecked());
+  error->Set(context, NewUtf8String(isolate, "exception"), exception).Check();
+  error->Set(context, NewUtf8String(isolate, "message"), NewUtf8String(isolate, *message)).Check();
+  error->Set(context, NewUtf8String(isolate, "lineNumber"), Integer::New(isolate, lineNumber)).Check();
+  error->Set(context, NewUtf8String(isolate, "startColumn"), Integer::New(isolate, startColumn)).Check();
+  error->Set(context, NewUtf8String(isolate, "endColumn"), Integer::New(isolate, endColumn)).Check();
+  error->Set(context, NewUtf8String(isolate, "startPosition"), Integer::New(isolate, startPosition)).Check();
+  error->Set(context, NewUtf8String(isolate, "endPosition"), Integer::New(isolate, endPosition)).Check();
+  error->Set(context, NewUtf8String(isolate, "sourceLine"), NewUtf8String(isolate, *sourceLine)).Check();
 
-  SetResult(context, result);
+  SetResult(isolate, context, result);
 }
 
-Sandbox *Sandbox::GetSandboxFromContext() {
-  auto context = Isolate::GetCurrent()->GetCurrentContext();
+Sandbox *Sandbox::GetSandboxFromContext(Isolate* isolate) {
+  Local<Context> context = isolate->GetCurrentContext();
 
-  auto hidden = Nan::GetPrivate(context->Global(), Nan::New("sandbox").ToLocalChecked());
-
-  if (hidden.IsEmpty()) {
+  Local<Value> hidden;
+  if (!context->Global()->GetPrivate(context, SandboxPrivateKey(isolate)).ToLocal(&hidden) || !hidden->IsExternal()) {
     return nullptr;
   }
 
-  Local<External> field = Local<External>::Cast(hidden.ToLocalChecked());
+  Local<External> field = Local<External>::Cast(hidden);
 
+#if V8_MAJOR_VERSION >= 14
+  Sandbox *sandbox = (Sandbox *)field->Value(v8::kExternalPointerTypeTagDefault);
+#else
   Sandbox *sandbox = (Sandbox *)field->Value();
+#endif
 
   return sandbox;
 }
@@ -431,7 +547,9 @@ void Sandbox::OnRead(uv_stream_t *pipe, ssize_t bytesRead, const uv_buf_t *buffe
     int chunkLength = bytesRead;
 
     if (sandbox->bytesExpected_ == -1) {
-      sandbox->bytesExpected_ = ntohl(((int32_t *)chunk)[0]);
+      uint32_t rawExpected = 0;
+      std::memcpy(&rawExpected, chunk, sizeof(rawExpected));
+      sandbox->bytesExpected_ = static_cast<int32_t>(ntohl(rawExpected));
       sandbox->bytesRead_ = 0;
       sandbox->result_ = "";
 
@@ -472,13 +590,14 @@ void Sandbox::WriteData(uv_stream_t *pipe, int messageId, int callbackId, std::s
 
   char *data = (char *)malloc(bufferLength);
 
-  uint32_t *base = (uint32_t *)data;
+  uint32_t header[3] = {
+    htonl(static_cast<uint32_t>(messageId)),
+    htonl(static_cast<uint32_t>(callbackId)),
+    htonl(static_cast<uint32_t>(messageLength)),
+  };
 
-  base[0] = htonl(messageId);
-  base[1] = htonl(callbackId);
-  base[2] = htonl(messageLength);
-
-  memcpy(&base[3], message.c_str(), messageLength);
+  std::memcpy(data, header, sizeof(header));
+  std::memcpy(data + sizeof(header), message.c_str(), messageLength);
 
   uv_buf_t buffers[] = {
     { .base = data, .len = bufferLength }
@@ -501,3 +620,4 @@ void Sandbox::OnWriteComplete(uv_write_t *request, int status) {
   free(request->data);
   free(request);
 }
+

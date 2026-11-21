@@ -1,5 +1,5 @@
 import net from 'net';
-import { once } from 'lodash';
+import once from '../once';
 import { ChildProcess } from 'child_process';
 import Sandbox, { HostError } from './sandbox';
 

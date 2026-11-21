@@ -1,7 +1,23 @@
 import fs from 'fs';
 import path from 'path';
 
-const NativeSandbox = require('bindings')('sandbox').Sandbox;
+function loadNativeSandbox() {
+  const root = path.join(__dirname, '..', '..');
+  const candidates = [
+    path.join(root, 'build', 'Release', 'sandbox.node'),
+    path.join(root, 'build', 'Debug', 'sandbox.node'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return require(candidate).Sandbox;
+    }
+  }
+
+  throw new Error(`Could not locate native sandbox addon in: ${candidates.join(', ')}`);
+}
+
+const NativeSandbox = loadNativeSandbox();
 
 const RUNTIME = fs.readFileSync(path.join(__dirname, 'runtime.js')).toString();
 
